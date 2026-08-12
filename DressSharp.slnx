@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/DressSharp.FixtureTests/DressSharp.FixtureTests.csproj" />
+    <Project Path="tests/DressSharp.IntegrationTests/DressSharp.IntegrationTests.csproj" />
+    <Project Path="tests/DressSharp.TestSupport/DressSharp.TestSupport.csproj" />
+    <Project Path="tests/DressSharp.UnitTests/DressSharp.UnitTests.csproj" />
+  </Folder>
+  <Project Path="src/DressSharp/DressSharp.csproj" />
+</Solution>

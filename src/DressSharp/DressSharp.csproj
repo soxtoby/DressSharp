@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>DressSharp</AssemblyName>
+    <RootNamespace>DressSharp</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>dotnet-dress</ToolCommandName>
+    <PackageId>DressSharp</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Simon Oxtoby</Authors>
+    <Description>A syntax-only, explicitly configured C# formatter.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\packages</PackageOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DressSharp.UnitTests" />
+    <InternalsVisibleTo Include="DressSharp.IntegrationTests" />
+  </ItemGroup>
+</Project>
