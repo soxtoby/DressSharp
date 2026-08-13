@@ -7,14 +7,13 @@ sealed class TransformationPipeline(RuleCatalog catalog) : ITransformationPipeli
 {
     public TransformationResult Transform(SyntaxNode root, FormattingConfiguration configuration)
     {
-        var original = root;
         var current = root;
         try
         {
             foreach (var rule in catalog.Rules)
             {
-                if (!configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference) ||
-                    preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
+                if (!configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference) 
+                    || preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                     continue;
                 if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
                     throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.PreferenceKey}'.");
@@ -25,7 +24,7 @@ sealed class TransformationPipeline(RuleCatalog catalog) : ITransformationPipeli
         }
         catch (Exception exception)
         {
-            return new TransformationResult(original, exception);
+            return new TransformationResult(root, exception);
         }
     }
 

@@ -29,7 +29,7 @@ sealed class RuleContext
     internal bool IsUnsafe(TextSpan occurrence) => _malformedRegions.Any(region => Intersects(region, occurrence));
 
     static bool Intersects(TextSpan left, TextSpan right) =>
-        left.IntersectsWith(right) ||
-        (left.IsEmpty && right.Start <= left.Start && left.Start <= right.End) ||
-        (right.IsEmpty && left.Start <= right.Start && right.Start <= left.End);
+        left.IntersectsWith(right)
+        || (left.IsEmpty && right.Start <= left.Start && left.Start <= right.End)
+        || (right.IsEmpty && left.Start <= right.Start && right.Start <= left.End);
 }
