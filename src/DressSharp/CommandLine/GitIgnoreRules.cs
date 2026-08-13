@@ -1,10 +1,10 @@
-using System.Text.RegularExpressions;
+using GitignoreParserNet;
 
 namespace DressSharp.CommandLine;
 
 sealed class GitIgnoreRules
 {
-    readonly List<Rule> rules = [];
+    readonly List<RuleSet> _ruleSets = [];
 
     internal void AddFile(string directory, string selectionRoot)
     {
@@ -16,59 +16,44 @@ sealed class GitIgnoreRules
         if (basePath == ".")
             basePath = string.Empty;
 
-        foreach (var sourceLine in File.ReadLines(ignoreFile))
-        {
-            var line = sourceLine.TrimEnd();
-            if (line.Length == 0 || line[0] == '#')
-                continue;
-
-            var negated = line[0] == '!';
-            if (negated)
-                line = line[1..];
-            else if (line.StartsWith("\\!", StringComparison.Ordinal) || line.StartsWith("\\#", StringComparison.Ordinal))
-                line = line[1..];
-
-            var directoryOnly = line.EndsWith('/');
-            line = line.TrimEnd('/');
-            if (line.Length == 0)
-                continue;
-
-            rules.Add(new Rule(CreatePattern(basePath, line), negated, directoryOnly));
-        }
+        _ruleSets.Add(new RuleSet(basePath, new GitignoreParser(File.ReadAllText(ignoreFile), false)));
     }
 
     internal bool IsIgnored(string relativePath, bool directory)
     {
         var path = relativePath.Replace('\\', '/');
         var ignored = false;
-        foreach (var rule in rules)
+        foreach (var ruleSet in _ruleSets)
         {
-            if (rule.Pattern.IsMatch(path))
-                ignored = !rule.Negated;
+            if (!TryGetLocalPath(path, ruleSet.BasePath, out var localPath))
+                continue;
+
+            if (directory)
+                localPath += "/";
+            if (ruleSet.Parser.Inspects(localPath))
+                ignored = ruleSet.Parser.Denies(localPath);
         }
         return ignored;
     }
 
-    static Regex CreatePattern(string basePath, string pattern)
+    static bool TryGetLocalPath(string path, string basePath, out string localPath)
     {
-        var anchored = pattern.StartsWith('/');
-        pattern = pattern.TrimStart('/');
-        var hasSlash = pattern.Contains('/');
-        var prefix = Regex.Escape(basePath);
-        if (prefix.Length > 0)
-            prefix += "/";
+        if (basePath.Length == 0)
+        {
+            localPath = path;
+            return true;
+        }
 
-        var body = Regex.Escape(pattern)
-            .Replace(@"\*\*", ".*")
-            .Replace(@"\*", "[^/]*")
-            .Replace(@"\?", "[^/]");
-        var start = anchored || hasSlash
-            ? "^" + prefix
-            : prefix.Length == 0
-                ? @"^(?:.*/)?"
-                : "^" + prefix + @"(?:.*/)?";
-        return new Regex(start + body + @"(?:/.*)?$", RegexOptions.CultureInvariant);
+        var prefix = basePath + "/";
+        if (path.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            localPath = path[prefix.Length..];
+            return true;
+        }
+
+        localPath = string.Empty;
+        return false;
     }
 
-    sealed record Rule(Regex Pattern, bool Negated, bool DirectoryOnly);
+    sealed record RuleSet(string BasePath, GitignoreParser Parser);
 }

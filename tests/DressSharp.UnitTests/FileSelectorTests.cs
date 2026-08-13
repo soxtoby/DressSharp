@@ -61,6 +61,30 @@ public sealed class FileSelectorTests : IDisposable
         Assert.Equal(["keep.skip.cs", "nested/yes.cs"], selected.Select(file => file.DisplayPath));
     }
 
+    [Fact]
+    public async Task Gitignore_character_ranges_double_stars_and_escapes_are_honored()
+    {
+        Write(".gitignore", "logs/**/trace[0-9].cs\n\\#generated.cs\nspace\\ .cs\n");
+        Write("logs/trace1.cs", "class Ignored {}");
+        Write("logs/deep/trace2.cs", "class Ignored {}");
+        Write("logs/deep/traceX.cs", "class Included {}");
+        Write("#generated.cs", "class Ignored {}");
+        Write("space .cs", "class Ignored {}");
+
+        var selected = await Select();
+
+        Assert.Equal(["logs/deep/traceX.cs"], selected.Select(file => file.DisplayPath));
+    }
+
+    [Fact]
+    public async Task Negation_cannot_reinclude_a_file_below_an_ignored_directory()
+    {
+        Write(".gitignore", "ignored/\n!ignored/keep.cs\n");
+        Write("ignored/keep.cs", "class Ignored {}");
+
+        Assert.Empty(await Select());
+    }
+
     [Theory]
     [InlineData("-")]
     [InlineData("*.cs")]

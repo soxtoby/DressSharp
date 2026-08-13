@@ -4,18 +4,16 @@ sealed class FileSelector(string invocationDirectory)
 {
     static readonly HashSet<string> VcsDirectories = new(StringComparer.OrdinalIgnoreCase) { ".git", ".hg", ".svn" };
     static readonly string[] GeneratedSuffixes = [".g.cs", ".generated.cs", ".designer.cs"];
-    readonly string invocationDirectory = Path.GetFullPath(invocationDirectory);
+    readonly string _invocationDirectory = Path.GetFullPath(invocationDirectory);
 
-    internal async Task<IReadOnlyList<SelectedFile>> SelectAsync(
-        IReadOnlyList<string> operands,
-        CancellationToken cancellationToken = default)
+    internal async Task<IReadOnlyList<SelectedFile>> SelectAsync(IReadOnlyList<string> operands, CancellationToken cancellationToken = default)
     {
         var candidates = new Dictionary<string, string>(PathIdentityComparer());
-        foreach (var operand in operands.Count == 0 ? [invocationDirectory] : operands)
+        foreach (var operand in operands.Count == 0 ? [_invocationDirectory] : operands)
         {
             cancellationToken.ThrowIfCancellationRequested();
             RejectUnsupportedOperand(operand);
-            var fullPath = Path.GetFullPath(operand, invocationDirectory);
+            var fullPath = Path.GetFullPath(operand, _invocationDirectory);
             if (File.Exists(fullPath))
                 await AddExplicitFileAsync(fullPath, candidates, cancellationToken);
             else if (Directory.Exists(fullPath))
@@ -30,10 +28,7 @@ sealed class FileSelector(string invocationDirectory)
             .ToArray();
     }
 
-    async Task AddExplicitFileAsync(
-        string path,
-        Dictionary<string, string> candidates,
-        CancellationToken cancellationToken)
+    async Task AddExplicitFileAsync(string path, Dictionary<string, string> candidates, CancellationToken cancellationToken)
     {
         if (!IsCSharp(path))
             throw new FileSelectionException($"Unsupported file path: {Display(path)}");
@@ -41,10 +36,7 @@ sealed class FileSelector(string invocationDirectory)
             candidates.TryAdd(Path.GetFullPath(path), Display(path));
     }
 
-    async Task AddDirectoryAsync(
-        string root,
-        Dictionary<string, string> candidates,
-        CancellationToken cancellationToken)
+    async Task AddDirectoryAsync(string root, Dictionary<string, string> candidates, CancellationToken cancellationToken)
     {
         var rules = new GitIgnoreRules();
         await VisitAsync(root, root, rules, candidates, cancellationToken);
@@ -78,9 +70,11 @@ sealed class FileSelector(string invocationDirectory)
             {
                 if (VcsDirectories.Contains(Path.GetFileName(entry)) || attributes.HasFlag(FileAttributes.ReparsePoint))
                     continue;
+                if (rules.IsIgnored(relativePath, directory: true))
+                    continue;
                 await VisitAsync(entry, root, rules, candidates, cancellationToken);
             }
-            else if (IsCSharp(entry) && !rules.IsIgnored(relativePath, false) && !await IsGeneratedAsync(entry, cancellationToken))
+            else if (IsCSharp(entry) && !rules.IsIgnored(relativePath, directory: false) && !await IsGeneratedAsync(entry, cancellationToken))
             {
                 var fullPath = Path.GetFullPath(entry);
                 candidates.TryAdd(fullPath, Display(fullPath));
@@ -90,7 +84,7 @@ sealed class FileSelector(string invocationDirectory)
 
     string Display(string path)
     {
-        var relative = Path.GetRelativePath(invocationDirectory, path);
+        var relative = Path.GetRelativePath(_invocationDirectory, path);
         var display = relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || relative == ".."
             ? Path.GetFullPath(path)
             : relative;
