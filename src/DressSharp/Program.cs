@@ -1,15 +1,43 @@
 using System.CommandLine;
+using DressSharp.CommandLine;
 using DressSharp.Configuration;
 
 namespace DressSharp;
 
 static class Program
 {
-    public static Task<int> Main(string[] args) => CreateCommand().Parse(args).InvokeAsync();
+    public static async Task<int> Main(string[] args)
+    {
+        var invalidOption = FindInvalidOption(args);
+        if (invalidOption is not null)
+        {
+            await Console.Error.WriteLineAsync($"Unrecognized option: {invalidOption}");
+            return 2;
+        }
+        return await CreateCommand().Parse(args).InvokeAsync();
+    }
 
     internal static RootCommand CreateCommand()
     {
         var root = new RootCommand("Format C# using explicit syntax-only preferences.");
+        root.TreatUnmatchedTokensAsErrors = true;
+        var verbose = new Option<bool>("--verbose") { Description = "List changed files and report an empty selection.", Recursive = true };
+        var configuration = new Option<string?>("--configuration") { Description = "Use an explicit EditorConfig file.", Recursive = true };
+        configuration.Aliases.Add("--config");
+        root.Options.Add(verbose);
+        root.Options.Add(configuration);
+
+        var format = CreateFileCommand("format", "Format selected C# files.", CommandKind.Format, verbose, configuration);
+        var check = CreateFileCommand("check", "List selected C# files that require formatting.", CommandKind.Check, verbose, configuration);
+        root.Subcommands.Add(format);
+        root.Subcommands.Add(check);
+
+        var rootPaths = new Argument<string[]>("paths") { Arity = ArgumentArity.ZeroOrMore };
+        root.Arguments.Add(rootPaths);
+        root.SetAction(parseResult => RunSelectionAsync(
+            new CommandRequest(CommandKind.Format, parseResult.GetValue(rootPaths) ?? [], parseResult.GetValue(verbose), parseResult.GetValue(configuration)),
+            Environment.CurrentDirectory));
+
         var target = new Argument<string?>("target") { Arity = ArgumentArity.ZeroOrOne };
         var force = new Option<bool>("--force");
         var init = new Command("init", "Write the complete Familiar preset to a managed EditorConfig block.") { target, force };
@@ -33,5 +61,65 @@ static class Program
         });
         root.Subcommands.Add(init);
         return root;
+    }
+
+    static Command CreateFileCommand(
+        string name,
+        string description,
+        CommandKind kind,
+        Option<bool> verbose,
+        Option<string?> configuration)
+    {
+        var paths = new Argument<string[]>("paths") { Arity = ArgumentArity.ZeroOrMore };
+        var command = new Command(name, description) { paths };
+        command.TreatUnmatchedTokensAsErrors = true;
+        command.SetAction(parseResult => RunSelectionAsync(
+            new CommandRequest(kind, parseResult.GetValue(paths) ?? [], parseResult.GetValue(verbose), parseResult.GetValue(configuration)),
+            Environment.CurrentDirectory));
+        return command;
+    }
+
+    internal static async Task<int> RunSelectionAsync(CommandRequest request, string invocationDirectory)
+    {
+        try
+        {
+            _ = request.ConfigurationPath;
+            var selected = await new FileSelector(invocationDirectory).SelectAsync(request.Paths);
+            if (request.Verbose && selected.Count == 0)
+                await Console.Out.WriteLineAsync("No eligible C# files selected.");
+            return 0;
+        }
+        catch (FileSelectionException exception)
+        {
+            await Console.Error.WriteLineAsync(exception.Message);
+            return 2;
+        }
+    }
+
+    static string? FindInvalidOption(IReadOnlyList<string> args)
+    {
+        var afterDelimiter = false;
+        for (var index = 0; index < args.Count; index++)
+        {
+            var argument = args[index];
+            if (argument == "--")
+            {
+                afterDelimiter = true;
+                continue;
+            }
+            if (afterDelimiter || !argument.StartsWith("-", StringComparison.Ordinal) || argument == "-")
+                continue;
+            if (argument is "--help" or "-h" or "-?" or "--version" or "--verbose" or "--force")
+                continue;
+            if (argument is "--configuration" or "--config")
+            {
+                index++;
+                continue;
+            }
+            if (argument.StartsWith("--configuration=", StringComparison.Ordinal) || argument.StartsWith("--config=", StringComparison.Ordinal))
+                continue;
+            return argument;
+        }
+        return null;
     }
 }
