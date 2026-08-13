@@ -61,7 +61,7 @@ public sealed class SmokeTests
             var exitCode = await Program.CreateCommand().Parse(["init", target]).InvokeAsync(
                 cancellationToken: TestContext.Current.CancellationToken);
 
-            Assert.Equal(1, exitCode);
+            Assert.Equal(2, exitCode);
             Assert.Equal(original, await File.ReadAllTextAsync(target, TestContext.Current.CancellationToken));
         }
         finally

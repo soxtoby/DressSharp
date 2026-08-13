@@ -3,7 +3,7 @@ using DressSharp.Configuration;
 
 namespace DressSharp;
 
-internal static class Program
+static class Program
 {
     public static Task<int> Main(string[] args) => CreateCommand().Parse(args).InvokeAsync();
 
@@ -21,14 +21,14 @@ internal static class Program
                     parseResult.GetValue(target), parseResult.GetValue(force), Environment.CurrentDirectory, cancellationToken);
                 foreach (var warning in result.Warnings)
                 {
-                    Console.Error.WriteLine($"warning: {warning}");
+                    await Console.Error.WriteLineAsync($"warning: {warning}");
                 }
                 return 0;
             }
             catch (ConfigurationException exception)
             {
-                Console.Error.WriteLine(exception.Message);
-                return 1;
+                await Console.Error.WriteLineAsync(exception.Message);
+                return 2;
             }
         });
         root.Subcommands.Add(init);

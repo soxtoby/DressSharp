@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace DressSharp.Configuration;
 
-internal static partial class EditorConfigSyntaxValidator
+static partial class EditorConfigSyntaxValidator
 {
     internal static void Validate(string path, string text)
     {
@@ -24,14 +24,16 @@ internal static partial class EditorConfigSyntaxValidator
 
             var key = property.Groups[1].Value;
             var value = property.Groups[2].Value;
-            if (key.Equals("root", StringComparison.OrdinalIgnoreCase) &&
-                !value.Equals("true", StringComparison.OrdinalIgnoreCase) &&
-                !value.Equals("false", StringComparison.OrdinalIgnoreCase))
+            if (key.Equals("root", StringComparison.OrdinalIgnoreCase)
+                && !value.Equals("true", StringComparison.OrdinalIgnoreCase) 
+                && !value.Equals("false", StringComparison.OrdinalIgnoreCase))
+            {
                 throw Error(path, index + 1, "root must be true or false");
+            }
         }
     }
 
-    private static ConfigurationException Error(string path, int line, string message) => new($"{path}({line}): {message}.");
+    static ConfigurationException Error(string path, int line, string message) => new($"{path}({line}): {message}.");
 
     [GeneratedRegex(@"^\s*[#;]")]
     private static partial Regex CommentPattern();

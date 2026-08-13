@@ -2,9 +2,9 @@ using System.Text;
 
 namespace DressSharp.Configuration;
 
-internal sealed record InitializationResult(string Path, bool Changed, IReadOnlyList<string> Warnings);
+sealed record InitializationResult(string Path, bool Changed, IReadOnlyList<string> Warnings);
 
-internal static class EditorConfigInitializer
+static class EditorConfigInitializer
 {
     internal const string BeginMarker = "# DressSharp Begin";
     internal const string EndMarker = "# DressSharp End";
@@ -47,7 +47,7 @@ internal static class EditorConfigInitializer
         return string.Join(newline, lines) + newline;
     }
 
-    private static string ResolveTarget(string? target, string invocationDirectory)
+    static string ResolveTarget(string? target, string invocationDirectory)
     {
         if (string.IsNullOrWhiteSpace(target))
             return Path.Combine(Path.GetFullPath(invocationDirectory), ".editorconfig");
@@ -60,20 +60,25 @@ internal static class EditorConfigInitializer
         return trailingSeparator ? Path.Combine(full, ".editorconfig") : full;
     }
 
-    private static List<string> SplitLines(string text) => text.Length == 0
+    static List<string> SplitLines(string text) => text.Length == 0
         ? []
         : text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd('\n').Split('\n').ToList();
 
-    private static string DetectNewline(string text) => text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-    private static List<int> FindMarkers(List<string> lines, string marker) => lines.Select((line, index) => (line, index)).Where(x => x.line == marker).Select(x => x.index).ToList();
+    static string DetectNewline(string text) => text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+    static List<int> FindMarkers(List<string> lines, string marker) => lines.Select((line, index) => (line, index)).Where(x => x.line == marker).Select(x => x.index).ToList();
 
-    private static void ValidateMarkers(string path, List<int> begin, List<int> end)
+    static void ValidateMarkers(string path, List<int> begin, List<int> end)
     {
-        if (begin.Count > 1 || end.Count > 1 || begin.Count != end.Count || (begin.Count == 1 && begin[0] >= end[0]))
+        if (begin.Count > 1
+            || end.Count > 1
+            || begin.Count != end.Count
+            || (begin.Count == 1 && begin[0] >= end[0]))
+        {
             throw new ConfigurationException($"{path}: malformed or duplicate DressSharp managed markers.");
+        }
     }
 
-    private static List<SourceLine> RemoveManagedBlock(List<string> lines, List<int> begin, List<int> end)
+    static List<SourceLine> RemoveManagedBlock(List<string> lines, List<int> begin, List<int> end)
     {
         var numberedLines = lines.Select((text, index) => new SourceLine(text, index + 1)).ToList();
         if (begin.Count == 0)
@@ -83,26 +88,30 @@ internal static class EditorConfigInitializer
         {
             result.RemoveAt(result.Count - 1);
         }
+
         return result;
     }
 
-    private static List<string> FindConflicts(string path, List<SourceLine> lines)
+    static List<string> FindConflicts(string path, List<SourceLine> lines)
     {
         var conflicts = new List<string>();
         foreach (var sourceLine in lines)
         {
             var line = sourceLine.Text.Trim();
-            if (line.Length == 0 || line[0] is '#' or ';' or '[')
-                continue;
-            var separator = line.IndexOfAny(['=', ':']);
-            if (separator <= 0)
-                continue;
-            var key = line[..separator].Trim();
-            if (PreferenceCatalog.Familiar.ContainsKey(key))
-                conflicts.Add($"{path}({sourceLine.Number}): {key}");
+            if (line.Length != 0 && line[0] is not ('#' or ';' or '['))
+            {
+                var separator = line.IndexOfAny(['=', ':']);
+                if (separator > 0)
+                {
+                    var key = line[..separator].Trim();
+                    if (PreferenceCatalog.Familiar.ContainsKey(key))
+                        conflicts.Add($"{path}({sourceLine.Number}): {key}");
+                }
+            }
         }
+
         return conflicts;
     }
 
-    private sealed record SourceLine(string Text, int Number);
+    sealed record SourceLine(string Text, int Number);
 }

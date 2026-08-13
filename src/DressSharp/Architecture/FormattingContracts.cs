@@ -3,35 +3,35 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DressSharp.Architecture;
 
-internal interface IFileSelector
+interface IFileSelector
 {
     ValueTask<IReadOnlyList<string>> SelectAsync(
         IReadOnlyList<string> paths,
         CancellationToken cancellationToken);
 }
 
-internal interface IConfigurationResolver
+interface IConfigurationResolver
 {
     ValueTask<FormattingConfiguration> ResolveAsync(
         string path,
         CancellationToken cancellationToken);
 }
 
-internal interface IParseContextResolver
+interface IParseContextResolver
 {
     ValueTask<CSharpParseOptions> ResolveAsync(
         string path,
         CancellationToken cancellationToken);
 }
 
-internal interface ITransformationPipeline
+interface ITransformationPipeline
 {
     SyntaxNode Transform(SyntaxNode root, FormattingConfiguration configuration);
 }
 
-internal interface IFilePersistence
+interface IFilePersistence
 {
     ValueTask WriteAsync(string path, ReadOnlyMemory<byte> content, CancellationToken cancellationToken);
 }
 
-internal sealed record FormattingConfiguration(IReadOnlyDictionary<string, string> Preferences);
+sealed record FormattingConfiguration(IReadOnlyDictionary<string, string> Preferences);

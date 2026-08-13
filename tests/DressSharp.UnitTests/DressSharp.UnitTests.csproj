@@ -10,4 +10,7 @@
     <ProjectReference Include="../../src/DressSharp/DressSharp.csproj" />
     <ProjectReference Include="../DressSharp.TestSupport/DressSharp.TestSupport.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\Familiar.editorconfig" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

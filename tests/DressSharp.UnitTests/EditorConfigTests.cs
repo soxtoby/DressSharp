@@ -5,7 +5,7 @@ namespace DressSharp.UnitTests;
 
 public sealed class EditorConfigTests : IDisposable
 {
-    private readonly string _directory = Path.Combine(Path.GetTempPath(), "DressSharp.Tests", Guid.NewGuid().ToString("N"));
+    readonly string _directory = Path.Combine(Path.GetTempPath(), "DressSharp.Tests", Guid.NewGuid().ToString("N"));
 
     public EditorConfigTests() => Directory.CreateDirectory(_directory);
 
@@ -78,6 +78,44 @@ public sealed class EditorConfigTests : IDisposable
             await new EditorConfigResolver().ResolveAsync(Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken));
     }
 
+    [Theory]
+    [InlineData("indent_size", "0")]
+    [InlineData("max_line_length", "0")]
+    [InlineData("dress_using_kind_order", "ordinary,ordinary,alias")]
+    [InlineData("csharp_new_line_before_open_brace", "methods,unknown")]
+    [InlineData("csharp_space_between_parentheses", "expressions,expressions")]
+    [InlineData("csharp_preferred_modifier_order", "public,private")]
+    public async Task Resolver_rejects_invalid_catalog_values(string key, string value)
+    {
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            $"[*.cs]\n{key} = {value}\n",
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<ConfigurationException>(async () =>
+            await new EditorConfigResolver().ResolveAsync(
+                Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("max_line_length", "off")]
+    [InlineData("dress_blank_lines_between_members", "0")]
+    [InlineData("dress_using_kind_order", "alias,ordinary,static")]
+    [InlineData("csharp_new_line_before_open_brace", "methods, properties")]
+    [InlineData("csharp_space_between_parentheses", "expressions, type_casts")]
+    public async Task Resolver_accepts_catalog_alternatives(string key, string value)
+    {
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            $"[*.cs]\n{key} = {value}\n",
+            TestContext.Current.CancellationToken);
+
+        var result = await new EditorConfigResolver().ResolveAsync(
+            Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(value, result.Preferences[key]);
+    }
+
     [Fact]
     public async Task Resolver_rejects_malformed_configuration_in_its_chain()
     {
@@ -116,6 +154,16 @@ public sealed class EditorConfigTests : IDisposable
         {
             Assert.Contains($"{pair.Key} = {pair.Value}\n", text);
         }
+    }
+
+    [Fact]
+    public async Task Familiar_block_matches_the_canonical_snapshot()
+    {
+        var expected = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", "Familiar.editorconfig"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, EditorConfigInitializer.BuildManagedBlock());
     }
 
     [Fact]

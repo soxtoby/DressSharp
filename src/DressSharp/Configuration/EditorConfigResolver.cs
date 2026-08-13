@@ -3,9 +3,9 @@ using EditorConfig.Core;
 
 namespace DressSharp.Configuration;
 
-internal sealed class EditorConfigResolver : IConfigurationResolver
+sealed class EditorConfigResolver : IConfigurationResolver
 {
-    private readonly EditorConfigParser _parser = new();
+    readonly EditorConfigParser _parser = new();
 
     public async ValueTask<FormattingConfiguration> ResolveAsync(string path, CancellationToken cancellationToken)
     {
@@ -42,16 +42,14 @@ internal sealed class EditorConfigResolver : IConfigurationResolver
     }
 }
 
-internal static class ConfigurationPreflight
+static class ConfigurationPreflight
 {
     internal static async Task<IReadOnlyDictionary<string, FormattingConfiguration>> ResolveAllAsync(
         IEnumerable<string> paths, IConfigurationResolver resolver, CancellationToken cancellationToken)
     {
         var result = new Dictionary<string, FormattingConfiguration>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in paths)
-        {
             result[path] = await resolver.ResolveAsync(path, cancellationToken);
-        }
         return result;
     }
 }
