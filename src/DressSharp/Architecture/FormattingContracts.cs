@@ -27,7 +27,7 @@ interface IParseContextResolver
 
 interface ITransformationPipeline
 {
-    SyntaxNode Transform(SyntaxNode root, FormattingConfiguration configuration);
+    TransformationResult Transform(SyntaxNode root, FormattingConfiguration configuration);
 }
 
 interface IFilePersistence
@@ -46,4 +46,9 @@ sealed record FormattingConfiguration
     }
 
     internal ImmutableDictionary<string, string> Preferences { get; }
+}
+
+sealed record TransformationResult(SyntaxNode Root, Exception? Failure = null)
+{
+    internal bool Succeeded => Failure is null;
 }
