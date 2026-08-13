@@ -47,7 +47,18 @@ sealed class RuleCatalog
             new InitializerIndentationRule("dress_collection_initializer_indentation", InitializerKind.Collection, 350),
             new InitializerIndentationRule("dress_array_initializer_indentation", InitializerKind.Array, 360),
             new InitializerIndentationRule("dress_with_initializer_indentation", InitializerKind.With, 370),
-            new InitializerIndentationRule("dress_collection_expression_indentation", InitializerKind.CollectionExpression, 380)
+            new InitializerIndentationRule("dress_collection_expression_indentation", InitializerKind.CollectionExpression, 380),
+            new ConstructLayoutRule("dress_arguments_layout", ConstructLayoutKind.Arguments, 400),
+            new ConstructLayoutRule("dress_parameters_layout", ConstructLayoutKind.Parameters, 410),
+            new ConstructLayoutRule("dress_initializers_layout", ConstructLayoutKind.Initializers, 420),
+            new ConstructLayoutRule("dress_collection_expressions_layout", ConstructLayoutKind.CollectionExpressions, 430),
+            new ConstructLayoutRule("dress_base_type_lists_layout", ConstructLayoutKind.BaseTypeLists, 440),
+            new ConstructLayoutRule("dress_constraint_clauses_layout", ConstructLayoutKind.ConstraintClauses, 450),
+            new ConstructLayoutRule("dress_member_access_chains_layout", ConstructLayoutKind.MemberAccessChains, 460),
+            new ConstructLayoutRule("dress_binary_expressions_layout", ConstructLayoutKind.BinaryExpressions, 470),
+            new ConstructLayoutRule("dress_conditional_expressions_layout", ConstructLayoutKind.ConditionalExpressions, 480),
+            new ConstructLayoutRule("dress_query_clauses_layout", ConstructLayoutKind.QueryClauses, 490),
+            new ConstructLayoutRule("dress_attributes_layout", ConstructLayoutKind.Attributes, 500)
         ]);
 
     static void Validate(ImmutableArray<IFormattingRule> rules)

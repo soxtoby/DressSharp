@@ -18,7 +18,22 @@ sealed class TransformationPipeline(RuleCatalog catalog) : ITransformationPipeli
                 if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
                     throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.PreferenceKey}'.");
 
-                current = rule.Transform(current, preference, new RuleContext(current));
+                var maximum = configuration.Preferences.TryGetValue("max_line_length", out var configuredMaximum)
+                    && int.TryParse(configuredMaximum, out var parsedMaximum)
+                        ? parsedMaximum
+                        : int.MaxValue;
+                var tabWidth = configuration.Preferences.TryGetValue("tab_width", out var configuredTabWidth)
+                    && int.TryParse(configuredTabWidth, out var parsedTabWidth)
+                        ? parsedTabWidth
+                        : 4;
+                var usesTabs = configuration.Preferences.TryGetValue("indent_style", out var indentStyle)
+                    && indentStyle.Equals("tab", StringComparison.OrdinalIgnoreCase);
+                var indentSize = configuration.Preferences.TryGetValue("indent_size", out var configuredIndentSize)
+                    && int.TryParse(configuredIndentSize, out var parsedIndentSize)
+                        ? parsedIndentSize
+                        : 4;
+                var indentUnit = usesTabs ? "\t" : new string(' ', indentSize);
+                current = rule.Transform(current, preference, new RuleContext(current, maximum, tabWidth, indentUnit));
             }
             return new TransformationResult(current);
         }
