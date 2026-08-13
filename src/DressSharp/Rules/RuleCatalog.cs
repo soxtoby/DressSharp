@@ -28,7 +28,26 @@ sealed class RuleCatalog
             new MemberBodyRule("dress_accessor_body", MemberBodyKind.Accessor, 150),
             new LambdaBodyRule(160),
             new NamespaceStyleRule(170),
-            new ConditionalBracesRule(180)
+            new ConditionalBracesRule(180),
+            new BlankLineRule("dress_blank_lines_around_namespaces", BlankLineKind.AroundNamespaces, 200),
+            new BlankLineRule("dress_blank_lines_around_types", BlankLineKind.AroundTypes, 210),
+            new BlankLineRule("dress_blank_lines_between_members", BlankLineKind.BetweenMembers, 220),
+            new BlankLineRule("dress_blank_lines_between_using_groups", BlankLineKind.BetweenUsingGroups, 230),
+            new BlankLineRule("dress_blank_lines_between_member_categories", BlankLineKind.BetweenMemberCategories, 240),
+            new BlankLineRule("dress_max_consecutive_blank_lines", BlankLineKind.Maximum, 250),
+            new CommentRule("dress_line_comment_spacing", CommentKind.LineSpacing, ["none", "single"], 260),
+            new CommentRule("dress_block_comment_spacing", CommentKind.BlockSpacing, ["none", "single"], 270),
+            new CommentRule("dress_attached_comment_placement", CommentKind.AttachedPlacement, ["same_line", "own_line", "auto"], 280),
+            new CommentRule("dress_xml_comment_placement", CommentKind.XmlPlacement, ["attached", "separated"], 290),
+            new CommentRule("dress_xml_element_layout", CommentKind.XmlElementLayout, ["single_line", "multi_line"], 300),
+            new UsingOrderRule("dress_global_using_order", 310),
+            new UsingOrderRule("dress_using_kind_order", 320),
+            new ModifierOrderRule(330),
+            new InitializerIndentationRule("dress_object_initializer_indentation", InitializerKind.Object, 340),
+            new InitializerIndentationRule("dress_collection_initializer_indentation", InitializerKind.Collection, 350),
+            new InitializerIndentationRule("dress_array_initializer_indentation", InitializerKind.Array, 360),
+            new InitializerIndentationRule("dress_with_initializer_indentation", InitializerKind.With, 370),
+            new InitializerIndentationRule("dress_collection_expression_indentation", InitializerKind.CollectionExpression, 380)
         ]);
 
     static void Validate(ImmutableArray<IFormattingRule> rules)
