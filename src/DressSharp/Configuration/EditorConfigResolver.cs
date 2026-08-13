@@ -7,7 +7,7 @@ internal sealed class EditorConfigResolver : IConfigurationResolver
 {
     private readonly EditorConfigParser _parser = new();
 
-    public ValueTask<FormattingConfiguration> ResolveAsync(string path, CancellationToken cancellationToken)
+    public async ValueTask<FormattingConfiguration> ResolveAsync(string path, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var fullPath = Path.GetFullPath(path);
@@ -15,6 +15,13 @@ internal sealed class EditorConfigResolver : IConfigurationResolver
         try
         {
             resolved = _parser.Parse(fullPath);
+            foreach (var config in resolved.EditorConfigFiles)
+            {
+                var configPath = Path.Combine(config.Directory, config.FileName);
+                EditorConfigSyntaxValidator.Validate(
+                    configPath,
+                    await File.ReadAllTextAsync(configPath, cancellationToken));
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -31,7 +38,7 @@ internal sealed class EditorConfigResolver : IConfigurationResolver
             if (!value.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 preferences[key] = PreferenceCatalog.Normalize(key, value);
         }
-        return ValueTask.FromResult(new FormattingConfiguration(preferences));
+        return new FormattingConfiguration(preferences);
     }
 }
 

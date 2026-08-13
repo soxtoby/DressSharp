@@ -12,15 +12,34 @@ public sealed class EditorConfigTests : IDisposable
     [Fact]
     public async Task Resolver_applies_traversal_sections_precedence_and_unset()
     {
-        await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "root = true\n[*.cs]\ndress_max_line_length = 100\nindent_style = space\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "root = true\n[*.cs]\nmax_line_length = 100\nindent_style = space\n", TestContext.Current.CancellationToken);
         var child = Directory.CreateDirectory(Path.Combine(_directory, "src")).FullName;
-        await File.WriteAllTextAsync(Path.Combine(child, ".editorconfig"), "[*.cs]\ndress_max_line_length = 180\nindent_style = unset\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(child, ".editorconfig"), "[*.cs]\nmax_line_length = 180\nindent_style = unset\n", TestContext.Current.CancellationToken);
         var source = Path.Combine(child, "Example.cs");
 
         var result = await new EditorConfigResolver().ResolveAsync(source, TestContext.Current.CancellationToken);
 
-        Assert.Equal("180", result.Preferences["dress_max_line_length"]);
+        Assert.Equal("180", result.Preferences["max_line_length"]);
         Assert.False(result.Preferences.ContainsKey("indent_style"));
+    }
+
+    [Fact]
+    public async Task Resolver_stops_at_root()
+    {
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            "[*.cs]\nmax_line_length = 90\n",
+            TestContext.Current.CancellationToken);
+        var root = Directory.CreateDirectory(Path.Combine(_directory, "root")).FullName;
+        await File.WriteAllTextAsync(
+            Path.Combine(root, ".editorconfig"),
+            "root = true\n[*.cs]\nindent_style = space\n",
+            TestContext.Current.CancellationToken);
+
+        var result = await new EditorConfigResolver().ResolveAsync(
+            Path.Combine(root, "Example.cs"), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Preferences.ContainsKey("max_line_length"));
     }
 
     [Fact]
@@ -39,7 +58,7 @@ public sealed class EditorConfigTests : IDisposable
     {
         await File.WriteAllTextAsync(
             Path.Combine(_directory, ".editorconfig"),
-            "[{src,tests}/File{1..3}.cs]\ndress_max_line_length = 180\n",
+            "[{src,tests}/File{1..3}.cs]\nmax_line_length = 180\n",
             TestContext.Current.CancellationToken);
 
         var matching = await new EditorConfigResolver().ResolveAsync(
@@ -47,8 +66,8 @@ public sealed class EditorConfigTests : IDisposable
         var excluded = await new EditorConfigResolver().ResolveAsync(
             Path.Combine(_directory, "src", "File4.cs"), TestContext.Current.CancellationToken);
 
-        Assert.Equal("180", matching.Preferences["dress_max_line_length"]);
-        Assert.False(excluded.Preferences.ContainsKey("dress_max_line_length"));
+        Assert.Equal("180", matching.Preferences["max_line_length"]);
+        Assert.False(excluded.Preferences.ContainsKey("max_line_length"));
     }
 
     [Fact]
@@ -57,6 +76,19 @@ public sealed class EditorConfigTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[*.cs]\nindent_style = invalid\n", TestContext.Current.CancellationToken);
         await Assert.ThrowsAsync<ConfigurationException>(async () =>
             await new EditorConfigResolver().ResolveAsync(Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Resolver_rejects_malformed_configuration_in_its_chain()
+    {
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            "[*.cs]\nbad key = value\n",
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<ConfigurationException>(async () =>
+            await new EditorConfigResolver().ResolveAsync(
+                Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -76,8 +108,7 @@ public sealed class EditorConfigTests : IDisposable
         var text = await File.ReadAllTextAsync(result.Path, TestContext.Current.CancellationToken);
 
         Assert.True(result.Changed);
-        Assert.StartsWith("# DressSharp Begin\n[*.cs]\n", text);
-        Assert.EndsWith("# DressSharp End\n", text);
+        Assert.Equal(EditorConfigInitializer.BuildManagedBlock(), text);
         Assert.DoesNotContain("root = true", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dress_conditional_braces = balanced\n", text);
         Assert.DoesNotContain("dress_control_flow_braces", text);
@@ -118,11 +149,57 @@ public sealed class EditorConfigTests : IDisposable
     }
 
     [Fact]
+    public async Task Init_reports_original_conflict_lines_after_managed_block()
+    {
+        var path = Path.Combine(_directory, ".editorconfig");
+        var text = $"root = true\n{EditorConfigInitializer.BeginMarker}\n[*.cs]\nindent_size = 4\n{EditorConfigInitializer.EndMarker}\n[generated.cs]\nindent_size = 2\n";
+        await File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<ConfigurationException>(() =>
+            EditorConfigInitializer.InitializeAsync(path, false, _directory, TestContext.Current.CancellationToken));
+
+        Assert.Contains($"{path}(7): indent_size", exception.Message);
+        Assert.Equal(text, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Force_never_bypasses_bad_markers()
     {
         var path = Path.Combine(_directory, ".editorconfig");
         await File.WriteAllTextAsync(path, $"{EditorConfigInitializer.BeginMarker}\n{EditorConfigInitializer.BeginMarker}\n{EditorConfigInitializer.EndMarker}\n", TestContext.Current.CancellationToken);
         await Assert.ThrowsAsync<ConfigurationException>(() => EditorConfigInitializer.InitializeAsync(path, true, _directory, TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("# DressSharp Begin\n")]
+    [InlineData("# DressSharp End\n")]
+    [InlineData("# DressSharp End\n# DressSharp Begin\n")]
+    [InlineData("# DressSharp Begin\n# DressSharp End\n# DressSharp End\n")]
+    public async Task Init_rejects_every_malformed_marker_shape(string text)
+    {
+        var path = Path.Combine(_directory, ".editorconfig");
+        await File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<ConfigurationException>(() =>
+            EditorConfigInitializer.InitializeAsync(path, true, _directory, TestContext.Current.CancellationToken));
+
+        Assert.Equal(text, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("[*.cs\nindent_size = 4\n")]
+    [InlineData("[*.cs]\nmissing value\n")]
+    [InlineData("[*.cs]\nbad key = value\n")]
+    [InlineData("root = perhaps\n")]
+    public async Task Init_rejects_malformed_configuration_even_when_forced(string text)
+    {
+        var path = Path.Combine(_directory, ".editorconfig");
+        await File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<ConfigurationException>(() =>
+            EditorConfigInitializer.InitializeAsync(path, true, _directory, TestContext.Current.CancellationToken));
+
+        Assert.Equal(text, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -132,6 +209,25 @@ public sealed class EditorConfigTests : IDisposable
         var result = await EditorConfigInitializer.InitializeAsync(target, false, _directory, TestContext.Current.CancellationToken);
         Assert.Equal(Path.Combine(_directory, "nested", ".editorconfig"), result.Path);
         Assert.True(File.Exists(result.Path));
+    }
+
+    [Fact]
+    public async Task Existing_directory_target_gets_editorconfig()
+    {
+        var target = Directory.CreateDirectory(Path.Combine(_directory, "existing")).FullName;
+        var result = await EditorConfigInitializer.InitializeAsync(target, false, _directory, TestContext.Current.CancellationToken);
+
+        Assert.Equal(Path.Combine(target, ".editorconfig"), result.Path);
+    }
+
+    [Fact]
+    public async Task Nonexistent_file_target_creates_parents()
+    {
+        var target = Path.Combine(_directory, "nested", "custom.editorconfig");
+        var result = await EditorConfigInitializer.InitializeAsync(target, false, _directory, TestContext.Current.CancellationToken);
+
+        Assert.Equal(target, result.Path);
+        Assert.True(File.Exists(target));
     }
 
     public void Dispose() => Directory.Delete(_directory, true);

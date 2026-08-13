@@ -28,7 +28,7 @@ internal static class EditorConfigInitializer
         if (conflicts.Count > 0 && !force)
             throw new ConfigurationException("DressSharp preference conflicts:" + Environment.NewLine + string.Join(Environment.NewLine, conflicts));
 
-        var prefix = string.Join(newline, outside).TrimEnd('\r', '\n');
+        var prefix = string.Join(newline, outside.Select(line => line.Text)).TrimEnd('\r', '\n');
         var block = BuildManagedBlock(newline);
         var output = prefix.Length == 0 ? block : prefix + newline + newline + block;
         if (original == output)
@@ -73,24 +73,25 @@ internal static class EditorConfigInitializer
             throw new ConfigurationException($"{path}: malformed or duplicate DressSharp managed markers.");
     }
 
-    private static List<string> RemoveManagedBlock(List<string> lines, List<int> begin, List<int> end)
+    private static List<SourceLine> RemoveManagedBlock(List<string> lines, List<int> begin, List<int> end)
     {
+        var numberedLines = lines.Select((text, index) => new SourceLine(text, index + 1)).ToList();
         if (begin.Count == 0)
-            return lines;
-        var result = lines.Take(begin[0]).Concat(lines.Skip(end[0] + 1)).ToList();
-        while (result.Count > 0 && string.IsNullOrWhiteSpace(result[^1]))
+            return numberedLines;
+        var result = numberedLines.Take(begin[0]).Concat(numberedLines.Skip(end[0] + 1)).ToList();
+        while (result.Count > 0 && string.IsNullOrWhiteSpace(result[^1].Text))
         {
             result.RemoveAt(result.Count - 1);
         }
         return result;
     }
 
-    private static List<string> FindConflicts(string path, List<string> lines)
+    private static List<string> FindConflicts(string path, List<SourceLine> lines)
     {
         var conflicts = new List<string>();
-        for (var index = 0; index < lines.Count; index++)
+        foreach (var sourceLine in lines)
         {
-            var line = lines[index].Trim();
+            var line = sourceLine.Text.Trim();
             if (line.Length == 0 || line[0] is '#' or ';' or '[')
                 continue;
             var separator = line.IndexOfAny(['=', ':']);
@@ -98,8 +99,10 @@ internal static class EditorConfigInitializer
                 continue;
             var key = line[..separator].Trim();
             if (PreferenceCatalog.Familiar.ContainsKey(key))
-                conflicts.Add($"{path}({index + 1}): {key}");
+                conflicts.Add($"{path}({sourceLine.Number}): {key}");
         }
         return conflicts;
     }
+
+    private sealed record SourceLine(string Text, int Number);
 }

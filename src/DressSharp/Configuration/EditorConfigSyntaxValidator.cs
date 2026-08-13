@@ -9,22 +9,21 @@ internal static partial class EditorConfigSyntaxValidator
         var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
         for (var index = 0; index < lines.Length; index++)
         {
-            var line = lines[index].Trim();
-            if (line.Length == 0 || line[0] is '#' or ';')
+            var line = lines[index];
+            if (string.IsNullOrWhiteSpace(line) || CommentPattern().IsMatch(line))
                 continue;
-            if (line.StartsWith('['))
+            if (SectionPattern().IsMatch(line))
+                continue;
+
+            var property = PropertyPattern().Match(line);
+            if (!property.Success)
             {
-                if (!line.EndsWith(']') || line.Length == 2)
-                    throw Error(path, index + 1, "malformed section header");
-                continue;
+                var message = line.TrimStart().StartsWith('[') ? "malformed section header" : "malformed key/value assignment";
+                throw Error(path, index + 1, message);
             }
 
-            var separator = line.IndexOfAny(['=', ':']);
-            if (separator <= 0 || !KeyPattern().IsMatch(line[..separator].Trim()) || line[(separator + 1)..].Trim().Length == 0)
-                throw Error(path, index + 1, "malformed key/value assignment");
-
-            var key = line[..separator].Trim();
-            var value = line[(separator + 1)..].Trim();
+            var key = property.Groups[1].Value;
+            var value = property.Groups[2].Value;
             if (key.Equals("root", StringComparison.OrdinalIgnoreCase) &&
                 !value.Equals("true", StringComparison.OrdinalIgnoreCase) &&
                 !value.Equals("false", StringComparison.OrdinalIgnoreCase))
@@ -34,6 +33,12 @@ internal static partial class EditorConfigSyntaxValidator
 
     private static ConfigurationException Error(string path, int line, string message) => new($"{path}({line}): {message}.");
 
-    [GeneratedRegex("^[A-Za-z0-9_.-]+$")]
-    private static partial Regex KeyPattern();
+    [GeneratedRegex(@"^\s*[#;]")]
+    private static partial Regex CommentPattern();
+
+    [GeneratedRegex(@"^\s*\[(([^#;]|\\#|\\;)+)\]\s*([#;].*)?$")]
+    private static partial Regex SectionPattern();
+
+    [GeneratedRegex(@"^\s*([\w.\-_]+)\s*[=:]\s*(.*?)\s*([#;].*)?$")]
+    private static partial Regex PropertyPattern();
 }
