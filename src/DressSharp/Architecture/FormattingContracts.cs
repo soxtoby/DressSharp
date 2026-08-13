@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -34,4 +35,15 @@ interface IFilePersistence
     ValueTask WriteAsync(string path, ReadOnlyMemory<byte> content, CancellationToken cancellationToken);
 }
 
-sealed record FormattingConfiguration(IReadOnlyDictionary<string, string> Preferences);
+sealed record FormattingConfiguration
+{
+    internal FormattingConfiguration(IEnumerable<KeyValuePair<string, string>> preferences)
+    {
+        Preferences = preferences.ToImmutableDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    internal ImmutableDictionary<string, string> Preferences { get; }
+}
