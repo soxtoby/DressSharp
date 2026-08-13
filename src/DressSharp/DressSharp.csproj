@@ -13,6 +13,7 @@
     <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\packages</PackageOutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="editorconfig" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>
