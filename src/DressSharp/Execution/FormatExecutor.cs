@@ -5,6 +5,7 @@ using DressSharp.IO;
 using DressSharp.Parsing;
 using DressSharp.Rules;
 using Microsoft.CodeAnalysis.CSharp;
+using System.Diagnostics;
 
 namespace DressSharp.Execution;
 
@@ -16,18 +17,29 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
 
     internal async Task<int> RunAsync(CommandRequest request, IReadOnlyList<SelectedFile> selected, CancellationToken cancellationToken = default)
     {
+        var timing = new BenchmarkTiming();
+        var commandStart = Stopwatch.GetTimestamp();
         if (selected.Count == 0)
             return 0;
 
         var paths = selected.Select(file => file.FullPath).ToArray();
+        var stageStart = Stopwatch.GetTimestamp();
         var configurations = await ConfigurationPreflight.ResolveAllAsync(paths, new EditorConfigResolver(), cancellationToken);
+        timing.EditorConfig = Stopwatch.GetElapsedTime(stageStart);
+        stageStart = Stopwatch.GetTimestamp();
         var contexts = await new ParseContextResolver(_invocationDirectory).ResolveAsync(paths, request.BuildConfiguration, cancellationToken);
+        timing.MsBuild = Stopwatch.GetElapsedTime(stageStart);
 
         var prepared = new PreparedFile?[selected.Count];
         var failed = false;
+        var parallelOptions = new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = BenchmarkDiagnostics.WorkerCount
+            };
         await Parallel.ForEachAsync(
             Enumerable.Range(0, selected.Count),
-            cancellationToken,
+            parallelOptions,
             async (index, token) =>
                 {
                     var file = selected[index];
@@ -36,13 +48,22 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
                         return;
                     try
                     {
+                        var readStart = Stopwatch.GetTimestamp();
                         var document = await SourceDocument.ReadAsync(file.FullPath, token);
+                        timing.AddRead(Stopwatch.GetElapsedTime(readStart));
+                        var parseStart = Stopwatch.GetTimestamp();
                         var tree = CSharpSyntaxTree.ParseText(document.Text, context.Options!, file.FullPath, cancellationToken: token);
+                        var root = await tree.GetRootAsync(token);
+                        timing.AddParse(Stopwatch.GetElapsedTime(parseStart));
+                        var transformStart = Stopwatch.GetTimestamp();
                         var transformation = new TransformationPipeline(RuleCatalog.BuiltIn)
-                            .Transform(await tree.GetRootAsync(token), configurations[file.FullPath]);
+                            .Transform(root, configurations[file.FullPath]);
+                        timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
                         if (!transformation.Succeeded)
                             throw transformation.Failure!;
+                        var encodeStart = Stopwatch.GetTimestamp();
                         var bytes = document.Encode(transformation.Root.ToFullString(), Representation(configurations[file.FullPath]));
+                        timing.AddEncode(Stopwatch.GetElapsedTime(encodeStart));
                         prepared[index] = new(document, bytes, transformation.SkippedOccurrences);
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -86,7 +107,9 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
             
             try
             {
+                var writeStart = Stopwatch.GetTimestamp();
                 await new AtomicFilePersistence().WriteIfChangedAsync(result.Document, result.Content, cancellationToken);
+                timing.AddWrite(Stopwatch.GetElapsedTime(writeStart));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -95,9 +118,10 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
             }
         }
 
-        if (failed)
-            return 2;
-        return request.Kind == CommandKind.Check && prepared.Any(result => result?.Changed == true) ? 1 : 0;
+        var exitCode = failed ? 2 : request.Kind == CommandKind.Check && prepared.Any(result => result?.Changed == true) ? 1 : 0;
+        timing.Wall = Stopwatch.GetElapsedTime(commandStart);
+        await BenchmarkDiagnostics.WriteAsync(timing, cancellationToken);
+        return exitCode;
     }
 
     static RepresentationPreferences Representation(FormattingConfiguration configuration) => new(
@@ -142,5 +166,36 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         internal Exception? Failure { get; }
         internal int SkippedOccurrences { get; }
         internal bool Changed => Failure is null && !Content.Span.SequenceEqual(Document!.OriginalBytes.Span);
+    }
+}
+
+sealed class BenchmarkTiming
+{
+    readonly object _gate = new();
+    TimeSpan _read;
+    TimeSpan _parse;
+    TimeSpan _transform;
+    TimeSpan _encode;
+    TimeSpan _write;
+
+    internal TimeSpan Wall { get; set; }
+    internal TimeSpan MsBuild { get; set; }
+    internal TimeSpan EditorConfig { get; set; }
+    internal TimeSpan Read => _read;
+    internal TimeSpan Parse => _parse;
+    internal TimeSpan Transform => _transform;
+    internal TimeSpan Encode => _encode;
+    internal TimeSpan Write => _write;
+
+    internal void AddRead(TimeSpan value) => Add(ref _read, value);
+    internal void AddParse(TimeSpan value) => Add(ref _parse, value);
+    internal void AddTransform(TimeSpan value) => Add(ref _transform, value);
+    internal void AddEncode(TimeSpan value) => Add(ref _encode, value);
+    internal void AddWrite(TimeSpan value) => Add(ref _write, value);
+
+    void Add(ref TimeSpan target, TimeSpan value)
+    {
+        lock (_gate)
+            target += value;
     }
 }
