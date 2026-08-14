@@ -20,9 +20,15 @@ interface IConfigurationResolver
 
 interface IParseContextResolver
 {
-    ValueTask<CSharpParseOptions> ResolveAsync(
-        string path,
+    ValueTask<IReadOnlyDictionary<string, ParseContextResolution>> ResolveAsync(
+        IReadOnlyList<string> paths,
+        string? configuration,
         CancellationToken cancellationToken);
+}
+
+sealed record ParseContextResolution(CSharpParseOptions? Options, IReadOnlyList<string> Diagnostics)
+{
+    internal bool CanFormat => Options is not null;
 }
 
 interface ITransformationPipeline
