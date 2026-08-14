@@ -1,0 +1,40 @@
+# CLI and configuration
+
+This document describes DressSharp 0.x. The executable is distributed by the `DressSharp` .NET tool package and invoked as `dotnet dress`.
+
+## Commands
+
+```text
+dotnet dress [paths] [--verbose] [--configuration <name>]
+dotnet dress format [paths] [--verbose] [--configuration <name>]
+dotnet dress check [paths] [--verbose] [--configuration <name>]
+dotnet dress init [target] [--force]
+```
+
+The root command aliases `format`. An omitted path selects the invocation directory. Paths are literal files or directories; use `--` before a path beginning with `-`. Selection includes ordinary `.cs` files, honors nested `.gitignore` rules, and excludes generated files, `.csx`, VCS directories, and linked directories. Overlapping paths are deduplicated.
+
+`format` writes changed files. `check` writes nothing and lists files requiring changes. `--verbose` lists changed files and reports an empty selection. `--configuration` (alias `--config`) selects the MSBuild configuration; the default is `Debug`.
+
+`init` writes the complete Familiar preset into one EOF block delimited by `# DressSharp Begin` and `# DressSharp End`. Its default target is `.editorconfig` in the invocation directory. Existing conflicting keys require `--force`; malformed or duplicate managed markers always fail.
+
+## Exit codes
+
+| Code | Meaning |
+| ---: | --- |
+| 0 | Command succeeded; `check` found no changes. |
+| 1 | `check` found files requiring formatting. |
+| 2 | Invalid invocation, configuration, selection, parse context, or processing failure. |
+
+## Configuration
+
+DressSharp resolves EditorConfig independently for each file using ordinary traversal, `root = true`, section matching, precedence, and `unset`. Missing or `unset` preferences do nothing: DressSharp has no implicit formatting defaults. `init` provides an explicit Familiar preset.
+
+Known invalid effective values and malformed EditorConfig fail preflight before source writes. Unknown well-formed keys are ignored for forward compatibility. Standard C# values may include a diagnostic severity suffix such as `:warning`; DressSharp ignores that suffix.
+
+See [rules-v1.md](rules-v1.md) for supported keys and values.
+
+## Safety and file handling
+
+DressSharp uses syntax only—never symbols, types, or semantic models. It derives language version, preprocessor symbols, source kind, and documentation mode from MSBuild. Unsupported project language versions fail before writes. Unsafe individual occurrences intersecting malformed syntax, directives, or disabled text are skipped; safe occurrences continue.
+
+Source decoding checks a BOM, then strict UTF-8, then strict Latin-1. BOM-less UTF-16 is not guessed. Unchanged files retain their original bytes. Changed files use same-directory atomic replacement, reject changed-since-read content, and protect symlink targets.
