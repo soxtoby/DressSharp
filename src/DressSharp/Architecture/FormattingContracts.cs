@@ -36,11 +36,6 @@ interface ITransformationPipeline
     TransformationResult Transform(SyntaxNode root, FormattingConfiguration configuration);
 }
 
-interface IFilePersistence
-{
-    ValueTask WriteAsync(string path, ReadOnlyMemory<byte> content, CancellationToken cancellationToken);
-}
-
 sealed record FormattingConfiguration
 {
     internal FormattingConfiguration(IEnumerable<KeyValuePair<string, string>> preferences)
