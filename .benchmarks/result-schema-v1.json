@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dresssharp.dev/benchmarks/result-schema-v1.json",
+  "type": "object",
+  "required": ["schemaVersion", "timestamp", "environment", "corpus", "tools", "profiles"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "environment": { "type": "object", "required": ["cpu", "logicalCores", "ramBytes", "os", "powerMode", "dotnetSdk", "gitCommit", "backgroundLoadCaveats"] },
+    "corpus": { "type": "object", "required": ["version", "hash", "fileCount"] },
+    "tools": { "type": "object", "required": ["dressSharp", "dotnetFormat", "roslyn"] },
+    "profiles": { "type": "array", "items": { "type": "object", "required": ["workers", "runs", "summary"] } }
+  }
+}

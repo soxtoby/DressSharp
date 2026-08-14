@@ -3,3 +3,5 @@ bin/
 obj/
 TestResults/
 *.user
+.benchmarks/corpus/files/
+.benchmarks/results/

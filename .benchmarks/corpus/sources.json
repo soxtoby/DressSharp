@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "fileCount": 1000,
+  "sources": [
+    { "name": "Dapper", "url": "https://github.com/DapperLib/Dapper.git", "revision": "72a54c475f75e18cb93cba0809d00a5e6e49efd9", "license": "Apache-2.0", "licenseUrl": "https://github.com/DapperLib/Dapper/blob/72a54c475f75e18cb93cba0809d00a5e6e49efd9/License.txt", "count": 157 },
+    { "name": "FluentAssertions", "url": "https://github.com/fluentassertions/fluentassertions.git", "revision": "f298d155fc025998e43672841c9479778bd0ded2", "license": "Apache-2.0", "licenseUrl": "https://github.com/fluentassertions/fluentassertions/blob/f298d155fc025998e43672841c9479778bd0ded2/LICENSE", "count": 211 },
+    { "name": "Humanizer", "url": "https://github.com/Humanizr/Humanizer.git", "revision": "ffc2b77c0f30d2fb176875841424379319d0ae9b", "license": "MIT", "licenseUrl": "https://github.com/Humanizr/Humanizer/blob/ffc2b77c0f30d2fb176875841424379319d0ae9b/LICENSE", "count": 211 },
+    { "name": "Polly", "url": "https://github.com/App-vNext/Polly.git", "revision": "b051f793698f852d5674279cde58dc4065a2dd46", "license": "BSD-3-Clause", "licenseUrl": "https://github.com/App-vNext/Polly/blob/b051f793698f852d5674279cde58dc4065a2dd46/LICENSE", "count": 211 },
+    { "name": "Spectre.Console", "url": "https://github.com/spectreconsole/spectre.console.git", "revision": "0acc92fada6c42f13984e79c2b5f3d993bdfb099", "license": "MIT", "licenseUrl": "https://github.com/spectreconsole/spectre.console/blob/0acc92fada6c42f13984e79c2b5f3d993bdfb099/LICENSE.md", "count": 210 }
+  ]
+}
