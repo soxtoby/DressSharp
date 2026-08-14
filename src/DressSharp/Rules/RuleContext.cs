@@ -8,6 +8,7 @@ namespace DressSharp.Rules;
 sealed class RuleContext
 {
     readonly ImmutableArray<TextSpan> _malformedRegions;
+    internal int SkippedOccurrences { get; private set; }
 
     internal RuleContext(SyntaxNode root, int maximumLineLength = int.MaxValue, int tabWidth = 4, string indentUnit = "    ")
     {
@@ -42,7 +43,13 @@ sealed class RuleContext
 
     internal bool IsUnsafe(SyntaxNode node) => IsUnsafe(node.FullSpan);
     internal bool IsUnsafe(SyntaxToken token) => IsUnsafe(token.FullSpan);
-    internal bool IsUnsafe(TextSpan occurrence) => _malformedRegions.Any(region => Intersects(region, occurrence));
+    internal bool IsUnsafe(TextSpan occurrence)
+    {
+        if (!_malformedRegions.Any(region => Intersects(region, occurrence)))
+            return false;
+        SkippedOccurrences++;
+        return true;
+    }
 
     static bool Intersects(TextSpan left, TextSpan right) =>
         left.IntersectsWith(right)

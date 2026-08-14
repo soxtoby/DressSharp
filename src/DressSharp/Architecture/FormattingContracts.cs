@@ -49,7 +49,7 @@ sealed record FormattingConfiguration
     internal ImmutableDictionary<string, string> Preferences { get; }
 }
 
-sealed record TransformationResult(SyntaxNode Root, Exception? Failure = null)
+sealed record TransformationResult(SyntaxNode Root, Exception? Failure = null, int SkippedOccurrences = 0)
 {
     internal bool Succeeded => Failure is null;
 }

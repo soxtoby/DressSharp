@@ -1,6 +1,7 @@
 using System.CommandLine;
 using DressSharp.CommandLine;
 using DressSharp.Configuration;
+using DressSharp.Execution;
 
 namespace DressSharp;
 
@@ -22,7 +23,7 @@ static class Program
         var root = new RootCommand("Format C# using explicit syntax-only preferences.");
         root.TreatUnmatchedTokensAsErrors = true;
         var verbose = new Option<bool>("--verbose") { Description = "List changed files and report an empty selection.", Recursive = true };
-        var configuration = new Option<string?>("--configuration") { Description = "Use an explicit EditorConfig file.", Recursive = true };
+        var configuration = new Option<string?>("--configuration") { Description = "Use an MSBuild configuration other than Debug.", Recursive = true };
         configuration.Aliases.Add("--config");
         root.Options.Add(verbose);
         root.Options.Add(configuration);
@@ -83,13 +84,12 @@ static class Program
     {
         try
         {
-            _ = request.ConfigurationPath;
             var selected = await new FileSelector(invocationDirectory).SelectAsync(request.Paths);
             if (request.Verbose && selected.Count == 0)
                 await Console.Out.WriteLineAsync("No eligible C# files selected.");
-            return 0;
+            return await new FormatExecutor(invocationDirectory).RunAsync(request, selected);
         }
-        catch (FileSelectionException exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             await Console.Error.WriteLineAsync(exception.Message);
             return 2;

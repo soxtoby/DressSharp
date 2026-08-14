@@ -8,6 +8,7 @@ sealed class TransformationPipeline(RuleCatalog catalog) : ITransformationPipeli
     public TransformationResult Transform(SyntaxNode root, FormattingConfiguration configuration)
     {
         var current = root;
+        var skippedOccurrences = 0;
         try
         {
             foreach (var rule in catalog.Rules)
@@ -33,9 +34,11 @@ sealed class TransformationPipeline(RuleCatalog catalog) : ITransformationPipeli
                         ? parsedIndentSize
                         : 4;
                 var indentUnit = usesTabs ? "\t" : new string(' ', indentSize);
-                current = rule.Transform(current, preference, new RuleContext(current, maximum, tabWidth, indentUnit));
+                var context = new RuleContext(current, maximum, tabWidth, indentUnit);
+                current = rule.Transform(current, preference, context);
+                skippedOccurrences += context.SkippedOccurrences;
             }
-            return new TransformationResult(current);
+            return new TransformationResult(current, SkippedOccurrences: skippedOccurrences);
         }
         catch (Exception exception)
         {

@@ -10,4 +10,4 @@ sealed record CommandRequest(
     CommandKind Kind,
     IReadOnlyList<string> Paths,
     bool Verbose,
-    string? ConfigurationPath);
+    string? BuildConfiguration);
