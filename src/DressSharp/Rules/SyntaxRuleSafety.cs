@@ -8,7 +8,7 @@ static class SyntaxRuleSafety
     internal static bool CanRewrite(SyntaxNode node, RuleContext context) =>
         !context.IsUnsafe(node) 
         &&
-        !node.DescendantTrivia(descendIntoTrivia: true).Any(trivia =>
+        node.DescendantTrivia(descendIntoTrivia: true).None(trivia =>
             trivia.IsDirective 
             || trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) 
             || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)

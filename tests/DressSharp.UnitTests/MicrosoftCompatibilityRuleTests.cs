@@ -8,6 +8,101 @@ namespace DressSharp.UnitTests;
 public class MicrosoftCompatibilityRuleTests
 {
     [Theory]
+    [InlineData("all", "class C { void M() { } }", "M()\n{")]
+    [InlineData("none", "class C\n{\n    void M()\n    {\n    }\n}", "M() {")]
+    [InlineData("accessors", "class C { int P { get { return 1; } } }", "get\n{")]
+    [InlineData("anonymous_methods", "class C { object M() => delegate() { }; }", "delegate()\n{")]
+    [InlineData("anonymous_types", "class C { object M() => new { A = 1 }; }", "new\n{")]
+    [InlineData("control_blocks", "class C { void M() { if (true) { } } }", "if (true)\n{")]
+    [InlineData("events", "class C { event System.Action E { add { } remove { } } }", "E\n{")]
+    [InlineData("indexers", "class C { int this[int x] { get => 1; } }", "]\n{")]
+    [InlineData("lambdas", "class C { object M() => () => { }; }", "=>\n{")]
+    [InlineData("local_functions", "class C { void M() { void L() { } } }", "L()\n{")]
+    [InlineData("methods", "class C { void M() { } }", "M()\n{")]
+    [InlineData("object_collection_array_initializers", "class C { int[] M() => new[] { 1 }; }", "[]\n{")]
+    [InlineData("properties", "class C { int P { get; } }", "P\n{")]
+    [InlineData("types", "class C { }", "C\n{")]
+    public void Applies_open_brace_value(string value, string source, string expected)
+    {
+        var first = Transform(source, ("csharp_new_line_before_open_brace", value));
+        Assert.Contains(expected, first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, ("csharp_new_line_before_open_brace", value)));
+    }
+
+    [Theory]
+    [InlineData("csharp_new_line_before_else", "class C { void M() { if (true) { } else { } } }", "}\nelse")]
+    [InlineData("csharp_new_line_before_catch", "class C { void M() { try { } catch { } } }", "}\ncatch")]
+    [InlineData("csharp_new_line_before_finally", "class C { void M() { try { } finally { } } }", "}\nfinally")]
+    [InlineData("csharp_new_line_before_members_in_object_initializers", "class C { object M() => new C { P = 1, Q = 2 }; int P; int Q; }", ",\nQ")]
+    [InlineData("csharp_new_line_before_members_in_anonymous_types", "class C { object M() => new { P = 1, Q = 2 }; }", ",\nQ")]
+    [InlineData("csharp_new_line_between_query_expression_clauses", "class C { object M(int[] xs) => from x in xs where x > 0 select x; }", "xs\nwhere")]
+    public void Applies_boolean_newline_rules(string key, string source, string expected)
+    {
+        var first = Transform(source, (key, "true"));
+        Assert.Contains(expected, first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, (key, "true")));
+        Assert.DoesNotContain(expected, Transform(first, (key, "false")).Replace("\r\n", "\n"));
+    }
+
+    [Theory]
+    [InlineData("csharp_indent_block_contents", "true", "class C\n{\nvoid M()\n{\nint x;\n}\n}", "\n    int x;")]
+    [InlineData("csharp_indent_block_contents", "false", "class C\n{\nvoid M()\n{\n    int x;\n}\n}", "\nint x;")]
+    [InlineData("csharp_indent_braces", "true", "class C\n{\nvoid M()\n{\n}\n}", "M()\n    {")]
+    [InlineData("csharp_indent_braces", "false", "class C\n{\nvoid M()\n    {\n    }\n}", "M()\n{")]
+    [InlineData("csharp_indent_switch_labels", "true", "class C { void M(int x) { switch (x)\n{\ncase 1:\nbreak;\n} } }", "\n    case 1:")]
+    [InlineData("csharp_indent_switch_labels", "false", "class C { void M(int x) { switch (x)\n{\n    case 1:\nbreak;\n} } }", "\ncase 1:")]
+    [InlineData("csharp_indent_case_contents", "true", "class C { void M(int x) { switch (x) {\ncase 1:\nbreak;\n} } }", "case 1:\n    break;")]
+    [InlineData("csharp_indent_case_contents", "false", "class C { void M(int x) { switch (x) {\ncase 1:\n    break;\n} } }", "case 1:\nbreak;")]
+    [InlineData("csharp_indent_case_contents_when_block", "true", "class C { void M(int x) { switch (x) {\ncase 1:\n{\n}\n} } }", "case 1:\n    {")]
+    [InlineData("csharp_indent_case_contents_when_block", "false", "class C { void M(int x) { switch (x) {\ncase 1:\n    {\n    }\n} } }", "case 1:\n{")]
+    [InlineData("csharp_indent_labels", "flush_left", "class C { void M() {\n    label:\nreturn;\n} }", "\nlabel:")]
+    [InlineData("csharp_indent_labels", "one_less_than_current", "class C { void M() {\n        label:\n        return;\n} }", "\n    label:")]
+    [InlineData("csharp_indent_labels", "no_change", "class C { void M() {\n        label:\nreturn;\n} }", "\n        label:")]
+    public void Applies_indentation_values(string key, string value, string source, string expected)
+    {
+        var first = Transform(source, (key, value));
+        Assert.Contains(expected, first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, (key, value)));
+    }
+
+    [Theory]
+    [InlineData("csharp_new_line_before_else")]
+    [InlineData("csharp_indent_block_contents")]
+    public void Newline_and_indentation_missing_and_unset_preserve_source(string key)
+    {
+        const string source = "class C { void M() { if (true) { } else { } } }";
+        Assert.Equal(source, Transform(source));
+        Assert.Equal(source, Transform(source, (key, "unset")));
+    }
+
+    [Fact]
+    public void Newline_and_indentation_rules_compose_and_are_idempotent()
+    {
+        const string source = "class C { void M(int x) { if (x > 0) { } else { switch (x) {\ncase 0:\nbreak;\n} } } }";
+        (string, string)[] preferences =
+        [
+            ("csharp_new_line_before_open_brace", "all"),
+            ("csharp_new_line_before_else", "true"),
+            ("csharp_indent_switch_labels", "true"),
+            ("csharp_indent_case_contents", "true")
+        ];
+        var first = Transform(source, preferences);
+        Assert.Equal(first, Transform(first, preferences));
+    }
+
+    [Fact]
+    public void Newline_rules_preserve_comments_directives_malformed_regions_raw_strings_and_disabled_text()
+    {
+        const string source = "class C { void A() /* keep */ { }\n#if OFF\nvoid B() { }\n#endif\nstring S() => \"\"\"{ raw }\"\"\";\nvoid Broken( { }\nvoid Safe() { } }";
+        var result = Transform(source, ("csharp_new_line_before_open_brace", "methods"));
+        Assert.Contains("A() /* keep */ {", result);
+        Assert.Contains("#if OFF\nvoid B() { }\n#endif", result);
+        Assert.Contains("\"\"\"{ raw }\"\"\"", result);
+        Assert.Contains("void Broken( {", result);
+        Assert.Contains("Safe()\n{", result.Replace("\r\n", "\n"));
+    }
+
+    [Theory]
     [InlineData("csharp_space_after_cast", "true", "class C { int M(object x) => (int)x; }", "(int) x")]
     [InlineData("csharp_space_after_cast", "false", "class C { int M(object x) => (int) x; }", "(int)x")]
     [InlineData("csharp_space_after_keywords_in_control_flow_statements", "true", "class C { void M() { if(true) { } } }", "if (true)")]

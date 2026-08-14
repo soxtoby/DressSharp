@@ -236,7 +236,7 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
 
     static SyntaxTriviaList XmlLayout(SyntaxTriviaList trivia, string preference)
     {
-        if (!trivia.Any(t => t.HasStructure && t.GetStructure() is DocumentationCommentTriviaSyntax))
+        if (trivia.None(t => t.HasStructure && t.GetStructure() is DocumentationCommentTriviaSyntax))
             return trivia;
         var text = trivia.ToFullString();
         text = preference == "multi_line"
