@@ -2,10 +2,7 @@ namespace DressSharp.IO;
 
 sealed class AtomicFilePersistence
 {
-    internal async ValueTask<bool> WriteIfChangedAsync(
-        SourceDocument document,
-        ReadOnlyMemory<byte> content,
-        CancellationToken cancellationToken = default)
+    internal async ValueTask<bool> WriteIfChangedAsync(SourceDocument document, ReadOnlyMemory<byte> content, CancellationToken cancellationToken = default)
     {
         if (content.Span.SequenceEqual(document.OriginalBytes.Span))
             return false;
@@ -20,11 +17,12 @@ sealed class AtomicFilePersistence
         {
             throw new SourceIOException($"Could not verify '{document.Path}' before writing.", exception);
         }
+        
         if (!current.AsSpan().SequenceEqual(document.OriginalBytes.Span))
             throw new SourceIOException($"'{document.Path}' changed after it was read.");
 
-        var directory = System.IO.Path.GetDirectoryName(destination)!;
-        var temporaryPath = System.IO.Path.Combine(directory, $".{System.IO.Path.GetFileName(destination)}.{Guid.NewGuid():N}.dresssharp.tmp");
+        var directory = Path.GetDirectoryName(destination)!;
+        var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.dresssharp.tmp");
         try
         {
             await File.WriteAllBytesAsync(temporaryPath, content, cancellationToken);

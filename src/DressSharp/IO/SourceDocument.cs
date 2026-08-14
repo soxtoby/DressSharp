@@ -2,33 +2,24 @@ using System.Text;
 
 namespace DressSharp.IO;
 
-enum SourceEncoding
-{
-    Utf8,
-    Utf8Bom,
-    Utf16LittleEndian,
-    Utf16BigEndian,
-    Latin1
-}
-
 sealed class SourceDocument
 {
-    readonly byte[] originalBytes;
+    readonly byte[] _originalBytes;
 
-    SourceDocument(string path, byte[] bytes, string text, SourceEncoding encoding, string preferredLineEnding)
+    SourceDocument(string path, byte[] bytes, string text, SourceEncoding sourceEncoding, string preferredLineEnding)
     {
         Path = path;
-        originalBytes = bytes;
+        _originalBytes = bytes;
         Text = text;
-        Encoding = encoding;
+        SourceEncoding = sourceEncoding;
         PreferredLineEnding = preferredLineEnding;
     }
 
     internal string Path { get; }
     internal string Text { get; }
-    internal SourceEncoding Encoding { get; }
+    internal SourceEncoding SourceEncoding { get; }
     internal string PreferredLineEnding { get; }
-    internal ReadOnlyMemory<byte> OriginalBytes => originalBytes;
+    internal ReadOnlyMemory<byte> OriginalBytes => _originalBytes;
 
     internal static async ValueTask<SourceDocument> ReadAsync(string path, CancellationToken cancellationToken = default)
     {
@@ -58,9 +49,9 @@ sealed class SourceDocument
         else if (preferences.InsertFinalNewline is false)
             text = TrimFinalLineEndings(text);
 
-        var encoding = preferences.Encoding ?? Encoding;
-        if (text == Text && encoding == Encoding)
-            return originalBytes.ToArray();
+        var encoding = preferences.Encoding ?? SourceEncoding;
+        if (text == Text && encoding == SourceEncoding)
+            return _originalBytes.ToArray();
         var encoder = CreateEncoder(encoding);
         var content = encoder.GetBytes(text);
         var preamble = encoder.GetPreamble();
@@ -104,7 +95,7 @@ sealed class SourceDocument
         _ => throw new ArgumentOutOfRangeException(nameof(encoding))
     };
 
-    static Encoding Latin1() => System.Text.Encoding.GetEncoding(
+    static Encoding Latin1() => Encoding.GetEncoding(
         28591,
         EncoderFallback.ExceptionFallback,
         DecoderFallback.ExceptionFallback);
@@ -128,16 +119,22 @@ sealed class SourceDocument
         var builder = new StringBuilder(text.Length);
         for (var index = 0; index < text.Length; index++)
         {
-            if (text[index] == '\r')
+            switch (text[index])
             {
-                if (index + 1 < text.Length && text[index + 1] == '\n')
-                    index++;
-                builder.Append(lineEnding);
+                case '\r':
+                    if (index + 1 < text.Length && text[index + 1] == '\n')
+                        index++;
+                    builder.Append(lineEnding);
+                    break;
+                
+                case '\n':
+                    builder.Append(lineEnding);
+                    break;
+                
+                default:
+                    builder.Append(text[index]);
+                    break;
             }
-            else if (text[index] == '\n')
-                builder.Append(lineEnding);
-            else
-                builder.Append(text[index]);
         }
         return builder.ToString();
     }
@@ -182,6 +179,15 @@ sealed class SourceDocument
         SourceEncoding.Utf16BigEndian => "UTF-16 BE",
         _ => encoding.ToString()
     };
+}
+
+enum SourceEncoding
+{
+    Utf8,
+    Utf8Bom,
+    Utf16LittleEndian,
+    Utf16BigEndian,
+    Latin1
 }
 
 sealed record RepresentationPreferences(
