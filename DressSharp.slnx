@@ -6,4 +6,9 @@
     <Project Path="tests/DressSharp.UnitTests/DressSharp.UnitTests.csproj" />
   </Folder>
   <Project Path="src/DressSharp/DressSharp.csproj" />
+  <Folder Name="/scripts/">
+    <File Path="scripts/benchmark.cs" />
+    <File Path="scripts/materialize-corpus.cs" />
+    <File Path="scripts/smoke-package.cs" />
+  </Folder>
 </Solution>

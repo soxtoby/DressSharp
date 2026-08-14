@@ -21,7 +21,8 @@ dotnet dress --version
 dotnet build DressSharp.slnx
 dotnet test DressSharp.slnx --no-build
 dotnet pack src/DressSharp/DressSharp.csproj
-pwsh eng/Smoke-Package.ps1
+dotnet tool restore
+dotnet do smoke-package
 ```
 
 The package installs one command: `dotnet dress`.

@@ -1,8 +1,8 @@
 # Benchmark protocol v1
 
-Materialize the pinned 1,000-file corpus with `pwsh .benchmarks/Materialize-Corpus.ps1`. A source or lock-manifest change starts a new benchmark series.
+Restore repository tools with `dotnet tool restore`, then materialize the pinned 1,000-file corpus with `dotnet do materialize-corpus`. A source or lock-manifest change starts a new benchmark series.
 
-Build Release first, then run `pwsh .benchmarks/Run-Benchmarks.ps1`. The runner compares complete fresh-process `check` commands against the .NET 10.0.302 SDK's pinned `dotnet format`. It performs three untimed warmups and fifteen measured pairs, alternating tool order. Default production concurrency is primary; one worker and all logical processors are diagnostic.
+Run `dotnet do benchmark`. The runner compares complete fresh-process `check` commands against the .NET 10.0.302 SDK's pinned `dotnet format`. It performs three untimed warmups and fifteen measured pairs, alternating tool order. Default production concurrency is primary; one worker and all logical processors are diagnostic.
 
 For `format`, the immutable materialized corpus is copied into a fresh directory outside timing. Inputs are verified against the manifest. Every measured run is retained. Never delete outliers; mark interference and repeat the entire set.
 
