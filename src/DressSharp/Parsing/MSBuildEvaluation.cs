@@ -12,23 +12,17 @@ interface IMSBuildEvaluator
         CancellationToken cancellationToken);
 }
 
-sealed record MSBuildEvaluation(
-    bool Succeeded,
-    IReadOnlyDictionary<string, string> Properties,
-    IReadOnlyList<string> CompileItems,
-    string Diagnostic);
-
 sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
 {
     static readonly string[] PropertyNames =
-    [
-        "TargetFrameworks",
-        "TargetFramework",
-        "LangVersion",
-        "DefineConstants",
-        "OutputType",
-        "GenerateDocumentationFile",
-    ];
+        [
+            "TargetFrameworks",
+            "TargetFramework",
+            "LangVersion",
+            "DefineConstants",
+            "OutputType",
+            "GenerateDocumentationFile",
+        ];
 
     public async ValueTask<MSBuildEvaluation> EvaluateAsync(
         string target,
@@ -37,12 +31,12 @@ sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
         CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo("dotnet")
-        {
-            WorkingDirectory = Path.GetDirectoryName(target)!,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
+            {
+                WorkingDirectory = Path.GetDirectoryName(target)!,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
         startInfo.ArgumentList.Add("build");
         startInfo.ArgumentList.Add(target);
         startInfo.ArgumentList.Add("--nologo");
@@ -88,3 +82,9 @@ sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
             ?? "MSBuild evaluation failed.";
     }
 }
+
+sealed record MSBuildEvaluation(
+    bool Succeeded,
+    IReadOnlyDictionary<string, string> Properties,
+    IReadOnlyList<string> CompileItems,
+    string Diagnostic);

@@ -6,8 +6,8 @@ namespace DressSharp.Parsing;
 
 sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evaluator = null) : IParseContextResolver
 {
-    readonly string discoveryRoot = Path.GetFullPath(discoveryRoot);
-    readonly IMSBuildEvaluator evaluator = evaluator ?? new DotNetMSBuildEvaluator();
+    readonly string _discoveryRoot = Path.GetFullPath(discoveryRoot);
+    readonly IMSBuildEvaluator _evaluator = evaluator ?? new DotNetMSBuildEvaluator();
 
     public async ValueTask<IReadOnlyDictionary<string, ParseContextResolution>> ResolveAsync(
         IReadOnlyList<string> paths,
@@ -16,7 +16,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
     {
         var selected = paths.Select(Path.GetFullPath).Distinct(PathComparer).ToArray();
         var contexts = selected.ToDictionary(path => path, _ => new List<ProjectContext>(), PathComparer);
-        foreach (var project in Directory.EnumerateFiles(discoveryRoot, "*.csproj", SearchOption.AllDirectories).Order(PathComparer))
+        foreach (var project in Directory.EnumerateFiles(_discoveryRoot, "*.csproj", SearchOption.AllDirectories).Order(PathComparer))
             await AddProjectContextsAsync(project, configuration ?? "Debug", contexts, cancellationToken);
 
         var results = new Dictionary<string, ParseContextResolution>(PathComparer);
@@ -36,7 +36,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
         IReadOnlyDictionary<string, List<ProjectContext>> contexts,
         CancellationToken cancellationToken)
     {
-        var outer = await evaluator.EvaluateAsync(project, configuration, null, cancellationToken);
+        var outer = await _evaluator.EvaluateAsync(project, configuration, null, cancellationToken);
         if (!outer.Succeeded)
         {
             foreach (var path in contexts.Keys.Where(path => IsUnder(path, Path.GetDirectoryName(project)!)))
@@ -51,7 +51,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
         {
             var evaluation = frameworks.Count == 1 && outer.Properties.GetValueOrDefault("TargetFramework") == framework
                 ? outer
-                : await evaluator.EvaluateAsync(project, configuration, framework, cancellationToken);
+                : await _evaluator.EvaluateAsync(project, configuration, framework, cancellationToken);
             if (!evaluation.Succeeded)
             {
                 foreach (var path in contexts.Keys.Where(path => IsUnder(path, Path.GetDirectoryName(project)!)))
@@ -74,7 +74,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
 
     async ValueTask<ParseContextResolution> ResolveFileAppAsync(string path, string configuration, CancellationToken cancellationToken)
     {
-        var evaluation = await evaluator.EvaluateAsync(path, configuration, null, cancellationToken);
+        var evaluation = await _evaluator.EvaluateAsync(path, configuration, null, cancellationToken);
         if (!evaluation.Succeeded)
         {
             return new(Fallback, [$"{path}: implicit file-app evaluation failed; using latest-stable fallback. {evaluation.Diagnostic}"]);
