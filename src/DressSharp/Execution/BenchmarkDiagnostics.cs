@@ -7,6 +7,8 @@ static class BenchmarkDiagnostics
     const string WorkerEnvironmentVariable = "DRESSSHARP_BENCHMARK_WORKERS";
     const string TimingEnvironmentVariable = "DRESSSHARP_BENCHMARK_TIMING";
 
+    internal static bool Enabled => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(TimingEnvironmentVariable));
+
     internal static int WorkerCount => int.TryParse(Environment.GetEnvironmentVariable(WorkerEnvironmentVariable), out var count) && count > 0
         ? count
         : Math.Min(Math.Max(Environment.ProcessorCount / 2, 1), 16);
@@ -39,8 +41,9 @@ static class BenchmarkDiagnostics
                         transformMilliseconds = Attributed(timing.Transform),
                         encodeMilliseconds = Attributed(timing.Encode),
                         writeMilliseconds = Attributed(timing.Write),
-                        otherMilliseconds = Math.Max(0, timing.Wall.TotalMilliseconds - attributed)
-                    }
+                      otherMilliseconds = Math.Max(0, timing.Wall.TotalMilliseconds - attributed)
+                    },
+                rules = timing.Rules.OrderByDescending(pair => pair.Value).ToDictionary(pair => pair.Key, pair => pair.Value.TotalMilliseconds)
             };
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(payload), cancellationToken);
     }

@@ -3,12 +3,13 @@ using Microsoft.CodeAnalysis;
 
 namespace DressSharp.Rules;
 
-sealed class TransformationPipeline(RuleCatalog catalog) : ITransformationPipeline
+sealed class TransformationPipeline(RuleCatalog catalog, Action<string, TimeSpan>? recordRule = null) : ITransformationPipeline
 {
     public TransformationResult Transform(SyntaxNode root, FormattingConfiguration configuration)
     {
         var current = root;
         var skippedOccurrences = 0;
+        var knownWellFormed = false;
         try
         {
             foreach (var rule in catalog.Rules)
@@ -34,8 +35,18 @@ sealed class TransformationPipeline(RuleCatalog catalog) : ITransformationPipeli
                         ? parsedIndentSize
                         : 4;
                 var indentUnit = usesTabs ? "\t" : new string(' ', indentSize);
-                var context = new RuleContext(current, maximum, tabWidth, indentUnit);
-                current = rule.Transform(current, preference, context);
+                var context = new RuleContext(current, maximum, tabWidth, indentUnit, knownWellFormed);
+                knownWellFormed |= !context.HasMalformedRegions;
+                if (recordRule is null)
+                {
+                    current = rule.Transform(current, preference, context);
+                }
+                else
+                {
+                    var started = System.Diagnostics.Stopwatch.GetTimestamp();
+                    current = rule.Transform(current, preference, context);
+                    recordRule(rule.Metadata.PreferenceKey, System.Diagnostics.Stopwatch.GetElapsedTime(started));
+                }
                 skippedOccurrences += context.SkippedOccurrences;
             }
             return new TransformationResult(current, SkippedOccurrences: skippedOccurrences);

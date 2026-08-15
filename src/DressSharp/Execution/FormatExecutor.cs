@@ -56,7 +56,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
                         var root = await tree.GetRootAsync(token);
                         timing.AddParse(Stopwatch.GetElapsedTime(parseStart));
                         var transformStart = Stopwatch.GetTimestamp();
-                        var transformation = new TransformationPipeline(RuleCatalog.BuiltIn)
+                        var transformation = new TransformationPipeline(RuleCatalog.BuiltIn, BenchmarkDiagnostics.Enabled ? timing.RecordRule : null)
                             .Transform(root, configurations[file.FullPath]);
                         timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
                         if (!transformation.Succeeded)
@@ -172,6 +172,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
 sealed class BenchmarkTiming
 {
     readonly object _gate = new();
+    readonly Dictionary<string, TimeSpan> _rules = [];
     TimeSpan _read;
     TimeSpan _parse;
     TimeSpan _transform;
@@ -186,12 +187,18 @@ sealed class BenchmarkTiming
     internal TimeSpan Transform => _transform;
     internal TimeSpan Encode => _encode;
     internal TimeSpan Write => _write;
+    internal IReadOnlyDictionary<string, TimeSpan> Rules => _rules;
 
     internal void AddRead(TimeSpan value) => Add(ref _read, value);
     internal void AddParse(TimeSpan value) => Add(ref _parse, value);
     internal void AddTransform(TimeSpan value) => Add(ref _transform, value);
     internal void AddEncode(TimeSpan value) => Add(ref _encode, value);
     internal void AddWrite(TimeSpan value) => Add(ref _write, value);
+    internal void RecordRule(string name, TimeSpan value)
+    {
+        lock (_gate)
+            _rules[name] = _rules.GetValueOrDefault(name) + value;
+    }
 
     void Add(ref TimeSpan target, TimeSpan value)
     {

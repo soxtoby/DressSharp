@@ -10,7 +10,7 @@ sealed class RuleContext
     readonly ImmutableArray<TextSpan> _malformedRegions;
     internal int SkippedOccurrences { get; private set; }
 
-    internal RuleContext(SyntaxNode root, int maximumLineLength = int.MaxValue, int tabWidth = 4, string indentUnit = "    ")
+    internal RuleContext(SyntaxNode root, int maximumLineLength = int.MaxValue, int tabWidth = 4, string indentUnit = "    ", bool knownWellFormed = false)
     {
         MaximumLineLength = maximumLineLength;
         TabWidth = tabWidth;
@@ -23,7 +23,9 @@ sealed class RuleContext
                     "\r" => "\r",
                     _ => "\n"
                 };
-        var regions = root.GetDiagnostics()
+        var regions = knownWellFormed
+            ? []
+            : root.GetDiagnostics()
             .Where(diagnostic => diagnostic.Location.IsInSource)
             .Select(diagnostic => diagnostic.Location.SourceSpan)
             .Concat(root.DescendantTokens(descendIntoTrivia: true)
@@ -40,6 +42,7 @@ sealed class RuleContext
     internal int TabWidth { get; }
     internal string IndentUnit { get; }
     internal string LineEnding { get; }
+    internal bool HasMalformedRegions => !_malformedRegions.IsEmpty;
 
     internal bool IsUnsafe(SyntaxNode node) => IsUnsafe(node.FullSpan);
     internal bool IsUnsafe(SyntaxToken token) => IsUnsafe(token.FullSpan);

@@ -47,6 +47,19 @@ public sealed class ParseContextResolverTests : IDisposable
     }
 
     [Fact]
+    public async Task Project_evaluations_run_concurrently()
+    {
+        var file = File("Program.cs");
+        File("First.csproj");
+        File("Second.csproj");
+        var evaluator = new ConcurrentEvaluator(file, 2);
+
+        await new ParseContextResolver(root, evaluator).ResolveAsync([file], null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, evaluator.MaximumConcurrency);
+    }
+
+    [Fact]
     public async Task Failed_owned_project_is_skipped()
     {
         var file = File("Program.cs");
@@ -150,6 +163,33 @@ public sealed class ParseContextResolverTests : IDisposable
         {
             Configurations.Add(configuration);
             return ValueTask.FromResult(evaluations[(target, targetFramework)]);
+        }
+    }
+
+    sealed class ConcurrentEvaluator(string compileItem, int expectedConcurrency) : IMSBuildEvaluator
+    {
+        readonly TaskCompletionSource allStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int active;
+        int maximumConcurrency;
+
+        internal int MaximumConcurrency => Volatile.Read(ref maximumConcurrency);
+
+        public async ValueTask<MSBuildEvaluation> EvaluateAsync(string target, string configuration, string? targetFramework, CancellationToken cancellationToken)
+        {
+            var concurrency = Interlocked.Increment(ref active);
+            var observed = Volatile.Read(ref maximumConcurrency);
+            while (observed < concurrency)
+            {
+                var exchanged = Interlocked.CompareExchange(ref maximumConcurrency, concurrency, observed);
+                if (exchanged == observed)
+                    break;
+                observed = exchanged;
+            }
+            if (concurrency == expectedConcurrency)
+                allStarted.TrySetResult();
+            await Task.WhenAny(allStarted.Task, Task.Delay(250, cancellationToken));
+            Interlocked.Decrement(ref active);
+            return Success(compileItem, ("TargetFramework", "net10.0"), ("LangVersion", "latest"));
         }
     }
 }

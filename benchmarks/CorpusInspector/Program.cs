@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 var corpus = Path.GetFullPath(args[0]);
 var manifestPath = Path.GetFullPath(args[1]);
 var entries = Directory.EnumerateFiles(corpus, "*.cs", SearchOption.AllDirectories)
+    .Where(path => !Path.GetRelativePath(corpus, path).Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj"))
     .Order(StringComparer.Ordinal)
     .Select(path =>
         {

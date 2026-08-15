@@ -22,9 +22,7 @@ sealed class BlankLineRule(string key, BlankLineKind kind, int order) : IFormatt
     {
         var count = int.Parse(preference);
         if (kind == BlankLineKind.Maximum)
-            return root.ReplaceTokens(
-                root.DescendantTokens(descendIntoTrivia: true),
-                (token, _) => token.WithLeadingTrivia(Cap(token.LeadingTrivia, Math.Max(0, count + 1 - EndingLines(token.GetPreviousToken().TrailingTrivia)))));
+            return new MaximumBlankLineRewriter(count).Visit(root)!;
 
         var targets = new List<SyntaxNode>();
         switch (kind)
@@ -131,6 +129,12 @@ sealed class BlankLineRule(string key, BlankLineKind kind, int order) : IFormatt
     }
 
     static string Indent(SyntaxTriviaList trivia) => trivia.LastOrDefault(t => t.IsKind(SyntaxKind.WhitespaceTrivia)).ToString();
+
+    sealed class MaximumBlankLineRewriter(int count) : CSharpSyntaxRewriter(visitIntoStructuredTrivia: true)
+    {
+        public override SyntaxToken VisitToken(SyntaxToken token) => base.VisitToken(
+            token.WithLeadingTrivia(Cap(token.LeadingTrivia, Math.Max(0, count + 1 - EndingLines(token.GetPreviousToken().TrailingTrivia)))));
+    }
 }
 
 enum BlankLineKind
@@ -154,6 +158,8 @@ enum CommentKind
 
 sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<string> values, int order) : IFormattingRule
 {
+    readonly CommentKind _kind = kind;
+
     public RuleMetadata Metadata { get; } = new(
         key,
         values,
@@ -162,15 +168,8 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
         "Comment text remains unchanged",
         order);
 
-    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context) => root.ReplaceTokens(
-        root.DescendantTokens(),
-        (token, _) => kind == CommentKind.XmlElementLayout
-            ? token
-                .WithLeadingTrivia(XmlLayout(token.LeadingTrivia, preference))
-                .WithTrailingTrivia(XmlLayout(token.TrailingTrivia, preference))
-            : token
-                .WithLeadingTrivia(Edit(token.LeadingTrivia, preference))
-                .WithTrailingTrivia(Edit(token.TrailingTrivia, preference)));
+    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context) =>
+        new CommentTriviaRewriter(this, preference).Visit(root)!;
 
     SyntaxTriviaList Edit(SyntaxTriviaList trivia, string preference)
     {
@@ -179,7 +178,7 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
         {
             var line = items[i].IsKind(SyntaxKind.SingleLineCommentTrivia);
             var block = items[i].IsKind(SyntaxKind.MultiLineCommentTrivia);
-            if (kind == CommentKind.AttachedPlacement && (line || block) && preference != "auto")
+            if (_kind == CommentKind.AttachedPlacement && (line || block) && preference != "auto")
             {
                 var own = preference == "own_line" || line;
                 if (items[i + 1].IsKind(SyntaxKind.WhitespaceTrivia) || items[i + 1].IsKind(SyntaxKind.EndOfLineTrivia))
@@ -187,7 +186,7 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
             }
         }
 
-        if (kind == CommentKind.XmlPlacement)
+        if (_kind == CommentKind.XmlPlacement)
         {
             for (var i = 0; i < items.Count; i++)
             {
@@ -213,7 +212,7 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
 
         for (var i = 0; i < items.Count; i++)
         {
-            switch (kind)
+            switch (_kind)
             {
                 case CommentKind.LineSpacing when items[i].IsKind(SyntaxKind.SingleLineCommentTrivia):
                 {
@@ -250,4 +249,15 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
 
     [GeneratedRegex(@"^(\s*///\s*)<([A-Za-z][\w.-]*)>\s*\r?\n\s*///\s*([^<\r\n]+)\s*\r?\n\s*///\s*</\2>\s*$", RegexOptions.Multiline)]
     private static partial Regex MultiLineXmlElementPattern();
+
+    sealed class CommentTriviaRewriter(CommentRule rule, string preference) : CSharpSyntaxRewriter
+    {
+        public override SyntaxToken VisitToken(SyntaxToken token) => rule._kind == CommentKind.XmlElementLayout
+            ? token
+                .WithLeadingTrivia(XmlLayout(token.LeadingTrivia, preference))
+                .WithTrailingTrivia(XmlLayout(token.TrailingTrivia, preference))
+            : token
+                .WithLeadingTrivia(rule.Edit(token.LeadingTrivia, preference))
+                .WithTrailingTrivia(rule.Edit(token.TrailingTrivia, preference));
+    }
 }

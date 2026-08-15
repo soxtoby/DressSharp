@@ -16,8 +16,10 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
     {
         var selected = paths.Select(Path.GetFullPath).Distinct(PathComparer).ToArray();
         var contexts = selected.ToDictionary(path => path, _ => new List<ProjectContext>(), PathComparer);
-        foreach (var project in Directory.EnumerateFiles(_discoveryRoot, "*.csproj", SearchOption.AllDirectories).Order(PathComparer))
-            await AddProjectContextsAsync(project, configuration ?? "Debug", contexts, cancellationToken);
+        var projects = Directory.EnumerateFiles(_discoveryRoot, "*.csproj", SearchOption.AllDirectories).Order(PathComparer);
+        await Task.WhenAll(projects.Select(project => AddProjectContextsAsync(project, configuration ?? "Debug", contexts, cancellationToken).AsTask()));
+        foreach (var projectContexts in contexts.Values)
+            projectContexts.Sort((left, right) => PathComparer.Compare(left.Project, right.Project));
 
         var results = new Dictionary<string, ParseContextResolution>(PathComparer);
         foreach (var path in selected)
@@ -40,7 +42,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
         if (!outer.Succeeded)
         {
             foreach (var path in contexts.Keys.Where(path => IsUnder(path, Path.GetDirectoryName(project)!)))
-                contexts[path].Add(ProjectContext.Failed(project, outer.Diagnostic));
+                AddContext(contexts[path], ProjectContext.Failed(project, outer.Diagnostic));
             return;
         }
 
@@ -55,21 +57,27 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
             if (!evaluation.Succeeded)
             {
                 foreach (var path in contexts.Keys.Where(path => IsUnder(path, Path.GetDirectoryName(project)!)))
-                    contexts[path].Add(ProjectContext.Failed(project, evaluation.Diagnostic));
+                    AddContext(contexts[path], ProjectContext.Failed(project, evaluation.Diagnostic));
                 continue;
             }
             try
             {
                 var options = CreateOptions(evaluation.Properties);
                 foreach (var item in evaluation.CompileItems.Where(contexts.ContainsKey))
-                    contexts[item].Add(new(project, framework, options, null));
+                    AddContext(contexts[item], new(project, framework, options, null));
             }
             catch (UnsupportedLanguageVersionException exception)
             {
                 foreach (var item in evaluation.CompileItems.Where(contexts.ContainsKey))
-                    contexts[item].Add(ProjectContext.Failed(project, exception.Message));
+                    AddContext(contexts[item], ProjectContext.Failed(project, exception.Message));
             }
         }
+    }
+
+    static void AddContext(List<ProjectContext> contexts, ProjectContext context)
+    {
+        lock (contexts)
+            contexts.Add(context);
     }
 
     async ValueTask<ParseContextResolution> ResolveFileAppAsync(string path, string configuration, CancellationToken cancellationToken)

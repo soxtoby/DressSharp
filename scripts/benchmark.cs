@@ -38,7 +38,17 @@ await (DotNet.Build with
         NoLogo = true
     });
 
-await Do.Exec("dotnet do materialize-corpus");
+if (!corpus.IsExistingDirectory)
+{
+    await Do.Exec("dotnet do materialize-corpus");
+}
+else
+{
+    (benchmarkRoot / "corpus/Corpus.csproj").CopyTo(corpus / "Corpus.csproj", new() { Overwrite = true });
+    var inspector = Do.RootDirectory / "benchmarks/CorpusInspector/CorpusInspector.csproj";
+    var manifest = benchmarkRoot / "corpus/manifest.json";
+    await Do.Exec($"dotnet run --project {inspector.QuotedArgument()} -- {corpus.QuotedArgument()} {manifest.QuotedArgument()}");
+}
 
 await (DotNet.Restore with
     {
@@ -157,7 +167,7 @@ try
             Dictionary<string, string?>? environment = null;
             if (tool == "DressSharp")
             {
-                arguments = ["run", "--no-build", "-c", "Release", "--project", "src/DressSharp/DressSharp.csproj", "--", mode, runRoot];
+                arguments = [Do.RootDirectory / "src/DressSharp/bin/Release/net10.0/DressSharp.dll", mode, runRoot];
                 environment = new() { ["DRESSSHARP_BENCHMARK_WORKERS"] = workers.ToString(), ["DRESSSHARP_BENCHMARK_TIMING"] = timingPath };
             }
             else
@@ -168,13 +178,15 @@ try
                 arguments = [.. values];
             }
 
-            var process = await Start(Do.RootDirectory, "dotnet", arguments, environment);
+            var process = await Start(runRoot, "dotnet", arguments, environment);
             var accepted = tool == "dotnet format" && mode == "check" ? new[] { 0, 2 } : [0, 1];
             if (!accepted.Contains(process.ExitCode))
                 throw new InvalidOperationException($"{tool} failed: {process.StandardError}");
             if (!measured)
                 return null;
             var timing = timingPath.IsExistingFile && new FileInfo(timingPath).Length > 0 ? timingPath.ReadJson() : null;
+            if (tool == "DressSharp" && timing is null)
+                throw new InvalidOperationException($"DressSharp did not emit benchmark timing: {process.StandardError}");
             var elapsed = process.Elapsed.TotalMilliseconds;
             if (timing is JsonObject timingObject)
                 timingObject["startupAndDiscoveryMilliseconds"] = Math.Max(0, elapsed - timingObject["wallMilliseconds"]!.GetValue<double>());
