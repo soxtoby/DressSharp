@@ -15,53 +15,68 @@ static class Program
             await Console.Error.WriteLineAsync($"Unrecognized option: {invalidOption}");
             return 2;
         }
+
         return await CreateCommand().Parse(args).InvokeAsync();
     }
 
     internal static RootCommand CreateCommand()
     {
-        var root = new RootCommand("Format C# using explicit syntax-only preferences.");
-        root.TreatUnmatchedTokensAsErrors = true;
         var verbose = new Option<bool>("--verbose") { Description = "List changed files and report an empty selection.", Recursive = true };
-        var configuration = new Option<string?>("--configuration") { Description = "Use an MSBuild configuration other than Debug.", Recursive = true };
-        configuration.Aliases.Add("--config");
-        root.Options.Add(verbose);
-        root.Options.Add(configuration);
-
-        var format = CreateFileCommand("format", "Format selected C# files.", CommandKind.Format, verbose, configuration);
-        var check = CreateFileCommand("check", "List selected C# files that require formatting.", CommandKind.Check, verbose, configuration);
-        root.Subcommands.Add(format);
-        root.Subcommands.Add(check);
-
+        var configuration = new Option<string?>("--configuration")
+            {
+                Description = "Use an MSBuild configuration other than Debug.",
+                Recursive = true,
+                Aliases = { "--config" },
+            };
         var rootPaths = new Argument<string[]>("paths") { Arity = ArgumentArity.ZeroOrMore };
-        root.Arguments.Add(rootPaths);
+
+        var root = new RootCommand("Format C# using explicit syntax-only preferences.")
+            {
+                TreatUnmatchedTokensAsErrors = true,
+                Options = { verbose, configuration },
+                Arguments = { rootPaths },
+                Subcommands =
+                    {
+                        CreateFileCommand("format", "Format selected C# files.", CommandKind.Format, verbose, configuration),
+                        CreateFileCommand("check", "List selected C# files that require formatting.", CommandKind.Check, verbose, configuration),
+                        CreateInitCommand(),
+                    },
+            };
         root.SetAction(parseResult => RunSelectionAsync(
             new CommandRequest(CommandKind.Format, parseResult.GetValue(rootPaths) ?? [], parseResult.GetValue(verbose), parseResult.GetValue(configuration)),
             Environment.CurrentDirectory));
 
+        return root;
+    }
+
+    static Command CreateInitCommand()
+    {
         var target = new Argument<string?>("target") { Arity = ArgumentArity.ZeroOrOne };
         var force = new Option<bool>("--force");
         var init = new Command("init", "Write the complete Familiar preset to a managed EditorConfig block.") { target, force };
         init.SetAction(async (parseResult, cancellationToken) =>
-        {
-            try
             {
-                var result = await EditorConfigInitializer.InitializeAsync(
-                    parseResult.GetValue(target), parseResult.GetValue(force), Environment.CurrentDirectory, cancellationToken);
-                foreach (var warning in result.Warnings)
+                try
                 {
-                    await Console.Error.WriteLineAsync($"warning: {warning}");
+                    var result = await EditorConfigInitializer.InitializeAsync(
+                        parseResult.GetValue(target),
+                        parseResult.GetValue(force),
+                        Environment.CurrentDirectory,
+                        cancellationToken);
+                    foreach (var warning in result.Warnings)
+                    {
+                        await Console.Error.WriteLineAsync($"warning: {warning}");
+                    }
+
+                    return 0;
                 }
-                return 0;
-            }
-            catch (ConfigurationException exception)
-            {
-                await Console.Error.WriteLineAsync(exception.Message);
-                return 2;
-            }
-        });
-        root.Subcommands.Add(init);
-        return root;
+                catch (ConfigurationException exception)
+                {
+                    await Console.Error.WriteLineAsync(exception.Message);
+                    return 2;
+                }
+            });
+        return init;
     }
 
     static Command CreateFileCommand(
@@ -80,7 +95,7 @@ static class Program
         return command;
     }
 
-    internal static async Task<int> RunSelectionAsync(CommandRequest request, string invocationDirectory)
+    static async Task<int> RunSelectionAsync(CommandRequest request, string invocationDirectory)
     {
         try
         {
@@ -107,6 +122,7 @@ static class Program
                 afterDelimiter = true;
                 continue;
             }
+
             if (afterDelimiter || !argument.StartsWith("-", StringComparison.Ordinal) || argument == "-")
                 continue;
             if (argument is "--help" or "-h" or "-?" or "--version" or "--verbose" or "--force")
@@ -116,10 +132,12 @@ static class Program
                 index++;
                 continue;
             }
+
             if (argument.StartsWith("--configuration=", StringComparison.Ordinal) || argument.StartsWith("--config=", StringComparison.Ordinal))
                 continue;
             return argument;
         }
+
         return null;
     }
 }
