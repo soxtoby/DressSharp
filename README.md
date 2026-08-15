@@ -14,15 +14,18 @@ For a repository-pinned install:
 ```powershell
 dotnet new tool-manifest
 dotnet tool install DressSharp
-dotnet dress --version
 ```
+
+## Development
+
+Build and install DressSharp locally:
 
 ```powershell
 dotnet build DressSharp.slnx
 dotnet test DressSharp.slnx --no-build
-dotnet pack src/DressSharp/DressSharp.csproj
 dotnet tool restore
-dotnet do smoke-package
+dotnet do install-local
+dotnet tool run dotnet-dress
 ```
 
 The package installs one command: `dotnet dress`.

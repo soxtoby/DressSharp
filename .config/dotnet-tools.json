@@ -4,7 +4,16 @@
   "tools": {
     "dotnetdo": {
       "version": "0.6.0",
-      "commands": ["dotnet-do"],
+      "commands": [
+        "dotnet-do"
+      ],
+      "rollForward": false
+    },
+    "dresssharp": {
+      "version": "0.1.0",
+      "commands": [
+        "dotnet-dress"
+      ],
       "rollForward": false
     }
   }
