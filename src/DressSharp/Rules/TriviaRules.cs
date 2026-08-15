@@ -132,8 +132,17 @@ sealed class BlankLineRule(string key, BlankLineKind kind, int order) : IFormatt
 
     sealed class MaximumBlankLineRewriter(int count) : CSharpSyntaxRewriter(visitIntoStructuredTrivia: true)
     {
-        public override SyntaxToken VisitToken(SyntaxToken token) => base.VisitToken(
-            token.WithLeadingTrivia(Cap(token.LeadingTrivia, Math.Max(0, count + 1 - EndingLines(token.GetPreviousToken().TrailingTrivia)))));
+        public override SyntaxToken VisitToken(SyntaxToken token)
+        {
+            // Only line breaks in leading trivia can be capped, and most tokens carry none, so bail
+            // before the previous-token lookup and the trivia list rebuild that would follow.
+            return base.VisitToken(
+                ContainsEndOfLine(token.LeadingTrivia)
+                    ? token.WithLeadingTrivia(Cap(token.LeadingTrivia, Math.Max(0, count + 1 - EndingLines(token.GetPreviousToken().TrailingTrivia))))
+                    : token);
+        }
+
+        static bool ContainsEndOfLine(SyntaxTriviaList trivia) => trivia.Any(item => item.IsKind(SyntaxKind.EndOfLineTrivia));
     }
 }
 
@@ -158,8 +167,6 @@ enum CommentKind
 
 sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<string> values, int order) : IFormattingRule
 {
-    readonly CommentKind _kind = kind;
-
     public RuleMetadata Metadata { get; } = new(
         key,
         values,
@@ -169,16 +176,44 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
         order);
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context) =>
-        new CommentTriviaRewriter(this, preference).Visit(root)!;
+        CommentRuleBatch.Apply(root, [new(this, preference)]);
+
+    /// <summary>
+    /// Rewrites one trivia list. The rule's whole effect is this function, applied to the leading and
+    /// trailing trivia of every token, which is what lets a run of comment rules share a single walk.
+    /// </summary>
+    internal SyntaxTriviaList Apply(SyntaxTriviaList trivia, string preference) =>
+        kind == CommentKind.XmlElementLayout
+            ? XmlLayout(trivia, preference)
+            : Edit(trivia, preference);
+
+    /// <summary>
+    /// Whether this trivia list holds anything the rule's kind acts on. Most tokens carry no comment
+    /// at all, and the edit below rebuilds the list unconditionally, so this check runs first.
+    /// </summary>
+    bool Relevant(SyntaxTriviaList trivia)
+    {
+        return trivia.Any(item => kind switch
+            {
+                CommentKind.LineSpacing => item.IsKind(SyntaxKind.SingleLineCommentTrivia),
+                CommentKind.BlockSpacing => item.IsKind(SyntaxKind.MultiLineCommentTrivia),
+                CommentKind.AttachedPlacement => item.IsKind(SyntaxKind.SingleLineCommentTrivia) || item.IsKind(SyntaxKind.MultiLineCommentTrivia),
+                CommentKind.XmlPlacement => item.HasStructure && item.GetStructure() is DocumentationCommentTriviaSyntax,
+                _ => false
+            });
+    }
 
     SyntaxTriviaList Edit(SyntaxTriviaList trivia, string preference)
     {
+        if (!Relevant(trivia))
+            return trivia;
+
         var items = trivia.ToList();
         for (var i = 0; i < items.Count - 1; i++)
         {
             var line = items[i].IsKind(SyntaxKind.SingleLineCommentTrivia);
             var block = items[i].IsKind(SyntaxKind.MultiLineCommentTrivia);
-            if (_kind == CommentKind.AttachedPlacement && (line || block) && preference != "auto")
+            if (kind == CommentKind.AttachedPlacement && (line || block) && preference != "auto")
             {
                 var own = preference == "own_line" || line;
                 if (items[i + 1].IsKind(SyntaxKind.WhitespaceTrivia) || items[i + 1].IsKind(SyntaxKind.EndOfLineTrivia))
@@ -186,7 +221,7 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
             }
         }
 
-        if (_kind == CommentKind.XmlPlacement)
+        if (kind == CommentKind.XmlPlacement)
         {
             for (var i = 0; i < items.Count; i++)
             {
@@ -212,7 +247,7 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
 
         for (var i = 0; i < items.Count; i++)
         {
-            switch (_kind)
+            switch (kind)
             {
                 case CommentKind.LineSpacing when items[i].IsKind(SyntaxKind.SingleLineCommentTrivia):
                 {
@@ -235,7 +270,7 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
 
     static SyntaxTriviaList XmlLayout(SyntaxTriviaList trivia, string preference)
     {
-        if (trivia.None(t => t.HasStructure && t.GetStructure() is DocumentationCommentTriviaSyntax))
+        if (!ContainsDocumentationComment(trivia))
             return trivia;
         var text = trivia.ToFullString();
         text = preference == "multi_line"
@@ -244,20 +279,46 @@ sealed partial class CommentRule(string key, CommentKind kind, ImmutableArray<st
         return SyntaxFactory.ParseLeadingTrivia(text);
     }
 
+    static bool ContainsDocumentationComment(SyntaxTriviaList trivia) => 
+        trivia.Any(item => item.HasStructure && item.GetStructure() is DocumentationCommentTriviaSyntax);
+
     [GeneratedRegex(@"^(\s*///\s*)<([A-Za-z][\w.-]*)>([^<\r\n]+)</\2>\s*$", RegexOptions.Multiline)]
     private static partial Regex SingleLineXmlElementPattern();
 
     [GeneratedRegex(@"^(\s*///\s*)<([A-Za-z][\w.-]*)>\s*\r?\n\s*///\s*([^<\r\n]+)\s*\r?\n\s*///\s*</\2>\s*$", RegexOptions.Multiline)]
     private static partial Regex MultiLineXmlElementPattern();
+}
 
-    sealed class CommentTriviaRewriter(CommentRule rule, string preference) : CSharpSyntaxRewriter
+/// <summary>
+/// Applies a run of comment rules in a single walk.
+/// </summary>
+/// <remarks>
+/// Each comment rule rewrites a token's leading and trailing trivia and nothing else, so applying
+/// them one after another to the same trivia list gives exactly what running them as separate passes
+/// would, for the cost of one walk and one rebuild rather than one of each per rule.
+/// </remarks>
+static class CommentRuleBatch
+{
+    internal static SyntaxNode Apply(SyntaxNode root, ReadOnlySpan<(CommentRule Rule, string Preference)> rules) =>
+        new Rewriter(rules.ToArray()).Visit(root)!;
+
+    sealed class Rewriter((CommentRule Rule, string Preference)[] rules) : CSharpSyntaxRewriter
     {
-        public override SyntaxToken VisitToken(SyntaxToken token) => rule._kind == CommentKind.XmlElementLayout
-            ? token
-                .WithLeadingTrivia(XmlLayout(token.LeadingTrivia, preference))
-                .WithTrailingTrivia(XmlLayout(token.TrailingTrivia, preference))
-            : token
-                .WithLeadingTrivia(rule.Edit(token.LeadingTrivia, preference))
-                .WithTrailingTrivia(rule.Edit(token.TrailingTrivia, preference));
+        public override SyntaxToken VisitToken(SyntaxToken token)
+        {
+            var leading = token.LeadingTrivia;
+            var trailing = token.TrailingTrivia;
+            foreach (var (rule, preference) in rules)
+            {
+                leading = rule.Apply(leading, preference);
+                trailing = rule.Apply(trailing, preference);
+            }
+
+            // Leaving an untouched token alone keeps its whole ancestor spine shared, so a file with
+            // no comments falls straight through instead of being rebuilt once per comment rule.
+            if (leading.Equals(token.LeadingTrivia) && trailing.Equals(token.TrailingTrivia))
+                return token;
+            return token.WithLeadingTrivia(leading).WithTrailingTrivia(trailing);
+        }
     }
 }

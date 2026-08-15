@@ -43,7 +43,7 @@ sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> va
             replacements[token] = rewrittenToken.WithLeadingTrivia(default(SyntaxTriviaList));
         }
 
-        return root.ReplaceTokens(replacements.Keys, (token, _) => replacements[token]);
+        return TokenRewriting.ReplaceTokens(root, replacements);
     }
 
     IEnumerable<SyntaxToken> Targets(SyntaxNode root) => kind switch
@@ -129,7 +129,7 @@ sealed class IndentationRule(string key, IndentationKind kind, ImmutableArray<st
             replacements[item.Token] = rewrittenToken.WithLeadingTrivia(default(SyntaxTriviaList));
         }
 
-        return root.ReplaceTokens(replacements.Keys, (token, _) => replacements[token]);
+        return TokenRewriting.ReplaceTokens(root, replacements);
     }
 
     IEnumerable<(SyntaxToken Token, string Indent)> Targets(SyntaxNode root, string preference, RuleContext context)

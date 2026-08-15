@@ -47,7 +47,9 @@ sealed class RuleCatalog
             new InitializerIndentationRule("dress_collection_initializer_indentation", InitializerKind.Collection, 350),
             new InitializerIndentationRule("dress_array_initializer_indentation", InitializerKind.Array, 360),
             new InitializerIndentationRule("dress_with_initializer_indentation", InitializerKind.With, 370),
-            new InitializerIndentationRule("dress_collection_expression_indentation", InitializerKind.CollectionExpression, 380),
+            // Kept with its sibling initializer rules rather than at 380, which fell inside the
+            // token-spacing range and split those rules into two passes over the file.
+            new InitializerIndentationRule("dress_collection_expression_indentation", InitializerKind.CollectionExpression, 371),
             new NewLineRule("csharp_new_line_before_open_brace", NewLineKind.OpenBrace, ["all", "none", "accessors", "anonymous_methods", "anonymous_types", "control_blocks", "events", "indexers", "lambdas", "local_functions", "methods", "object_collection_array_initializers", "properties", "types"], 600),
             new NewLineRule("csharp_new_line_before_else", NewLineKind.Else, ["true", "false"], 601),
             new NewLineRule("csharp_new_line_before_catch", NewLineKind.Catch, ["true", "false"], 602),

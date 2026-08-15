@@ -20,52 +20,228 @@ abstract class TokenSpacingRule(
         "Only same-line whitespace changes",
         order);
 
-    public virtual SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
+    /// <summary>
+    /// Whether the rule decides spacing purely from an adjacent token pair, so the pipeline can
+    /// run it inside a shared single-pass batch instead of giving it its own walk and rewrite.
+    /// </summary>
+    internal virtual bool ParticipatesInBatch => true;
+
+    /// <summary>
+    /// The token kinds that can make <see cref="DesiredSpace"/> claim a pair, on either side. A pair
+    /// where neither token has one of these kinds never reaches the rule.
+    /// </summary>
+    internal abstract ImmutableArray<SyntaxKind> TriggerKinds { get; }
+
+    public virtual SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context) =>
+        TokenSpacingBatch.Apply(root, [new(this, preference)], context);
+
+    internal abstract bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference);
+
+    internal virtual bool IsUnsafe(TokenPair pair, RuleContext context) =>
+        context.IsUnsafe(pair.Left)
+        || context.IsUnsafe(pair.Right)
+        || pair.HasBoundary;
+}
+
+/// <summary>
+/// One adjacent token pair under consideration, carrying the boundary test that every spacing rule
+/// shares. The instance is reused across pairs so a batch walk allocates nothing per token.
+/// </summary>
+sealed class TokenPair
+{
+    bool? _hasBoundary;
+
+    internal SyntaxToken Left { get; private set; }
+    internal SyntaxToken Right { get; private set; }
+
+    internal void Reset(SyntaxToken left, SyntaxToken right)
     {
-        var tokens = root.DescendantTokens().ToArray();
-        var replacements = new Dictionary<SyntaxToken, SyntaxToken>();
-        for (var index = 0; index + 1 < tokens.Length; index++)
-        {
-            var left = tokens[index];
-            var right = tokens[index + 1];
-            var desired = DesiredSpace(left, right, preference);
-            if (desired is null || IsUnsafe(left, right, context))
-                continue;
-
-            var rewrittenLeft = replacements.GetValueOrDefault(left, left);
-            var rewrittenRight = replacements.GetValueOrDefault(right, right);
-            if (rewrittenLeft.Span.IsEmpty)
-                rewrittenLeft = rewrittenLeft.WithLeadingTrivia(WithoutWhitespace(rewrittenLeft.LeadingTrivia));
-            rewrittenLeft = rewrittenLeft.WithTrailingTrivia(WithoutWhitespace(rewrittenLeft.TrailingTrivia));
-            rewrittenRight = rewrittenRight.WithLeadingTrivia(WithSpace(WithoutWhitespace(rewrittenRight.LeadingTrivia), desired.Value));
-            replacements[left] = rewrittenLeft;
-            replacements[right] = rewrittenRight;
-        }
-
-        return root.ReplaceTokens(replacements.Keys, (token, _) => replacements[token]);
+        Left = left;
+        Right = right;
+        _hasBoundary = null;
     }
 
-    protected abstract bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference);
+    /// <summary>
+    /// True when trivia around the pair carries meaning a spacing rule must not disturb. It depends
+    /// only on the pair, so it is computed at most once however many rules ask.
+    /// </summary>
+    internal bool HasBoundary =>
+        _hasBoundary ??=
+            ContainsBoundary(Left.LeadingTrivia)
+            || ContainsBoundary(Left.TrailingTrivia)
+            || ContainsBoundary(Right.LeadingTrivia)
+            || ContainsBoundary(Right.TrailingTrivia);
 
-    protected virtual bool IsUnsafe(SyntaxToken left, SyntaxToken right, RuleContext context) =>
-        context.IsUnsafe(left)
-        || context.IsUnsafe(right)
-        || HasBoundary(left.LeadingTrivia, left.TrailingTrivia)
-        || HasBoundary(right.LeadingTrivia, right.TrailingTrivia);
+    static bool ContainsBoundary(SyntaxTriviaList trivia)
+    {
+        return trivia.Any(item =>
+            item.IsDirective
+            || item.IsComment()
+            || item.IsKind(SyntaxKind.EndOfLineTrivia)
+            || item.IsKind(SyntaxKind.DisabledTextTrivia));
+    }
+}
 
-    static bool HasBoundary(SyntaxTriviaList left, SyntaxTriviaList right) =>
-        left.Concat(right)
-            .Any(trivia =>
-                trivia.IsDirective
-                || trivia.IsComment()
-                || trivia.IsKind(SyntaxKind.EndOfLineTrivia)
-                || trivia.IsKind(SyntaxKind.DisabledTextTrivia));
+/// <summary>
+/// Applies a run of token-spacing rules in a single walk. Running them together is equivalent to
+/// running them one after another because each rule fully overwrites the whitespace around the pair
+/// it owns, so the last rule in catalog order that claims a pair decides it either way.
+/// </summary>
+static class TokenSpacingBatch
+{
+    /// <summary>
+    /// How many rules one run can hold, bounded by the width of the per-kind trigger mask.
+    /// </summary>
+    internal const int MaximumRules = 64;
 
-    static SyntaxTriviaList WithoutWhitespace(SyntaxTriviaList trivia) =>
-        SyntaxFactory.TriviaList(trivia.Where(item => !item.IsKind(SyntaxKind.WhitespaceTrivia)));
+    internal static SyntaxNode Apply(
+        SyntaxNode root,
+        ReadOnlySpan<(TokenSpacingRule Rule, string Preference)> rules,
+        RuleContext context)
+    {
+        var triggers = Triggers(rules);
+        Dictionary<SyntaxToken, SyntaxToken>? replacements = null;
+        var pair = new TokenPair();
+        var left = default(SyntaxToken);
+        var leftTrigger = 0UL;
+        var started = false;
+        foreach (var right in root.DescendantTokens())
+        {
+            var rightTrigger = triggers.GetValueOrDefault(right.RawKind);
+            if (!started)
+            {
+                left = right;
+                leftTrigger = rightTrigger;
+                started = true;
+                continue;
+            }
+
+            // Nearly every pair is two tokens no spacing rule owns. Skipping those on a kind lookup
+            // keeps the walk off the rules entirely instead of asking each one in turn.
+            var candidates = leftTrigger | rightTrigger;
+            if (candidates != 0)
+            {
+                pair.Reset(left, right);
+                var desired = default(bool?);
+                for (var index = 0; index < rules.Length; index++)
+                {
+                    if ((candidates & (1UL << index)) == 0)
+                        continue;
+                    var (rule, preference) = rules[index];
+                    var candidate = rule.DesiredSpace(left, right, preference);
+                    if (candidate is not null && !rule.IsUnsafe(pair, context))
+                        desired = candidate;
+                }
+
+                if (desired is not null)
+                    Record(ref replacements, left, right, desired.Value);
+            }
+
+            left = right;
+            leftTrigger = rightTrigger;
+        }
+
+        return replacements is null ? root : TokenRewriting.ReplaceTokens(root, replacements);
+    }
+
+    /// <summary>
+    /// Maps a token kind to the bit set of rules in this run that could claim a pair containing it.
+    /// </summary>
+    static Dictionary<int, ulong> Triggers(ReadOnlySpan<(TokenSpacingRule Rule, string Preference)> rules)
+    {
+        var triggers = new Dictionary<int, ulong>();
+
+        for (var index = 0; index < rules.Length; index++)
+            foreach (var kind in rules[index].Rule.TriggerKinds)
+                triggers[(int)kind] = triggers.GetValueOrDefault((int)kind) | (1UL << index);
+
+        return triggers;
+    }
+
+    static void Record(ref Dictionary<SyntaxToken, SyntaxToken>? replacements, SyntaxToken left, SyntaxToken right, bool space)
+    {
+        var rewrittenLeft = replacements is not null && replacements.TryGetValue(left, out var pendingLeft) ? pendingLeft : left;
+        var rewrittenRight = replacements is not null && replacements.TryGetValue(right, out var pendingRight) ? pendingRight : right;
+
+        var changedLeft = false;
+        if (rewrittenLeft.Span.IsEmpty && HasWhitespace(rewrittenLeft.LeadingTrivia))
+        {
+            rewrittenLeft = rewrittenLeft.WithLeadingTrivia(WithoutWhitespace(rewrittenLeft.LeadingTrivia));
+            changedLeft = true;
+        }
+
+        if (HasWhitespace(rewrittenLeft.TrailingTrivia))
+        {
+            rewrittenLeft = rewrittenLeft.WithTrailingTrivia(WithoutWhitespace(rewrittenLeft.TrailingTrivia));
+            changedLeft = true;
+        }
+
+        var changedRight = !LeadingAlreadyDesired(rewrittenRight.LeadingTrivia, space);
+        if (changedRight)
+            rewrittenRight = rewrittenRight.WithLeadingTrivia(WithSpace(WithoutWhitespace(rewrittenRight.LeadingTrivia), space));
+
+        // Rewriting a token to identical text still forces Roslyn to rebuild its whole ancestor
+        // spine, so only record tokens whose trivia actually differs from what the rule wants.
+        if (!changedLeft && !changedRight)
+            return;
+
+        replacements ??= [];
+        if (changedLeft)
+            replacements[left] = rewrittenLeft;
+        if (changedRight)
+            replacements[right] = rewrittenRight;
+    }
+
+    static bool HasWhitespace(SyntaxTriviaList trivia) => trivia.Any(item => item.IsKind(SyntaxKind.WhitespaceTrivia));
+
+    static bool LeadingAlreadyDesired(SyntaxTriviaList trivia, bool space)
+    {
+        var index = 0;
+        if (space)
+        {
+            if (trivia.Count == 0 || !IsSingleSpace(trivia[0]))
+                return false;
+            index = 1;
+        }
+
+        for (; index < trivia.Count; index++)
+        {
+            if (trivia[index].IsKind(SyntaxKind.WhitespaceTrivia))
+                return false;
+        }
+
+        return true;
+    }
+
+    static bool IsSingleSpace(SyntaxTrivia trivia) =>
+        trivia.IsKind(SyntaxKind.WhitespaceTrivia)
+        && trivia.FullSpan.Length == 1
+        && trivia.ToString() == " ";
+
+    static readonly SyntaxTriviaList SingleSpace = SyntaxFactory.TriviaList(SyntaxFactory.Space);
+
+    static SyntaxTriviaList WithoutWhitespace(SyntaxTriviaList trivia)
+    {
+        var kept = trivia.Count(item => !item.IsKind(SyntaxKind.WhitespaceTrivia));
+
+        // Trivia between two tokens a spacing rule owns is nearly always whitespace and nothing else,
+        // so the usual answer is the empty list, which costs no allocation at all.
+        if (kept == 0)
+            return default;
+        if (kept == trivia.Count)
+            return trivia;
+
+        var retained = new List<SyntaxTrivia>(kept);
+        retained.AddRange(trivia
+            .Where(item => !item.IsKind(SyntaxKind.WhitespaceTrivia)));
+
+        return SyntaxFactory.TriviaList(retained);
+    }
 
     static SyntaxTriviaList WithSpace(SyntaxTriviaList trivia, bool space) =>
-        space ? trivia.Insert(0, SyntaxFactory.Space) : trivia;
+        !space ? trivia
+        : trivia.Count == 0 ? SingleSpace
+        : trivia.Insert(0, SyntaxFactory.Space);
 }
 
 sealed class CastSpacingRule(int order) : TokenSpacingRule(
@@ -74,7 +250,9 @@ sealed class CastSpacingRule(int order) : TokenSpacingRule(
     "cast expressions",
     order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.CloseParenToken];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
         left.IsKind(SyntaxKind.CloseParenToken) && left.Parent is CastExpressionSyntax
             ? preference == "true"
             : null;
@@ -86,7 +264,9 @@ sealed class ControlFlowKeywordSpacingRule(int order) : TokenSpacingRule(
     "control-flow keywords",
     order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
         right.IsKind(SyntaxKind.OpenParenToken) && IsControlKeyword(left)
             ? preference == "true"
             : null;
@@ -108,26 +288,50 @@ sealed class ParenthesisSpacingRule(int order) : TokenSpacingRule(
     "parenthesized syntax",
     order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
     {
-        var parent = left.IsKind(SyntaxKind.OpenParenToken)
-            ? left.Parent
-            : right.IsKind(SyntaxKind.CloseParenToken)
-                ? right.Parent
-                : null;
+        var parent = left.IsKind(SyntaxKind.OpenParenToken) ? left.Parent
+            : right.IsKind(SyntaxKind.CloseParenToken) ? right.Parent
+            : null;
 
         if (parent is null)
             return null;
 
         var category = parent switch
             {
-                CastExpressionSyntax => "type_casts",
-                IfStatementSyntax or WhileStatementSyntax or ForStatementSyntax or ForEachStatementSyntax
-                    or SwitchStatementSyntax or LockStatementSyntax or UsingStatementSyntax or CatchDeclarationSyntax
-                    => "control_flow_statements",
-                _ => "expressions"
+                CastExpressionSyntax => Category.TypeCasts,
+                IfStatementSyntax
+                    or WhileStatementSyntax
+                    or ForStatementSyntax
+                    or ForEachStatementSyntax
+                    or SwitchStatementSyntax
+                    or LockStatementSyntax
+                    or UsingStatementSyntax
+                    or CatchDeclarationSyntax
+                    => Category.ControlFlowStatements,
+                _ => Category.Expressions
             };
-        return preference.Split(',', StringSplitOptions.TrimEntries).Contains(category);
+        return (Selected.GetValueOrDefault(preference) & category) != 0;
+    }
+
+    static readonly string[] CategoryNames = ["control_flow_statements", "expressions", "type_casts"];
+
+    /// <summary>
+    /// Every accepted preference value mapped to the categories it selects. Splitting the preference
+    /// string per token pair dominated this rule's cost, and the value set is fixed and tiny.
+    /// </summary>
+    static readonly Dictionary<string, Category> Selected = AcceptedValues()
+        .ToDictionary(value => value, Parse, StringComparer.OrdinalIgnoreCase);
+
+    static Category Parse(string preference)
+    {
+        return preference
+            .Split(',', StringSplitOptions.TrimEntries)
+            .Select(part => Array.IndexOf(CategoryNames, part))
+            .Where(index => index >= 0)
+            .Aggregate(default(Category), (current, index) => current | (Category)(1 << index));
     }
 
     static ImmutableArray<string> AcceptedValues()
@@ -138,6 +342,14 @@ sealed class ParenthesisSpacingRule(int order) : TokenSpacingRule(
                 .Select(permutation => string.Join(',', permutation.Take(length))))
             .Distinct();
         return ["false", .. subsets];
+    }
+
+    [Flags]
+    enum Category
+    {
+        ControlFlowStatements = 1,
+        Expressions = 2,
+        TypeCasts = 4
     }
 }
 
@@ -153,7 +365,9 @@ sealed class BaseListColonSpacingRule(SpacingSide side, int order) : TokenSpacin
     "base-list colons",
     order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.ColonToken];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
     {
         var token = side == SpacingSide.Before ? right : left;
         return token.IsKind(SyntaxKind.ColonToken) && token.Parent is BaseListSyntax
@@ -168,20 +382,30 @@ sealed class BinaryOperatorSpacingRule(int order) : TokenSpacingRule(
     "binary and assignment operators",
     order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
+    // Derived from Roslyn rather than hand-listed so the trigger set cannot drift from IsOperator.
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } =
+        [
+            .. Enum.GetValues<SyntaxKind>()
+                .Where(kind =>
+                    SyntaxFacts.GetBinaryExpression(kind) != SyntaxKind.None
+                    || SyntaxFacts.GetAssignmentExpression(kind) != SyntaxKind.None)
+        ];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
     {
         return preference == "ignore" ? null
             : IsOperator(left) || IsOperator(right) ? preference == "before_and_after"
             : null;
     }
 
-    protected override bool IsUnsafe(SyntaxToken left, SyntaxToken right, RuleContext context)
+    internal override bool IsUnsafe(TokenPair pair, RuleContext context)
     {
-        var token = IsOperator(left) ? left
-            : IsOperator(right) ? right
+        var token = IsOperator(pair.Left) ? pair.Left
+            : IsOperator(pair.Right) ? pair.Right
             : default;
-        return base.IsUnsafe(left, right, context)
-            || token != default && token.Parent!.DescendantTrivia(descendIntoTrivia: true).Any(trivia => trivia.IsDirective || trivia.IsComment());
+        return base.IsUnsafe(pair, context)
+            || token != default && token.Parent!.DescendantTrivia(descendIntoTrivia: true)
+                .Any(trivia => trivia.IsDirective || trivia.IsComment());
     }
 
     static bool IsOperator(SyntaxToken token) => token.Parent switch
@@ -190,13 +414,6 @@ sealed class BinaryOperatorSpacingRule(int order) : TokenSpacingRule(
             AssignmentExpressionSyntax assignment => token == assignment.OperatorToken,
             _ => false
         };
-}
-
-enum ParenthesisSpacingKind
-{
-    Contents,
-    EmptyContents,
-    BeforeOpening
 }
 
 sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind, int order) : TokenSpacingRule(
@@ -210,7 +427,9 @@ sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind, int order
     "method declaration parameter lists",
     order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
         Matches(left, right) ? preference == "true" : null;
 
     bool Matches(SyntaxToken left, SyntaxToken right) => kind switch
@@ -240,7 +459,9 @@ sealed class MethodCallSpacingRule(ParenthesisSpacingKind kind, int order) : Tok
     "invocation argument lists",
     order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
         Matches(left, right) ? preference == "true" : null;
 
     bool Matches(SyntaxToken left, SyntaxToken right) => kind switch
@@ -257,10 +478,19 @@ sealed class MethodCallSpacingRule(ParenthesisSpacingKind kind, int order) : Tok
         left.IsKind(SyntaxKind.OpenParenToken) ? left.Parent as ArgumentListSyntax : right.IsKind(SyntaxKind.CloseParenToken) ? right.Parent as ArgumentListSyntax : null;
 }
 
+enum ParenthesisSpacingKind
+{
+    Contents,
+    EmptyContents,
+    BeforeOpening
+}
+
 abstract class PunctuationSpacingRule(string key, SyntaxKind tokenKind, SpacingSide side, string ownedSyntax, int order)
     : TokenSpacingRule(key, ["true", "false"], ownedSyntax, order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [tokenKind];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
     {
         var token = side == SpacingSide.Before ? right : left;
         return token.IsKind(tokenKind) && IsOwned(token) ? preference == "true" : null;
@@ -299,7 +529,9 @@ sealed class DeclarationSpacingRule(int order) : TokenSpacingRule(
     "declaration equals tokens",
     order)
 {
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.EqualsToken];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
         (left.IsKind(SyntaxKind.EqualsToken)
             || right.IsKind(SyntaxKind.EqualsToken))
         && (left.Parent is EqualsValueClauseSyntax
@@ -326,6 +558,10 @@ sealed class BracketSpacingRule(BracketSpacingKind kind, int order) : TokenSpaci
     "array and element-access brackets",
     order)
 {
+    // The empty-brackets variant rewrites whole rank specifiers rather than deciding an adjacent
+    // token pair, so it keeps its own pass instead of joining the shared spacing batch.
+    internal override bool ParticipatesInBatch => kind != BracketSpacingKind.EmptyContents;
+
     public override SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {
         if (kind != BracketSpacingKind.EmptyContents)
@@ -341,7 +577,10 @@ sealed class BracketSpacingRule(BracketSpacingKind kind, int order) : TokenSpaci
             (node, rewritten) => RewriteEmpty(rewritten, preference == "true"));
     }
 
-    protected override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) => kind switch
+    internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } =
+            [SyntaxKind.OpenBracketToken, SyntaxKind.CloseBracketToken];
+
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) => kind switch
         {
             BracketSpacingKind.BeforeOpening when right.IsKind(SyntaxKind.OpenBracketToken)
                 && right.Parent is BracketedArgumentListSyntax or BracketedParameterListSyntax or ArrayRankSpecifierSyntax
@@ -441,7 +680,7 @@ sealed class SystemUsingSortRule(int order) : UsingDirectiveRule(
     order)
 {
     protected override SyntaxList<UsingDirectiveSyntax> Rewrite(SyntaxList<UsingDirectiveSyntax> source, bool enabled, RuleContext context) =>
-        enabled 
+        enabled
             ? SyntaxFactory.List(source.OrderBy(item => IsSystem(item) ? 0 : 1))
             : source;
 }
@@ -474,7 +713,7 @@ sealed class ImportGroupSeparationRule(int order) : UsingDirectiveRule(
     static SyntaxTriviaList RemoveFirstEndOfLine(SyntaxTriviaList trivia)
     {
         var removed = false;
-        return SyntaxFactory.TriviaList(trivia.Where(item =>
-            !item.IsKind(SyntaxKind.EndOfLineTrivia) || removed || (removed = true)));
+        return SyntaxFactory.TriviaList(trivia
+            .Where(item => !item.IsKind(SyntaxKind.EndOfLineTrivia) || removed || (removed = true)));
     }
 }

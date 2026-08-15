@@ -7,7 +7,7 @@ namespace DressSharp.Parsing;
 sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evaluator = null) : IParseContextResolver
 {
     readonly string _discoveryRoot = Path.GetFullPath(discoveryRoot);
-    readonly IMSBuildEvaluator _evaluator = evaluator ?? new DotNetMSBuildEvaluator();
+    readonly IMSBuildEvaluator _evaluator = evaluator ?? new MSBuildEvaluationCache(new DotNetMSBuildEvaluator());
 
     public async ValueTask<IReadOnlyDictionary<string, ParseContextResolution>> ResolveAsync(
         IReadOnlyList<string> paths,
