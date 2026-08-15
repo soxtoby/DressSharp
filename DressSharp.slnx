@@ -10,5 +10,6 @@
     <File Path="scripts/benchmark.cs" />
     <File Path="scripts/install-local.cs" />
     <File Path="scripts/materialize-corpus.cs" />
+    <File Path="scripts/test.cs" />
   </Folder>
 </Solution>
