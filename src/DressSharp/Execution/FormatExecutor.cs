@@ -15,6 +15,11 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
     readonly TextWriter _output = output ?? Console.Out;
     readonly TextWriter _error = error ?? Console.Error;
 
+    /// <summary>
+    /// Whether to reparse each result and confirm formatting only moved whitespace.
+    /// </summary>
+    static bool VerifyTokens { get; } = Environment.GetEnvironmentVariable("DRESSSHARP_VERIFY_TOKENS") == "1";
+
     internal async Task<int> RunAsync(CommandRequest request, IReadOnlyList<SelectedFile> selected, CancellationToken cancellationToken = default)
     {
         var timing = new BenchmarkTiming();
@@ -55,16 +60,37 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
                         var tree = CSharpSyntaxTree.ParseText(document.Text, context.Options!, file.FullPath, cancellationToken: token);
                         var root = await tree.GetRootAsync(token);
                         timing.AddParse(Stopwatch.GetElapsedTime(parseStart));
+                        var configuration = configurations[file.FullPath];
+                        string formatted;
+                        var skipped = 0;
                         var transformStart = Stopwatch.GetTimestamp();
-                        var transformation = new TransformationPipeline(RuleCatalog.BuiltIn, BenchmarkDiagnostics.Enabled ? timing.RecordRule : null)
-                            .Transform(root, configurations[file.FullPath]);
-                        timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
-                        if (!transformation.Succeeded)
-                            throw transformation.Failure!;
+                        if (SinglePassEmitter.Enabled)
+                        {
+                            formatted = SinglePassEmitter.Emit(root, EmitterPlan.From(RuleCatalog.BuiltIn, configuration), document.Text);
+                            timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
+                        }
+                        else
+                        {
+                            var transformation = new TransformationPipeline(RuleCatalog.BuiltIn, BenchmarkDiagnostics.Enabled ? timing.RecordRule : null)
+                                .Transform(root, configuration);
+                            timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
+                            if (!transformation.Succeeded)
+                                throw transformation.Failure!;
+                            formatted = transformation.Root.ToFullString();
+                            skipped = transformation.SkippedOccurrences;
+                        }
+
+                        // The layout stage must leave the token stream alone. The invariant belongs to
+                        // that stage rather than to the catalog, because the nine syntax-transformation
+                        // rules are meant to change tokens, so it is checked where layout stands alone.
+                        if (VerifyTokens && SinglePassEmitter.Enabled
+                            && TokenEquivalence.FirstDifference(root, formatted, context.Options!) is { } difference)
+                            throw new InvalidOperationException($"formatting altered the token stream: {difference}");
+
                         var encodeStart = Stopwatch.GetTimestamp();
-                        var bytes = document.Encode(transformation.Root.ToFullString(), Representation(configurations[file.FullPath]));
+                        var bytes = document.Encode(formatted, Representation(configuration));
                         timing.AddEncode(Stopwatch.GetElapsedTime(encodeStart));
-                        prepared[index] = new(document, bytes, transformation.SkippedOccurrences);
+                        prepared[index] = new(document, bytes, skipped);
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {
