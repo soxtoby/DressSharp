@@ -11,6 +11,10 @@
     <Description>A syntax-only, explicitly configured C# formatter.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\packages</PackageOutputPath>
+    <!-- Formatting a repository allocates syntax nodes on every worker at once, and collection was
+         measured at roughly a third of active CPU under the workstation collector. -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="editorconfig" />

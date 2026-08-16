@@ -14,53 +14,68 @@ sealed class ConstructLayoutRule(string key, ConstructLayoutKind kind, int order
         "Only whitespace owned by the construct changes",
         order);
 
-    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
-    {
-        var maximum = int.MaxValue;
-        if (preference.Equals("auto", StringComparison.OrdinalIgnoreCase))
-            maximum = context.MaximumLineLength;
+    internal ConstructLayoutKind Kind => kind;
 
-        return new Rewriter(kind, preference, maximum, context).Visit(root)!;
+    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context) =>
+        ConstructLayoutBatch.Apply(root, [new(this, preference)], context);
+
+    /// <summary>
+    /// What one construct kind was asked for: the wrapping outcome, and the line length that the
+    /// auto outcome measures against.
+    /// </summary>
+    internal readonly record struct Setting(string Preference, int Maximum)
+    {
+        internal static Setting For(string preference, RuleContext context) => new(
+            preference,
+            preference.Equals("auto", StringComparison.OrdinalIgnoreCase) ? context.MaximumLineLength : int.MaxValue);
     }
 
-    sealed class Rewriter(ConstructLayoutKind kind, string preference, int maximum, RuleContext context) : CSharpSyntaxRewriter
+    internal sealed class Rewriter(Setting?[] byKind, RuleContext context) : CSharpSyntaxRewriter
     {
-        public override SyntaxNode? VisitArgumentList(ArgumentListSyntax node) =>
-            kind == ConstructLayoutKind.Arguments
-                ? Delimited((ArgumentListSyntax)base.VisitArgumentList(node)!)
-                : base.VisitArgumentList(node);
+        Setting? Enabled(ConstructLayoutKind kind) => byKind[(int)kind];
 
-        public override SyntaxNode? VisitBracketedArgumentList(BracketedArgumentListSyntax node) =>
-            kind == ConstructLayoutKind.Arguments
-                ? Delimited((BracketedArgumentListSyntax)base.VisitBracketedArgumentList(node)!)
-                : base.VisitBracketedArgumentList(node);
+        public override SyntaxNode? VisitArgumentList(ArgumentListSyntax node)
+        {
+            var visited = (ArgumentListSyntax)base.VisitArgumentList(node)!;
+            return Enabled(ConstructLayoutKind.Arguments) is { } setting ? Delimited(visited, setting) : visited;
+        }
 
-        public override SyntaxNode? VisitParameterList(ParameterListSyntax node) =>
-            kind == ConstructLayoutKind.Parameters
-                ? Delimited((ParameterListSyntax)base.VisitParameterList(node)!)
-                : base.VisitParameterList(node);
+        public override SyntaxNode? VisitBracketedArgumentList(BracketedArgumentListSyntax node)
+        {
+            var visited = (BracketedArgumentListSyntax)base.VisitBracketedArgumentList(node)!;
+            return Enabled(ConstructLayoutKind.Arguments) is { } setting ? Delimited(visited, setting) : visited;
+        }
 
-        public override SyntaxNode? VisitBracketedParameterList(BracketedParameterListSyntax node) =>
-            kind == ConstructLayoutKind.Parameters
-                ? Delimited((BracketedParameterListSyntax)base.VisitBracketedParameterList(node)!)
-                : base.VisitBracketedParameterList(node);
+        public override SyntaxNode? VisitParameterList(ParameterListSyntax node)
+        {
+            var visited = (ParameterListSyntax)base.VisitParameterList(node)!;
+            return Enabled(ConstructLayoutKind.Parameters) is { } setting ? Delimited(visited, setting) : visited;
+        }
 
-        public override SyntaxNode? VisitInitializerExpression(InitializerExpressionSyntax node) =>
-            kind == ConstructLayoutKind.Initializers
-                ? Delimited((InitializerExpressionSyntax)base.VisitInitializerExpression(node)!)
-                : base.VisitInitializerExpression(node);
+        public override SyntaxNode? VisitBracketedParameterList(BracketedParameterListSyntax node)
+        {
+            var visited = (BracketedParameterListSyntax)base.VisitBracketedParameterList(node)!;
+            return Enabled(ConstructLayoutKind.Parameters) is { } setting ? Delimited(visited, setting) : visited;
+        }
 
-        public override SyntaxNode? VisitCollectionExpression(CollectionExpressionSyntax node) =>
-            kind == ConstructLayoutKind.CollectionExpressions
-                ? Delimited((CollectionExpressionSyntax)base.VisitCollectionExpression(node)!)
-                : base.VisitCollectionExpression(node);
+        public override SyntaxNode? VisitInitializerExpression(InitializerExpressionSyntax node)
+        {
+            var visited = (InitializerExpressionSyntax)base.VisitInitializerExpression(node)!;
+            return Enabled(ConstructLayoutKind.Initializers) is { } setting ? Delimited(visited, setting) : visited;
+        }
+
+        public override SyntaxNode? VisitCollectionExpression(CollectionExpressionSyntax node)
+        {
+            var visited = (CollectionExpressionSyntax)base.VisitCollectionExpression(node)!;
+            return Enabled(ConstructLayoutKind.CollectionExpressions) is { } setting ? Delimited(visited, setting) : visited;
+        }
 
         public override SyntaxNode? VisitBaseList(BaseListSyntax node)
         {
             var visited = (BaseListSyntax)base.VisitBaseList(node)!;
-            if (kind != ConstructLayoutKind.BaseTypeLists || visited.Types.Count == 0 || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.BaseTypeLists) is not { } setting || visited.Types.Count == 0 || Unsafe(visited))
                 return visited;
-            return LayoutSeparated(visited, visited.Types.GetSeparators(), visited.Types.Select(x => x.GetFirstToken()));
+            return LayoutSeparated(visited, visited.Types.GetSeparators(), visited.Types.Select(x => x.GetFirstToken()), setting);
         }
 
         public override SyntaxNode VisitClassDeclaration(ClassDeclarationSyntax node) => Constraints((ClassDeclarationSyntax)base.VisitClassDeclaration(node)!);
@@ -70,74 +85,77 @@ sealed class ConstructLayoutRule(string key, ConstructLayoutKind kind, int order
 
         T Constraints<T>(T visited) where T : TypeDeclarationSyntax
         {
-            if (kind != ConstructLayoutKind.ConstraintClauses || visited.ConstraintClauses.Count == 0 || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.ConstraintClauses) is not { } setting || visited.ConstraintClauses.Count == 0 || Unsafe(visited))
                 return visited;
-            return LayoutItems(visited, visited.ConstraintClauses.Select(x => x.GetFirstToken()), continuation: true);
+            return LayoutItems(visited, visited.ConstraintClauses.Select(x => x.GetFirstToken()), setting, continuation: true);
         }
 
         public override SyntaxNode? VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
             var visited = (MethodDeclarationSyntax)base.VisitMethodDeclaration(node)!;
-            if (kind != ConstructLayoutKind.ConstraintClauses || visited.ConstraintClauses.Count == 0 || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.ConstraintClauses) is not { } setting || visited.ConstraintClauses.Count == 0 || Unsafe(visited))
                 return visited;
-            return LayoutItems(visited, visited.ConstraintClauses.Select(x => x.GetFirstToken()), continuation: true);
+            return LayoutItems(visited, visited.ConstraintClauses.Select(x => x.GetFirstToken()), setting, continuation: true);
         }
 
         public override SyntaxNode? VisitLocalFunctionStatement(LocalFunctionStatementSyntax node)
         {
             var visited = (LocalFunctionStatementSyntax)base.VisitLocalFunctionStatement(node)!;
-            if (kind != ConstructLayoutKind.ConstraintClauses || visited.ConstraintClauses.Count == 0 || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.ConstraintClauses) is not { } setting || visited.ConstraintClauses.Count == 0 || Unsafe(visited))
                 return visited;
-            return LayoutItems(visited, visited.ConstraintClauses.Select(x => x.GetFirstToken()), continuation: true);
+            return LayoutItems(visited, visited.ConstraintClauses.Select(x => x.GetFirstToken()), setting, continuation: true);
         }
 
         public override SyntaxNode? VisitDelegateDeclaration(DelegateDeclarationSyntax node)
         {
             var visited = (DelegateDeclarationSyntax)base.VisitDelegateDeclaration(node)!;
-            if (kind != ConstructLayoutKind.ConstraintClauses || visited.ConstraintClauses.Count == 0 || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.ConstraintClauses) is not { } setting || visited.ConstraintClauses.Count == 0 || Unsafe(visited))
                 return visited;
-            return LayoutItems(visited, visited.ConstraintClauses.Select(x => x.GetFirstToken()), continuation: true);
+            return LayoutItems(visited, visited.ConstraintClauses.Select(x => x.GetFirstToken()), setting, continuation: true);
         }
 
         public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
         {
             var visited = (MemberAccessExpressionSyntax)base.VisitMemberAccessExpression(node)!;
-            if (kind != ConstructLayoutKind.MemberAccessChains || node.Parent is MemberAccessExpressionSyntax || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.MemberAccessChains) is not { } setting || node.Parent is MemberAccessExpressionSyntax || Unsafe(visited))
                 return visited;
             var operators = visited.DescendantTokens().Where(x => x.IsKind(SyntaxKind.DotToken) || x.IsKind(SyntaxKind.MinusGreaterThanToken));
-            return LayoutItems(visited, operators, continuation: true, compactSingle: true);
+            return LayoutItems(visited, operators, setting, continuation: true, compactSingle: true);
         }
 
         public override SyntaxNode? VisitBinaryExpression(BinaryExpressionSyntax node)
         {
             var visited = (BinaryExpressionSyntax)base.VisitBinaryExpression(node)!;
-            if (kind != ConstructLayoutKind.BinaryExpressions || node.Parent is BinaryExpressionSyntax || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.BinaryExpressions) is not { } setting || node.Parent is BinaryExpressionSyntax || Unsafe(visited))
                 return visited;
             var operators = visited.DescendantNodesAndSelf().OfType<BinaryExpressionSyntax>().Select(x => x.OperatorToken);
-            return LayoutItems(visited, operators, continuation: true);
+            return LayoutItems(visited, operators, setting, continuation: true);
         }
 
         public override SyntaxNode? VisitConditionalExpression(ConditionalExpressionSyntax node)
         {
             var visited = (ConditionalExpressionSyntax)base.VisitConditionalExpression(node)!;
-            if (kind != ConstructLayoutKind.ConditionalExpressions || node.Parent is ConditionalExpressionSyntax || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.ConditionalExpressions) is not { } setting || node.Parent is ConditionalExpressionSyntax || Unsafe(visited))
                 return visited;
-            return LayoutItems(visited, [visited.QuestionToken, visited.ColonToken], continuation: true);
+            return LayoutItems(visited, [visited.QuestionToken, visited.ColonToken], setting, continuation: true);
         }
 
         public override SyntaxNode? VisitQueryExpression(QueryExpressionSyntax node)
         {
             var visited = (QueryExpressionSyntax)base.VisitQueryExpression(node)!;
-            if (kind != ConstructLayoutKind.QueryClauses || Unsafe(visited))
+            if (Enabled(ConstructLayoutKind.QueryClauses) is not { } setting || Unsafe(visited))
                 return visited;
             var starts = visited.Body.Clauses.Select(x => x.GetFirstToken()).Append(visited.Body.SelectOrGroup.GetFirstToken());
-            return LayoutItems(visited, starts, continuation: true);
+            return LayoutItems(visited, starts, setting, continuation: true);
         }
 
-        public override SyntaxNode? VisitAttributeList(AttributeListSyntax node) =>
-            kind == ConstructLayoutKind.Attributes ? Delimited((AttributeListSyntax)base.VisitAttributeList(node)!) : base.VisitAttributeList(node);
+        public override SyntaxNode? VisitAttributeList(AttributeListSyntax node)
+        {
+            var visited = (AttributeListSyntax)base.VisitAttributeList(node)!;
+            return Enabled(ConstructLayoutKind.Attributes) is { } setting ? Delimited(visited, setting) : visited;
+        }
 
-        T Delimited<T>(T node) where T : SyntaxNode
+        T Delimited<T>(T node, Setting setting) where T : SyntaxNode
         {
             if (Unsafe(node))
                 return node;
@@ -148,7 +166,7 @@ sealed class ConstructLayoutRule(string key, ConstructLayoutKind kind, int order
             if (elements.Length == 0)
                 return node;
 
-            var multi = IsMulti(node);
+            var multi = IsMulti(node, setting);
             if (!multi && HasLineComment(node))
                 return node;
             var indent = Indent(node, multi ? 1 : 0);
@@ -194,9 +212,9 @@ sealed class ConstructLayoutRule(string key, ConstructLayoutKind kind, int order
                 _ => []
             };
 
-        T LayoutSeparated<T>(T node, IEnumerable<SyntaxToken> separators, IEnumerable<SyntaxToken> starts) where T : SyntaxNode
+        T LayoutSeparated<T>(T node, IEnumerable<SyntaxToken> separators, IEnumerable<SyntaxToken> starts, Setting setting) where T : SyntaxNode
         {
-            var multi = IsMulti(node);
+            var multi = IsMulti(node, setting);
             if (!multi && HasLineComment(node))
                 return node;
             var indent = Indent(node, 1);
@@ -219,13 +237,13 @@ sealed class ConstructLayoutRule(string key, ConstructLayoutKind kind, int order
             return node.ReplaceTokens(replacements.Keys, (token, _) => replacements[token]);
         }
 
-        T LayoutItems<T>(T node, IEnumerable<SyntaxToken> starts, bool continuation, bool compactSingle = false) where T : SyntaxNode
+        T LayoutItems<T>(T node, IEnumerable<SyntaxToken> starts, Setting setting, bool continuation, bool compactSingle = false) where T : SyntaxNode
         {
             var tokens = starts.Distinct().ToArray();
             if (tokens.Length == 0)
                 return node;
             
-            var multi = IsMulti(node);
+            var multi = IsMulti(node, setting);
             if (!multi && HasLineComment(node))
                 return node;
             
@@ -247,16 +265,19 @@ sealed class ConstructLayoutRule(string key, ConstructLayoutKind kind, int order
             return node.ReplaceTokens(replacements.Keys, (token, _) => replacements[token]);
         }
 
-        bool IsMulti(SyntaxNode node)
+        bool IsMulti(SyntaxNode node, Setting setting)
         {
-            if (preference.Equals("always_multi", StringComparison.OrdinalIgnoreCase))
+            if (setting.Preference.Equals("always_multi", StringComparison.OrdinalIgnoreCase))
                 return true;
-            if (preference.Equals("always_single", StringComparison.OrdinalIgnoreCase) || maximum == int.MaxValue)
+            if (setting.Preference.Equals("always_single", StringComparison.OrdinalIgnoreCase) || setting.Maximum == int.MaxValue)
                 return false;
-            return VisualStartColumn(node) + SingleLineWidth(node) > maximum;
+            return VisualStartColumn(node) + SingleLineWidth(node) > setting.Maximum;
         }
 
-        bool Unsafe(SyntaxNode node) => context.IsUnsafe(node) || node.DescendantTrivia(descendIntoTrivia: true).Any(x => x.IsDirective);
+        // ContainsDirectives is a flag Roslyn already carries on every node, so it answers what a
+        // full descendant-trivia scan of the subtree would, without the scan. The scan ran once per
+        // construct, which on nested constructs meant walking the same trivia over and over.
+        bool Unsafe(SyntaxNode node) => context.IsUnsafe(node) || node.ContainsDirectives;
 
         int SingleLineWidth(SyntaxNode node)
         {
@@ -326,6 +347,28 @@ sealed class ConstructLayoutRule(string key, ConstructLayoutKind kind, int order
 
         static SyntaxTriviaList WithoutWhitespace(SyntaxTriviaList trivia) => SyntaxFactory.TriviaList(
             trivia.Where(x => !x.IsKind(SyntaxKind.WhitespaceTrivia) && !x.IsKind(SyntaxKind.EndOfLineTrivia)));
+    }
+}
+
+
+/// <summary>
+/// Applies a run of construct-layout rules in a single walk.
+/// </summary>
+/// <remarks>
+/// The rules own disjoint constructs and each rewrites only the whitespace inside the construct it
+/// owns, so one traversal can carry them all instead of one traversal and one rebuild per rule.
+/// </remarks>
+static class ConstructLayoutBatch
+{
+    internal static SyntaxNode Apply(
+        SyntaxNode root,
+        ReadOnlySpan<(ConstructLayoutRule Rule, string Preference)> rules,
+        RuleContext context)
+    {
+        var byKind = new ConstructLayoutRule.Setting?[Enum.GetValues<ConstructLayoutKind>().Length];
+        foreach (var (rule, preference) in rules)
+            byKind[(int)rule.Kind] = ConstructLayoutRule.Setting.For(preference, context);
+        return new ConstructLayoutRule.Rewriter(byKind, context).Visit(root)!;
     }
 }
 

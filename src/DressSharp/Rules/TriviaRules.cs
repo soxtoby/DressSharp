@@ -18,12 +18,16 @@ sealed class BlankLineRule(string key, BlankLineKind kind, int order) : IFormatt
         "Only whitespace trivia changes",
         order);
 
-    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
-    {
-        var count = int.Parse(preference);
-        if (kind == BlankLineKind.Maximum)
-            return new MaximumBlankLineRewriter(count).Visit(root)!;
+    internal BlankLineKind Kind => kind;
 
+    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context) =>
+        BlankLineBatch.Apply(root, [new(this, preference)], context);
+
+    /// <summary>
+    /// The first token of every construct this rule owns a line break in front of.
+    /// </summary>
+    internal IEnumerable<SyntaxToken> Targets(SyntaxNode root, RuleContext context)
+    {
         var targets = new List<SyntaxNode>();
         switch (kind)
         {
@@ -55,11 +59,34 @@ sealed class BlankLineRule(string key, BlankLineKind kind, int order) : IFormatt
             }
         }
 
-        return root.ReplaceTokens(
-            targets
-                .Where(node => !context.IsUnsafe(node))
-                .Select(node => node.GetFirstToken()),
-            (token, _) => token.WithLeadingTrivia(SetBreaks(token.LeadingTrivia, Math.Max(0, count + 1 - EndingLines(token.GetPreviousToken().TrailingTrivia)))));
+        return targets
+            .Where(node => !context.IsUnsafe(node))
+            .Select(node => node.GetFirstToken());
+    }
+
+    /// <summary>
+    /// The leading trivia a target token should carry to sit behind <paramref name="count"/> blank
+    /// lines, given whatever leading trivia it carries now.
+    /// </summary>
+    internal static SyntaxTriviaList Separate(SyntaxToken token, SyntaxTriviaList leading, int count) =>
+        SetBreaks(leading, Math.Max(0, count + 1 - EndingLines(token.GetPreviousToken().TrailingTrivia)));
+
+    /// <summary>
+    /// The leading trivia a token should carry once runs of blank lines are capped at
+    /// <paramref name="count"/>.
+    /// </summary>
+    internal static SyntaxTriviaList CapRuns(SyntaxToken token, SyntaxTriviaList leading, int count) =>
+        Cap(leading, Math.Max(0, count + 1 - EndingLines(token.GetPreviousToken().TrailingTrivia)));
+
+    internal static bool ContainsEndOfLine(SyntaxTriviaList trivia)
+    {
+        foreach (var item in trivia)
+        {
+            if (item.IsKind(SyntaxKind.EndOfLineTrivia))
+                return true;
+        }
+
+        return false;
     }
 
     static IEnumerable<SyntaxList<UsingDirectiveSyntax>> UsingLists(SyntaxNode root)
@@ -130,19 +157,86 @@ sealed class BlankLineRule(string key, BlankLineKind kind, int order) : IFormatt
 
     static string Indent(SyntaxTriviaList trivia) => trivia.LastOrDefault(t => t.IsKind(SyntaxKind.WhitespaceTrivia)).ToString();
 
-    sealed class MaximumBlankLineRewriter(int count) : CSharpSyntaxRewriter(visitIntoStructuredTrivia: true)
+}
+
+/// <summary>
+/// Applies a run of blank-line rules in a single walk.
+/// </summary>
+/// <remarks>
+/// Each rule in the run only ever rewrites the leading trivia of tokens it owns, and reads only that
+/// leading trivia plus the trailing trivia of the preceding token, which no rule in the run touches.
+/// So the rules compose: gathering their edits against one snapshot and applying them together gives
+/// what running them in sequence gives, for one rebuild of the tree rather than one per rule.
+/// </remarks>
+static class BlankLineBatch
+{
+    internal static SyntaxNode Apply(
+        SyntaxNode root,
+        ReadOnlySpan<(BlankLineRule Rule, string Preference)> rules,
+        RuleContext context)
+    {
+        var separated = new Dictionary<SyntaxToken, SyntaxTriviaList>();
+        int? cap = null;
+        foreach (var (rule, preference) in rules)
+        {
+            var count = int.Parse(preference);
+            if (rule.Kind == BlankLineKind.Maximum)
+            {
+                // Maximum runs last in catalog order, so it caps whatever the others produced.
+                cap = count;
+                continue;
+            }
+
+            foreach (var token in rule.Targets(root, context))
+            {
+                var leading = separated.TryGetValue(token, out var pending) ? pending : token.LeadingTrivia;
+                separated[token] = BlankLineRule.Separate(token, leading, count);
+            }
+        }
+
+        return separated.Count == 0 && cap is null
+            ? root
+            : new Rewriter(separated, cap).Visit(root)!;
+    }
+
+    /// <summary>
+    /// Whether this run can share a pass, which needs the capping rule to come last so that it sees
+    /// the other rules' output, exactly as it would when the rules run one at a time.
+    /// </summary>
+    internal static bool Composes(List<(BlankLineRule Rule, string Preference)> rules)
+    {
+        for (var index = 0; index < rules.Count - 1; index++)
+        {
+            if (rules[index].Rule.Kind == BlankLineKind.Maximum)
+                return false;
+        }
+
+        return true;
+    }
+
+    sealed class Rewriter(Dictionary<SyntaxToken, SyntaxTriviaList> separated, int? cap)
+        : CSharpSyntaxRewriter(visitIntoStructuredTrivia: cap is not null)
     {
         public override SyntaxToken VisitToken(SyntaxToken token)
         {
-            // Only line breaks in leading trivia can be capped, and most tokens carry none, so bail
-            // before the previous-token lookup and the trivia list rebuild that would follow.
-            return base.VisitToken(
-                ContainsEndOfLine(token.LeadingTrivia)
-                    ? token.WithLeadingTrivia(Cap(token.LeadingTrivia, Math.Max(0, count + 1 - EndingLines(token.GetPreviousToken().TrailingTrivia))))
-                    : token);
-        }
+            var leading = token.LeadingTrivia;
+            var edited = false;
+            if (separated.Count > 0 && separated.TryGetValue(token, out var replacement))
+            {
+                leading = replacement;
+                edited = true;
+            }
 
-        static bool ContainsEndOfLine(SyntaxTriviaList trivia) => trivia.Any(item => item.IsKind(SyntaxKind.EndOfLineTrivia));
+            // Only leading trivia holding a line break can be capped, and most tokens carry none, so
+            // this avoids the previous-token lookup and the list rebuild for the great majority.
+            if (cap is { } allowed && BlankLineRule.ContainsEndOfLine(leading))
+            {
+                leading = BlankLineRule.CapRuns(token, leading, allowed);
+                edited = true;
+            }
+
+            return base.VisitToken(edited ? token.WithLeadingTrivia(leading) : token);
+        }
     }
 }
 

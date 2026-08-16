@@ -100,7 +100,7 @@ static class TokenSpacingBatch
         RuleContext context)
     {
         var triggers = Triggers(rules);
-        Dictionary<SyntaxToken, SyntaxToken>? replacements = null;
+        var edits = new TokenEdits();
         var pair = new TokenPair();
         var left = default(SyntaxToken);
         var leftTrigger = 0UL;
@@ -134,14 +134,14 @@ static class TokenSpacingBatch
                 }
 
                 if (desired is not null)
-                    Record(ref replacements, left, right, desired.Value);
+                    Record(edits, left, right, desired.Value);
             }
 
             left = right;
             leftTrigger = rightTrigger;
         }
 
-        return replacements is null ? root : TokenRewriting.ReplaceTokens(root, replacements);
+        return edits.Apply(root);
     }
 
     /// <summary>
@@ -158,10 +158,12 @@ static class TokenSpacingBatch
         return triggers;
     }
 
-    static void Record(ref Dictionary<SyntaxToken, SyntaxToken>? replacements, SyntaxToken left, SyntaxToken right, bool space)
+    static void Record(TokenEdits edits, SyntaxToken left, SyntaxToken right, bool space)
     {
-        var rewrittenLeft = replacements is not null && replacements.TryGetValue(left, out var pendingLeft) ? pendingLeft : left;
-        var rewrittenRight = replacements is not null && replacements.TryGetValue(right, out var pendingRight) ? pendingRight : right;
+        // The walk reaches each token as the right of one pair and then as the left of the next, so
+        // the only edit that can still need merging is the one most recently appended.
+        var rewrittenLeft = edits.Pending(left);
+        var rewrittenRight = right;
 
         var changedLeft = false;
         if (rewrittenLeft.Span.IsEmpty && HasWhitespace(rewrittenLeft.LeadingTrivia))
@@ -185,11 +187,10 @@ static class TokenSpacingBatch
         if (!changedLeft && !changedRight)
             return;
 
-        replacements ??= [];
         if (changedLeft)
-            replacements[left] = rewrittenLeft;
+            edits.Append(left, rewrittenLeft);
         if (changedRight)
-            replacements[right] = rewrittenRight;
+            edits.Append(right, rewrittenRight);
     }
 
     static bool HasWhitespace(SyntaxTriviaList trivia) => trivia.Any(item => item.IsKind(SyntaxKind.WhitespaceTrivia));

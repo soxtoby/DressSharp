@@ -20,6 +20,8 @@ sealed class TransformationPipeline(RuleCatalog catalog, Action<string, TimeSpan
             knownWellFormed |= !context.HasMalformedRegions;
             var spacingBatch = new List<(TokenSpacingRule Rule, string Preference)>();
             var commentBatch = new List<(CommentRule Rule, string Preference)>();
+            var blankLineBatch = new List<(BlankLineRule Rule, string Preference)>();
+            var lineLayoutBatch = new List<(IFormattingRule Rule, string Preference)>();
 
             for (var index = 0; index < enabled.Count;)
             {
@@ -45,6 +47,36 @@ sealed class TransformationPipeline(RuleCatalog catalog, Action<string, TimeSpan
                     index++;
                 }
 
+                // And for consecutive blank-line rules, which each rewrite leading trivia in place.
+                blankLineBatch.Clear();
+                while (spacingBatch.Count == 0
+                    && commentBatch.Count == 0
+                    && index < enabled.Count
+                    && enabled[index].Rule is BlankLineRule blankLine)
+                {
+                    blankLineBatch.Add((blankLine, enabled[index].Preference));
+                    index++;
+                }
+
+                // And for consecutive line-break and indentation rules, which share a trivia buffer.
+                lineLayoutBatch.Clear();
+                while (spacingBatch.Count == 0
+                    && commentBatch.Count == 0
+                    && blankLineBatch.Count == 0
+                    && index < enabled.Count
+                    && LineLayoutBatch.Handles(enabled[index].Rule))
+                {
+                    lineLayoutBatch.Add(enabled[index]);
+                    index++;
+                }
+
+                if (!BlankLineBatch.Composes(blankLineBatch))
+                {
+                    // Fall back to one rule at a time when the run is not in an order they compose in.
+                    index -= blankLineBatch.Count;
+                    blankLineBatch.Clear();
+                }
+
                 SyntaxNode input;
                 if (spacingBatch.Count > 0)
                 {
@@ -59,6 +91,20 @@ sealed class TransformationPipeline(RuleCatalog catalog, Action<string, TimeSpan
                     var started = recordRule is null ? 0 : Stopwatch.GetTimestamp();
                     current = CommentRuleBatch.Apply(input, CollectionsMarshal.AsSpan(commentBatch));
                     recordRule?.Invoke("comment_rules", Stopwatch.GetElapsedTime(started));
+                }
+                else if (blankLineBatch.Count > 0)
+                {
+                    input = current;
+                    var started = recordRule is null ? 0 : Stopwatch.GetTimestamp();
+                    current = BlankLineBatch.Apply(input, CollectionsMarshal.AsSpan(blankLineBatch), context);
+                    recordRule?.Invoke("blank_lines", Stopwatch.GetElapsedTime(started));
+                }
+                else if (lineLayoutBatch.Count > 0)
+                {
+                    input = current;
+                    var started = recordRule is null ? 0 : Stopwatch.GetTimestamp();
+                    current = LineLayoutBatch.Apply(input, CollectionsMarshal.AsSpan(lineLayoutBatch), context);
+                    recordRule?.Invoke("line_layout", Stopwatch.GetElapsedTime(started));
                 }
                 else
                 {

@@ -17,6 +17,13 @@ sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> va
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {
+        var buffer = new TriviaBuffer();
+        Fill(buffer, root, preference, context);
+        return buffer.Apply(root);
+    }
+
+    internal void Fill(TriviaBuffer buffer, SyntaxNode root, string preference, RuleContext context)
+    {
         var boundaries = kind == NewLineKind.OpenBrace
             ? root.DescendantTokens()
                 .Where(token => token.IsKind(SyntaxKind.OpenBraceToken) && BraceCategory(token) is not null)
@@ -25,11 +32,10 @@ sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> va
                     NewLine: preference == "all" || preference.Split(',', StringSplitOptions.TrimEntries).Contains(BraceCategory(token)!)))
             : Targets(root).Select(token => (Token: token, NewLine: preference == "true"));
 
-        var replacements = new Dictionary<SyntaxToken, SyntaxToken>();
-        foreach (var (token, newLine) in boundaries.Where(item => SafeBoundary(item.Token, context)))
+        foreach (var (token, newLine) in boundaries.Where(item => SafeBoundary(buffer, item.Token, context)))
         {
             var previous = token.GetPreviousToken();
-            var combined = previous.TrailingTrivia.Concat(token.LeadingTrivia).ToList();
+            var combined = buffer.Trailing(previous).Concat(buffer.Leading(token)).ToList();
             var lastLine = combined.FindLastIndex(trivia => trivia.IsKind(SyntaxKind.EndOfLineTrivia));
             var indent = lastLine >= 0 && lastLine + 1 < combined.Count && combined[lastLine + 1].IsKind(SyntaxKind.WhitespaceTrivia)
                 ? combined[lastLine + 1].ToString()
@@ -37,13 +43,9 @@ sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> va
             var separator = newLine
                 ? SyntaxFactory.TriviaList(SyntaxFactory.EndOfLine(context.LineEnding), SyntaxFactory.Whitespace(indent))
                 : SyntaxFactory.TriviaList(SyntaxFactory.Space);
-            var rewrittenPrevious = replacements.GetValueOrDefault(previous, previous);
-            var rewrittenToken = replacements.GetValueOrDefault(token, token);
-            replacements[previous] = rewrittenPrevious.WithTrailingTrivia(separator);
-            replacements[token] = rewrittenToken.WithLeadingTrivia(default(SyntaxTriviaList));
+            buffer.SetTrailing(previous, separator);
+            buffer.SetLeading(token, default);
         }
-
-        return TokenRewriting.ReplaceTokens(root, replacements);
     }
 
     IEnumerable<SyntaxToken> Targets(SyntaxNode root) => kind switch
@@ -64,11 +66,11 @@ sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> va
             _ => []
         };
 
-    static bool SafeBoundary(SyntaxToken token, RuleContext context)
+    static bool SafeBoundary(TriviaBuffer buffer, SyntaxToken token, RuleContext context)
     {
         var previous = token.GetPreviousToken();
         return !context.IsUnsafe(token) && !context.IsUnsafe(previous)
-            && previous.TrailingTrivia.Concat(token.LeadingTrivia)
+            && buffer.Trailing(previous).Concat(buffer.Leading(token))
                 .None(trivia => trivia.IsDirective
                     || trivia.IsComment()
                     || trivia.IsKind(SyntaxKind.DisabledTextTrivia));
@@ -115,36 +117,38 @@ sealed class IndentationRule(string key, IndentationKind kind, ImmutableArray<st
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {
-        if (kind == IndentationKind.Labels && preference == "no_change")
-            return root;
+        var buffer = new TriviaBuffer();
+        Fill(buffer, root, preference, context);
+        return buffer.Apply(root);
+    }
 
-        var targets = Targets(root, preference, context).DistinctBy(item => item.Token).ToArray();
-        var replacements = new Dictionary<SyntaxToken, SyntaxToken>();
+    internal void Fill(TriviaBuffer buffer, SyntaxNode root, string preference, RuleContext context)
+    {
+        if (kind == IndentationKind.Labels && preference == "no_change")
+            return;
+
+        var targets = Targets(buffer, root, preference, context).DistinctBy(item => item.Token).ToArray();
         foreach (var item in targets)
         {
             var previous = item.Token.GetPreviousToken();
-            var rewrittenPrevious = replacements.GetValueOrDefault(previous, previous);
-            var rewrittenToken = replacements.GetValueOrDefault(item.Token, item.Token);
-            replacements[previous] = rewrittenPrevious.WithTrailingTrivia(SetIndent(previous.TrailingTrivia, item.Token.LeadingTrivia, item.Indent));
-            replacements[item.Token] = rewrittenToken.WithLeadingTrivia(default(SyntaxTriviaList));
+            buffer.SetTrailing(previous, SetIndent(buffer.Trailing(previous), buffer.Leading(item.Token), item.Indent));
+            buffer.SetLeading(item.Token, default);
         }
-
-        return TokenRewriting.ReplaceTokens(root, replacements);
     }
 
-    IEnumerable<(SyntaxToken Token, string Indent)> Targets(SyntaxNode root, string preference, RuleContext context)
+    IEnumerable<(SyntaxToken Token, string Indent)> Targets(TriviaBuffer buffer, SyntaxNode root, string preference, RuleContext context)
     {
         switch (kind)
         {
             case IndentationKind.BlockContents:
-                foreach (var block in root.DescendantNodes().OfType<BlockSyntax>().Where(block => Safe(block, context)))
+                foreach (var block in root.DescendantNodes().OfType<BlockSyntax>().Where(block => Safe(buffer, block, context)))
                 foreach (var statement in block.Statements)
-                    yield return (statement.GetFirstToken(), IndentOf(block.OpenBraceToken) + (preference == "true" ? context.IndentUnit : ""));
+                    yield return (statement.GetFirstToken(), IndentOf(buffer, block.OpenBraceToken) + (preference == "true" ? context.IndentUnit : ""));
                 break;
             case IndentationKind.Braces:
-                foreach (var pair in BracePairs(root).Where(pair => Safe(pair.Owner, context)))
+                foreach (var pair in BracePairs(root).Where(pair => Safe(buffer, pair.Owner, context)))
                 {
-                    var ownerIndent = IndentOf(pair.Owner.GetFirstToken());
+                    var ownerIndent = IndentOf(buffer, pair.Owner.GetFirstToken());
                     var indent = ownerIndent + (preference == "true" ? context.IndentUnit : "");
                     yield return (pair.Open, indent);
                     yield return (pair.Close, indent);
@@ -152,29 +156,29 @@ sealed class IndentationRule(string key, IndentationKind kind, ImmutableArray<st
 
                 break;
             case IndentationKind.SwitchLabels:
-                foreach (var section in root.DescendantNodes().OfType<SwitchSectionSyntax>().Where(section => Safe(section, context)))
+                foreach (var section in root.DescendantNodes().OfType<SwitchSectionSyntax>().Where(section => Safe(buffer, section, context)))
                 foreach (var label in section.Labels)
-                    yield return (label.GetFirstToken(), IndentOf(section.Parent!.ChildTokens().First(token => token.IsKind(SyntaxKind.OpenBraceToken))) + (preference == "true" ? context.IndentUnit : ""));
+                    yield return (label.GetFirstToken(), IndentOf(buffer, section.Parent!.ChildTokens().First(token => token.IsKind(SyntaxKind.OpenBraceToken))) + (preference == "true" ? context.IndentUnit : ""));
                 break;
             case IndentationKind.CaseContents:
-                foreach (var section in root.DescendantNodes().OfType<SwitchSectionSyntax>().Where(section => Safe(section, context)))
+                foreach (var section in root.DescendantNodes().OfType<SwitchSectionSyntax>().Where(section => Safe(buffer, section, context)))
                 foreach (var statement in section.Statements)
-                    yield return (statement.GetFirstToken(), IndentOf(section.Labels[0].GetFirstToken()) + (preference == "true" ? context.IndentUnit : ""));
+                    yield return (statement.GetFirstToken(), IndentOf(buffer, section.Labels[0].GetFirstToken()) + (preference == "true" ? context.IndentUnit : ""));
                 break;
             case IndentationKind.CaseBlock:
-                foreach (var section in root.DescendantNodes().OfType<SwitchSectionSyntax>().Where(section => Safe(section, context)))
+                foreach (var section in root.DescendantNodes().OfType<SwitchSectionSyntax>().Where(section => Safe(buffer, section, context)))
                 foreach (var block in section.Statements.OfType<BlockSyntax>())
                 {
-                    var indent = IndentOf(section.Labels[0].GetFirstToken()) + (preference == "true" ? context.IndentUnit : "");
+                    var indent = IndentOf(buffer, section.Labels[0].GetFirstToken()) + (preference == "true" ? context.IndentUnit : "");
                     yield return (block.OpenBraceToken, indent);
                     yield return (block.CloseBraceToken, indent);
                 }
 
                 break;
             case IndentationKind.Labels:
-                foreach (var label in root.DescendantNodes().OfType<LabeledStatementSyntax>().Where(label => Safe(label, context)))
+                foreach (var label in root.DescendantNodes().OfType<LabeledStatementSyntax>().Where(label => Safe(buffer, label, context)))
                 {
-                    var statementIndent = IndentOf(label.Statement.GetFirstToken());
+                    var statementIndent = IndentOf(buffer, label.Statement.GetFirstToken());
                     yield return (label.GetFirstToken(), preference == "flush_left" ? "" : RemoveUnit(statementIndent, context.IndentUnit));
                 }
 
@@ -182,8 +186,8 @@ sealed class IndentationRule(string key, IndentationKind kind, ImmutableArray<st
         }
     }
 
-    static bool Safe(SyntaxNode node, RuleContext context) => !context.IsUnsafe(node)
-        && node.GetLeadingTrivia().None(trivia => trivia.IsDirective || trivia.IsComment() || trivia.IsKind(SyntaxKind.DisabledTextTrivia));
+    static bool Safe(TriviaBuffer buffer, SyntaxNode node, RuleContext context) => !context.IsUnsafe(node)
+        && buffer.Leading(node.GetFirstToken()).None(trivia => trivia.IsDirective || trivia.IsComment() || trivia.IsKind(SyntaxKind.DisabledTextTrivia));
 
     static IEnumerable<(SyntaxNode Owner, SyntaxToken Open, SyntaxToken Close)> BracePairs(SyntaxNode root)
     {
@@ -229,9 +233,9 @@ sealed class IndentationRule(string key, IndentationKind kind, ImmutableArray<st
         return SyntaxFactory.TriviaList(trivia);
     }
 
-    static string IndentOf(SyntaxToken token)
+    static string IndentOf(TriviaBuffer buffer, SyntaxToken token)
     {
-        var trivia = token.GetPreviousToken().TrailingTrivia.Concat(token.LeadingTrivia).ToList();
+        var trivia = buffer.Trailing(token.GetPreviousToken()).Concat(buffer.Leading(token)).ToList();
         var lastLine = -1;
         for (var index = trivia.Count - 1; index >= 0; index--)
         {
@@ -256,4 +260,42 @@ enum IndentationKind
     BlockContents,
     Braces,
     CaseBlock
+}
+
+/// <summary>
+/// Applies a run of line-break and indentation rules in a single walk.
+/// </summary>
+/// <remarks>
+/// These rules all express themselves as edits to the trivia between a token and the one before it,
+/// and they read that same trivia to decide. Sharing a <see cref="TriviaBuffer"/> lets a later rule
+/// see an earlier one's edits, which is exactly what it would see if the earlier rule had rebuilt
+/// the tree first, so the run collapses to one rebuild.
+/// </remarks>
+static class LineLayoutBatch
+{
+    internal static SyntaxNode Apply(
+        SyntaxNode root,
+        ReadOnlySpan<(IFormattingRule Rule, string Preference)> rules,
+        RuleContext context)
+    {
+        var buffer = new TriviaBuffer();
+        foreach (var (rule, preference) in rules)
+        {
+            switch (rule)
+            {
+                case NewLineRule newLine:
+                    newLine.Fill(buffer, root, preference, context);
+                    break;
+                case IndentationRule indentation:
+                    indentation.Fill(buffer, root, preference, context);
+                    break;
+                default:
+                    throw new InvalidOperationException($"{rule.Metadata.PreferenceKey} does not belong to this run.");
+            }
+        }
+
+        return buffer.Apply(root);
+    }
+
+    internal static bool Handles(IFormattingRule rule) => rule is NewLineRule or IndentationRule;
 }
