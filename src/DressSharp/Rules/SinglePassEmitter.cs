@@ -104,6 +104,16 @@ sealed class SinglePassEmitter
             return;
         }
 
+        // A line-break rule that owns this boundary decides it outright, in either direction.
+        if (ClaimsBreak(right) is { } wantsBreak)
+        {
+            if (wantsBreak)
+                StartLine(right);
+            else
+                Append(" ");
+            return;
+        }
+
         // Indentation rules only ever restate the whitespace after an existing line break; where the
         // source kept two tokens on one line, no indentation rule has an opinion.
         var gap = _source.AsSpan(left.Span.End, right.SpanStart - left.Span.End);
@@ -111,9 +121,7 @@ sealed class SinglePassEmitter
         if (lastBreak >= 0)
         {
             _output.Append(_source, left.Span.End, lastBreak + 1);
-            _lineIndent = IndentFor(right);
-            _output.Append(_lineIndent);
-            _column = _lineIndent.Length;
+            WriteIndent(right);
             return;
         }
 
@@ -131,6 +139,33 @@ sealed class SinglePassEmitter
 
         if (desired.Value)
             Append(" ");
+    }
+
+    /// <summary>
+    /// Whether any enabled line-break rule owns the boundary in front of the token.
+    /// </summary>
+    bool? ClaimsBreak(SyntaxToken token)
+    {
+        foreach (var (rule, categories) in _plan.NewLines)
+        {
+            if (rule.ClaimsBreakBefore(token, categories) is { } claim)
+                return claim;
+        }
+
+        return null;
+    }
+
+    void StartLine(SyntaxToken token)
+    {
+        _output.Append(_plan.LineEnding);
+        WriteIndent(token);
+    }
+
+    void WriteIndent(SyntaxToken token)
+    {
+        _lineIndent = IndentFor(token);
+        _output.Append(_lineIndent);
+        _column = _lineIndent.Length;
     }
 
     /// <summary>
@@ -309,12 +344,14 @@ sealed class EmitterPlan
 
     EmitterPlan(
         (TokenSpacingRule Rule, string Preference)[] spacing,
+        (NewLineRule Rule, NewLineRule.BraceCategories Categories)[] newLines,
         Dictionary<int, ulong> triggers,
         RuleSettings settings,
         bool indentBraces,
         bool indentBlockContents)
     {
         Spacing = spacing;
+        NewLines = newLines;
         _triggers = triggers;
         MaximumLineLength = settings.MaximumLineLength;
         IndentUnit = settings.IndentUnit;
@@ -323,6 +360,7 @@ sealed class EmitterPlan
     }
 
     internal (TokenSpacingRule Rule, string Preference)[] Spacing { get; }
+    internal (NewLineRule Rule, NewLineRule.BraceCategories Categories)[] NewLines { get; }
     internal int MaximumLineLength { get; }
     internal string IndentUnit { get; }
     internal bool IndentBraces { get; }
@@ -334,12 +372,16 @@ sealed class EmitterPlan
     internal static EmitterPlan From(RuleCatalog catalog, FormattingConfiguration configuration)
     {
         var spacing = new List<(TokenSpacingRule, string)>();
+        var newLines = new List<(NewLineRule, NewLineRule.BraceCategories)>();
         foreach (var rule in catalog.Rules)
         {
-            if (rule is TokenSpacingRule { ParticipatesInBatch: true } candidate
-                && configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
-                && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
-                spacing.Add((candidate, preference));
+            if (!configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+                || preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (rule is TokenSpacingRule { ParticipatesInBatch: true } spacingRule)
+                spacing.Add((spacingRule, preference));
+            else if (rule is NewLineRule newLine)
+                newLines.Add((newLine, NewLineRule.BraceCategories.From(newLine.Kind, preference)));
         }
 
         var triggers = new Dictionary<int, ulong>();
@@ -351,6 +393,7 @@ sealed class EmitterPlan
 
         return new(
             [.. spacing],
+            [.. newLines],
             triggers,
             RuleSettings.From(configuration),
             IsTrue(configuration, "csharp_indent_braces"),

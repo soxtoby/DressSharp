@@ -63,10 +63,24 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
                         var configuration = configurations[file.FullPath];
                         string formatted;
                         var skipped = 0;
+
+                        // What the layout stage was handed, which is what its output must still tokenise
+                        // to. That is the tree after the syntax-transformation rules, not the parse.
+                        Microsoft.CodeAnalysis.SyntaxNode? layoutInput = null;
                         var transformStart = Stopwatch.GetTimestamp();
                         if (SinglePassEmitter.Enabled)
                         {
-                            formatted = SinglePassEmitter.Emit(root, EmitterPlan.From(RuleCatalog.BuiltIn, configuration), document.Text);
+                            // Rules that change the token sequence still run as tree rewrites; the
+                            // emitter then decides the whitespace around whatever they produced.
+                            var structural = new TransformationPipeline(RuleCatalog.BuiltIn.Structural)
+                                .Transform(root, configuration);
+                            if (!structural.Succeeded)
+                                throw structural.Failure!;
+                            var shaped = structural.Root;
+                            layoutInput = shaped;
+                            var text = ReferenceEquals(shaped, root) ? document.Text : shaped.ToFullString();
+                            formatted = SinglePassEmitter.Emit(shaped, EmitterPlan.From(RuleCatalog.BuiltIn, configuration), text);
+                            skipped = structural.SkippedOccurrences;
                             timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
                         }
                         else
@@ -81,10 +95,10 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
                         }
 
                         // The layout stage must leave the token stream alone. The invariant belongs to
-                        // that stage rather than to the catalog, because the nine syntax-transformation
-                        // rules are meant to change tokens, so it is checked where layout stands alone.
-                        if (VerifyTokens && SinglePassEmitter.Enabled
-                            && TokenEquivalence.FirstDifference(root, formatted, context.Options!) is { } difference)
+                        // that stage rather than to the catalog, because the syntax-transformation rules
+                        // are meant to change tokens, so it is checked against what layout was handed.
+                        if (VerifyTokens && layoutInput is not null
+                            && TokenEquivalence.FirstDifference(layoutInput, formatted, context.Options!) is { } difference)
                             throw new InvalidOperationException($"formatting altered the token stream: {difference}");
 
                         var encodeStart = Stopwatch.GetTimestamp();

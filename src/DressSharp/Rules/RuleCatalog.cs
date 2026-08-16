@@ -102,6 +102,22 @@ sealed class RuleCatalog
             new ConstructLayoutRule("dress_attributes_layout", ConstructLayoutKind.Attributes, 500)
         ]);
 
+    /// <summary>
+    /// The rules that change the sequence of tokens rather than the whitespace between them.
+    /// </summary>
+    /// <remarks>
+    /// The emitter writes whitespace and must leave the token stream alone, so these run ahead of it
+    /// as tree rewrites. Reordering rules count even though they are classed as layout, because
+    /// moving a using directive or a modifier moves tokens.
+    /// </remarks>
+    internal RuleCatalog Structural => _structural ??= new(
+        Rules.Where(rule =>
+            rule.Metadata.SafetyClass == RuleSafetyClass.SyntaxTransformation
+            || rule is UsingOrderRule or ModifierOrderRule or SystemUsingSortRule),
+        Version);
+
+    RuleCatalog? _structural;
+
     static void Validate(ImmutableArray<IFormattingRule> rules)
     {
         if (rules.Any(rule => string.IsNullOrWhiteSpace(rule.Metadata.PreferenceKey) ||

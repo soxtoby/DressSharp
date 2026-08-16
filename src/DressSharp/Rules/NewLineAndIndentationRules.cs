@@ -15,6 +15,8 @@ sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> va
         "Only boundary whitespace changes",
         order);
 
+    internal NewLineKind Kind => kind;
+
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {
         var buffer = new TriviaBuffer();
@@ -48,6 +50,69 @@ sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> va
         }
     }
 
+    /// <summary>
+    /// Whether this rule owns the boundary in front of the token, and if so whether it wants a line
+    /// break there. Null means the rule has no opinion about that boundary.
+    /// </summary>
+    /// <remarks>
+    /// The emitter reaches tokens one at a time and needs an answer per boundary, where the pipeline
+    /// gathers targets by querying the whole tree. Both ask the same question of the same syntax.
+    /// </remarks>
+    internal bool? ClaimsBreakBefore(SyntaxToken token, BraceCategories categories) => kind switch
+        {
+            NewLineKind.OpenBrace => token.IsKind(SyntaxKind.OpenBraceToken) && BraceCategory(token) is { } category
+                ? categories.Contains(category)
+                : null,
+            NewLineKind.Else => token.IsKind(SyntaxKind.ElseKeyword) ? categories.Enabled : null,
+            NewLineKind.Catch => token.IsKind(SyntaxKind.CatchKeyword) ? categories.Enabled : null,
+            NewLineKind.Finally => token.IsKind(SyntaxKind.FinallyKeyword) ? categories.Enabled : null,
+            NewLineKind.ObjectInitializerMembers => StartsLaterElement(token) is InitializerExpressionSyntax initializer
+                && initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
+                    ? categories.Enabled
+                    : null,
+            NewLineKind.AnonymousTypeMembers => StartsLaterElement(token) is AnonymousObjectCreationExpressionSyntax
+                ? categories.Enabled
+                : null,
+            NewLineKind.QueryClauses => StartsQueryClause(token) ? categories.Enabled : null,
+            _ => null
+        };
+
+    /// <summary>
+    /// The list owner whose second or later element starts at this token, if any.
+    /// </summary>
+    static SyntaxNode? StartsLaterElement(SyntaxToken token)
+    {
+        for (var node = token.Parent; node is not null; node = node.Parent)
+        {
+            if (node.GetFirstToken() != token)
+                return null;
+            var owner = node.Parent;
+            var elements = owner switch
+                {
+                    InitializerExpressionSyntax initializer => (IReadOnlyList<SyntaxNode>)initializer.Expressions,
+                    AnonymousObjectCreationExpressionSyntax anonymous => anonymous.Initializers,
+                    _ => null
+                };
+            if (elements is not null)
+                return elements.Count > 0 && !ReferenceEquals(elements[0], node) ? owner : null;
+        }
+
+        return null;
+    }
+
+    static bool StartsQueryClause(SyntaxToken token)
+    {
+        for (var node = token.Parent; node is not null; node = node.Parent)
+        {
+            if (node.GetFirstToken() != token)
+                return false;
+            if (node.Parent is QueryBodySyntax body)
+                return body.Clauses.Contains(node) || ReferenceEquals(body.SelectOrGroup, node);
+        }
+
+        return false;
+    }
+
     IEnumerable<SyntaxToken> Targets(SyntaxNode root) => kind switch
         {
             NewLineKind.Else => root.DescendantTokens().Where(token => token.IsKind(SyntaxKind.ElseKeyword)),
@@ -74,6 +139,36 @@ sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> va
                 .None(trivia => trivia.IsDirective
                     || trivia.IsComment()
                     || trivia.IsKind(SyntaxKind.DisabledTextTrivia));
+    }
+
+    /// <summary>
+    /// A rule's preference value resolved ahead of the walk, so that deciding a boundary is a lookup
+    /// rather than a string split per token.
+    /// </summary>
+    internal sealed class BraceCategories
+    {
+        readonly HashSet<string>? _selected;
+
+        BraceCategories(bool enabled, HashSet<string>? selected)
+        {
+            Enabled = enabled;
+            _selected = selected;
+        }
+
+        internal bool Enabled { get; }
+
+        internal bool Contains(string category) => _selected is null ? Enabled : _selected.Contains(category);
+
+        internal static BraceCategories From(NewLineKind kind, string preference)
+        {
+            if (kind != NewLineKind.OpenBrace)
+                return new(preference.Equals("true", StringComparison.OrdinalIgnoreCase), null);
+            if (preference.Equals("all", StringComparison.OrdinalIgnoreCase))
+                return new(true, null);
+            if (preference.Equals("none", StringComparison.OrdinalIgnoreCase))
+                return new(false, null);
+            return new(false, [.. preference.Split(',', StringSplitOptions.TrimEntries)]);
+        }
     }
 
     static string? BraceCategory(SyntaxToken token) => token.Parent switch
