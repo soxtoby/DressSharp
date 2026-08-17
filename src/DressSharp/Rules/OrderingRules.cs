@@ -7,6 +7,8 @@ namespace DressSharp.Rules;
 
 sealed class UsingOrderRule(string key, int order) : IFormattingRule
 {
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
+
     public RuleMetadata Metadata { get; } = new(
         key,
         key == "dress_global_using_order"
@@ -17,37 +19,51 @@ sealed class UsingOrderRule(string key, int order) : IFormattingRule
         "Directives and comments remain boundaries",
         order);
 
-    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
-    {
-        var unit = (CompilationUnitSyntax)root;
-        unit = unit.WithUsings(Sort(unit.Usings, preference));
-        return unit.ReplaceNodes(
-            unit.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>(),
-            (node, rewritten) => rewritten.WithUsings(Sort(rewritten.Usings, preference)));
-    }
+    public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } = [SyntaxKind.UsingDirective];
 
-    SyntaxList<UsingDirectiveSyntax> Sort(SyntaxList<UsingDirectiveSyntax> source, string preference)
+    internal SyntaxList<UsingDirectiveSyntax> Rewrite(SyntaxList<UsingDirectiveSyntax> source, string preference)
     {
         if (preference == "mixed" || source.Any(HasBoundary))
             return source;
-        IEnumerable<UsingDirectiveSyntax> ordered = key == "dress_global_using_order"
-            ? preference == "first"
-                ? source.OrderByDescending(x => !x.GlobalKeyword.IsKind(SyntaxKind.None))
-                : source.OrderBy(x => !x.GlobalKeyword.IsKind(SyntaxKind.None))
-            : source.OrderBy(x => Rank(x, preference));
-        return SyntaxFactory.List(ordered);
+        var ranks = key == "dress_global_using_order" ? null : Ranks(preference);
+        int RankOf(UsingDirectiveSyntax directive) => key == "dress_global_using_order"
+            ? preference == "first" == !directive.GlobalKeyword.IsKind(SyntaxKind.None) ? 0 : 1
+            : Rank(directive, ranks!);
+        if (IsOrdered(source, RankOf))
+            return source;
+        return SyntaxFactory.List(source.OrderBy(RankOf));
     }
 
     static bool HasBoundary(UsingDirectiveSyntax x) => x.DescendantTrivia(descendIntoTrivia: true).Any(t => t.IsDirective || t.IsComment());
 
-    static int Rank(UsingDirectiveSyntax x, string value)
+    static int Rank(UsingDirectiveSyntax directive, Dictionary<string, int> ranks)
     {
-        var kind = x.Alias is not null
+        var kind = directive.Alias is not null
             ? "alias"
-            : x.StaticKeyword.IsKind(SyntaxKind.StaticKeyword)
+            : directive.StaticKeyword.IsKind(SyntaxKind.StaticKeyword)
                 ? "static"
                 : "ordinary";
-        return Array.IndexOf(value.Split(',', StringSplitOptions.TrimEntries), kind);
+        return ranks[kind];
+    }
+
+    static Dictionary<string, int> Ranks(string preference) => RankCache.GetOrAdd(
+        preference,
+        static value => value.Split(',', StringSplitOptions.TrimEntries)
+            .Select((kind, rank) => (kind, rank))
+            .ToDictionary(entry => entry.kind, entry => entry.rank));
+
+    static bool IsOrdered(SyntaxList<UsingDirectiveSyntax> source, Func<UsingDirectiveSyntax, int> rank)
+    {
+        var previous = -1;
+        foreach (var directive in source)
+        {
+            var current = rank(directive);
+            if (current < previous)
+                return false;
+            previous = current;
+        }
+
+        return true;
     }
 
     static ImmutableArray<string> Permutations() =>
@@ -61,21 +77,54 @@ sealed class ModifierOrderRule(int order) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new("csharp_preferred_modifier_order", ["public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"], "member modifier lists", RuleSafetyClass.Layout, "Only modifier token order changes", order);
 
-    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
+
+    internal SyntaxNode TransformMember(SyntaxNode root, string preference, RuleContext context)
     {
-        var ranks = preference.Split(',', StringSplitOptions.TrimEntries).Select((x, i) => (x, i)).ToDictionary(x => x.x, x => x.i);
-        return root.ReplaceNodes(root.DescendantNodes().OfType<MemberDeclarationSyntax>().Where(x => !context.IsUnsafe(x)), (node, rewritten) => rewritten.WithModifiers(SyntaxFactory.TokenList(rewritten.Modifiers.OrderBy(x => ranks.GetValueOrDefault(x.ValueText, int.MaxValue)))));
+        if (root is not MemberDeclarationSyntax member)
+            return root;
+        var ranks = RankCache.GetOrAdd(preference, static value => value
+            .Split(',', StringSplitOptions.TrimEntries)
+            .Select((name, rank) => (name, rank))
+            .ToDictionary(entry => entry.name, entry => entry.rank));
+        return IsOutOfOrder(member.Modifiers, ranks) && !context.IsUnsafe(member)
+            ? member.WithModifiers(SyntaxFactory.TokenList(member.Modifiers.OrderBy(modifier => Rank(modifier, ranks))))
+            : member;
     }
+
+    /// <summary>
+    /// Whether reordering would actually move anything.
+    /// </summary>
+    /// <remarks>
+    /// The sort is stable, so a member whose modifiers already rank in order sorts to itself. Asking
+    /// first matters because rebuilding the member regardless makes every member look changed, which
+    /// costs a rewrite here and denies callers any way to tell the untouched members apart.
+    /// </remarks>
+    static bool IsOutOfOrder(SyntaxTokenList modifiers, Dictionary<string, int> ranks)
+    {
+        if (modifiers.Count < 2)
+            return false;
+
+        var previous = -1;
+        foreach (var modifier in modifiers)
+        {
+            var rank = Rank(modifier, ranks);
+            if (rank < previous)
+                return true;
+            previous = rank;
+        }
+
+        return false;
+    }
+
+    static int Rank(SyntaxToken modifier, Dictionary<string, int> ranks) =>
+        ranks.GetValueOrDefault(modifier.ValueText, int.MaxValue);
 }
 
 static class RuleExtensions
 {
     extension(SyntaxTrivia t)
     {
-        internal bool IsWhitespaceOrEndOfLine() =>
-            t.IsKind(SyntaxKind.WhitespaceTrivia)
-            || t.IsKind(SyntaxKind.EndOfLineTrivia);
-
         internal bool IsComment() =>
             t.IsKind(SyntaxKind.SingleLineCommentTrivia)
             || t.IsKind(SyntaxKind.MultiLineCommentTrivia)

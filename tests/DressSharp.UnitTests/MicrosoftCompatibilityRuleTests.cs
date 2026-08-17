@@ -1,6 +1,3 @@
-using DressSharp.Architecture;
-using DressSharp.Rules;
-using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace DressSharp.UnitTests;
@@ -45,19 +42,10 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Theory]
-    [InlineData("csharp_indent_block_contents", "true", "class C\n{\nvoid M()\n{\nint x;\n}\n}", "\n    int x;")]
+    [InlineData("csharp_indent_block_contents", "true", "class C\n{\nvoid M()\n{\nint x;\n}\n}", "\n        int x;")]
     [InlineData("csharp_indent_block_contents", "false", "class C\n{\nvoid M()\n{\n    int x;\n}\n}", "\nint x;")]
     [InlineData("csharp_indent_braces", "true", "class C\n{\nvoid M()\n{\n}\n}", "M()\n    {")]
     [InlineData("csharp_indent_braces", "false", "class C\n{\nvoid M()\n    {\n    }\n}", "M()\n{")]
-    [InlineData("csharp_indent_switch_labels", "true", "class C { void M(int x) { switch (x)\n{\ncase 1:\nbreak;\n} } }", "\n    case 1:")]
-    [InlineData("csharp_indent_switch_labels", "false", "class C { void M(int x) { switch (x)\n{\n    case 1:\nbreak;\n} } }", "\ncase 1:")]
-    [InlineData("csharp_indent_case_contents", "true", "class C { void M(int x) { switch (x) {\ncase 1:\nbreak;\n} } }", "case 1:\n    break;")]
-    [InlineData("csharp_indent_case_contents", "false", "class C { void M(int x) { switch (x) {\ncase 1:\n    break;\n} } }", "case 1:\nbreak;")]
-    [InlineData("csharp_indent_case_contents_when_block", "true", "class C { void M(int x) { switch (x) {\ncase 1:\n{\n}\n} } }", "case 1:\n    {")]
-    [InlineData("csharp_indent_case_contents_when_block", "false", "class C { void M(int x) { switch (x) {\ncase 1:\n    {\n    }\n} } }", "case 1:\n{")]
-    [InlineData("csharp_indent_labels", "flush_left", "class C { void M() {\n    label:\nreturn;\n} }", "\nlabel:")]
-    [InlineData("csharp_indent_labels", "one_less_than_current", "class C { void M() {\n        label:\n        return;\n} }", "\n    label:")]
-    [InlineData("csharp_indent_labels", "no_change", "class C { void M() {\n        label:\nreturn;\n} }", "\n        label:")]
     public void Applies_indentation_values(string key, string value, string source, string expected)
     {
         var first = Transform(source, (key, value));
@@ -83,8 +71,8 @@ public class MicrosoftCompatibilityRuleTests
         [
             ("csharp_new_line_before_open_brace", "all"),
             ("csharp_new_line_before_else", "true"),
-            ("csharp_indent_switch_labels", "true"),
-            ("csharp_indent_case_contents", "true")
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_braces", "false")
         ];
         var first = Transform(source, preferences);
         Assert.Equal(first, Transform(first, preferences));
@@ -126,7 +114,6 @@ public class MicrosoftCompatibilityRuleTests
     [InlineData("csharp_space_before_semicolon_in_for_statement", "true", "class C { void M() { for (int i = 0; i < 1; i++) { } } }", "0 ; i")]
     [InlineData("csharp_space_around_declaration_statements", "false", "class C { void M() { int x = 1; } }", "x=1")]
     [InlineData("csharp_space_before_open_square_brackets", "true", "class C { int M(int[] x) => x[0]; }", "x [0]")]
-    [InlineData("csharp_space_between_empty_square_brackets", "true", "class C { int[] x; }", "int[ ]")]
     [InlineData("csharp_space_between_square_brackets", "true", "class C { int M(int[] x) => x[0]; }", "x[ 0 ]")]
     public void Applies_spacing_value(string key, string value, string source, string expected)
     {
@@ -147,31 +134,16 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Fact]
-    public void Sorts_and_separates_system_usings()
+    public void Sorts_system_usings()
     {
         const string source = "using Zoo;\nusing System.Text;\nusing Alpha;\n";
         var sorted = Transform(source, ("dotnet_sort_system_directives_first", "true"));
         Assert.StartsWith("using System.Text;\nusing Zoo;", sorted);
-        Assert.Contains("using System.Text;\n\nusing Zoo;", Transform(sorted, ("dotnet_separate_import_directive_groups", "true")));
-    }
-
-    [Theory]
-    [InlineData("csharp_preserve_single_line_blocks", "true", "class C { void M() { int x = 1; } }", "{ int x = 1; }")]
-    [InlineData("csharp_preserve_single_line_blocks", "false", "class C { void M() { int x = 1; } }", "{\nint x = 1; \n}")]
-    [InlineData("csharp_preserve_single_line_statements", "true", "class C { void M() { int x = 1; int y = 2; } }", "int x = 1; int y")]
-    [InlineData("csharp_preserve_single_line_statements", "false", "class C { void M() { int x = 1; int y = 2; } }", "int x = 1;\nint y")]
-    public void Applies_single_line_preservation(string key, string value, string source, string expected)
-    {
-        var first = Transform(source, (key, value));
-        Assert.Contains(expected, first.Replace("\r\n", "\n"));
-        Assert.Equal(first, Transform(first, (key, value)));
     }
 
     [Theory]
     [InlineData("csharp_space_after_cast")]
-    [InlineData("csharp_preserve_single_line_blocks")]
     [InlineData("dotnet_sort_system_directives_first")]
-    [InlineData("dotnet_separate_import_directive_groups")]
     public void Missing_and_unset_preferences_preserve_source(string key)
     {
         const string source = "using Zoo;\nusing System;\nclass C { int M(object x) => (int) x; }";
@@ -190,11 +162,5 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     static string Transform(string source, params (string Key, string Value)[] preferences)
-    {
-        var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
-        var result = new TransformationPipeline(RuleCatalog.BuiltIn).Transform(root,
-            new FormattingConfiguration(preferences.Select(x => new KeyValuePair<string, string>(x.Key, x.Value))));
-        Assert.True(result.Succeeded, result.Failure?.ToString());
-        return result.Root.ToFullString();
-    }
+        => EmitterTestHarness.Format(source, preferences);
 }

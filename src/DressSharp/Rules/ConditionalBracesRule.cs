@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class ConditionalBracesRule(int order) : IFormattingRule
+sealed class ConditionalBracesRule(int order) : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         "dress_conditional_braces",
@@ -13,6 +13,8 @@ sealed class ConditionalBracesRule(int order) : IFormattingRule
         RuleSafetyClass.SyntaxTransformation,
         "Branch statements and else-if chain shape are preserved, and braces are removed only when unambiguous.",
         order);
+
+    public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } = [SyntaxKind.IfStatement];
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context) =>
         new Rewriter(preference.ToLowerInvariant(), context).Visit(root)!;
@@ -24,6 +26,8 @@ sealed class ConditionalBracesRule(int order) : IFormattingRule
             // Only the outer node owns a chain; nested else-if nodes are rewritten with it.
             if (node.Parent is ElseClauseSyntax)
                 return node;
+            if (!CouldChange(node))
+                return node;
             if (!SyntaxRuleSafety.CanRewrite(node, context))
                 return node;
             var branches = Branches(node).ToArray();
@@ -33,6 +37,21 @@ sealed class ConditionalBracesRule(int order) : IFormattingRule
             var remove = preference == "compact"
                 || preference == "balanced" && canCompact;
             return RewriteChain(node, add, remove);
+        }
+
+        bool CouldChange(IfStatementSyntax node)
+        {
+            var branches = Branches(node).ToArray();
+            if (preference == "always")
+                return branches.Any(statement => statement is not BlockSyntax);
+            if (preference == "compact")
+                return branches.Any(statement => statement is BlockSyntax { Statements: [_] });
+
+            var canCompact = branches.All(statement => statement is not BlockSyntax or BlockSyntax { Statements: [_] })
+                && !HasDanglingElseRisk(node);
+            return canCompact
+                ? branches.Any(statement => statement is BlockSyntax)
+                : branches.Any(statement => statement is not BlockSyntax);
         }
 
         static IEnumerable<StatementSyntax> Branches(IfStatementSyntax root)

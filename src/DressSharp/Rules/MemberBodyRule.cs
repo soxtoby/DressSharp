@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : IFormattingRule
+sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         key,
@@ -14,6 +14,27 @@ sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : IForma
         RuleSafetyClass.SyntaxTransformation,
         "The selected body form preserves the represented statement or returned expression.",
         order);
+
+    /// <summary>
+    /// The declaration kinds this rule's rewriter visits, which follow directly from its member kind.
+    /// </summary>
+    public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } = kind switch
+        {
+            MemberBodyKind.Method => [SyntaxKind.MethodDeclaration],
+            MemberBodyKind.Constructor => [SyntaxKind.ConstructorDeclaration],
+            MemberBodyKind.Operator => [SyntaxKind.OperatorDeclaration, SyntaxKind.ConversionOperatorDeclaration],
+            MemberBodyKind.Property => [SyntaxKind.PropertyDeclaration],
+            MemberBodyKind.Indexer => [SyntaxKind.IndexerDeclaration],
+            _ =>
+                [
+                    SyntaxKind.GetAccessorDeclaration,
+                    SyntaxKind.SetAccessorDeclaration,
+                    SyntaxKind.InitAccessorDeclaration,
+                    SyntaxKind.AddAccessorDeclaration,
+                    SyntaxKind.RemoveAccessorDeclaration,
+                    SyntaxKind.UnknownAccessorDeclaration
+                ]
+        };
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {
@@ -60,6 +81,8 @@ sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : IForma
 
         T RewriteCallable<T>(T node, BlockSyntax? body, ArrowExpressionClauseSyntax? arrow, SyntaxToken semicolon, bool statementBody) where T : SyntaxNode
         {
+            if (!CanConvert(body, arrow, statementBody))
+                return node;
             if (!SyntaxRuleSafety.CanRewrite(node, context))
                 return node;
 
@@ -85,6 +108,8 @@ sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : IForma
 
         PropertyDeclarationSyntax RewriteProperty(PropertyDeclarationSyntax node)
         {
+            if (!CanConvert(node))
+                return node;
             if (!SyntaxRuleSafety.CanRewrite(node, context))
                 return node;
 
@@ -108,6 +133,8 @@ sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : IForma
 
         IndexerDeclarationSyntax RewriteIndexer(IndexerDeclarationSyntax node)
         {
+            if (!CanConvert(node))
+                return node;
             if (!SyntaxRuleSafety.CanRewrite(node, context))
                 return node;
 
@@ -131,10 +158,11 @@ sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : IForma
 
         AccessorDeclarationSyntax RewriteAccessor(AccessorDeclarationSyntax node)
         {
+            var statementBody = node.IsKind(SyntaxKind.SetAccessorDeclaration) || node.IsKind(SyntaxKind.InitAccessorDeclaration) || node.IsKind(SyntaxKind.AddAccessorDeclaration) || node.IsKind(SyntaxKind.RemoveAccessorDeclaration);
+            if (!CanConvert(node.Body, node.ExpressionBody, statementBody))
+                return node;
             if (!SyntaxRuleSafety.CanRewrite(node, context))
                 return node;
-
-            var statementBody = node.IsKind(SyntaxKind.SetAccessorDeclaration) || node.IsKind(SyntaxKind.InitAccessorDeclaration) || node.IsKind(SyntaxKind.AddAccessorDeclaration) || node.IsKind(SyntaxKind.RemoveAccessorDeclaration);
 
             switch (expression)
             {
@@ -178,6 +206,20 @@ sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : IForma
         static ReturnStatementSyntax Return(ExpressionSyntax expression) =>
             SyntaxFactory.ReturnStatement(expression.WithoutLeadingTrivia())
                 .WithReturnKeyword(SyntaxFactory.Token(SyntaxKind.ReturnKeyword).WithTrailingTrivia(SyntaxFactory.Space));
+
+        bool CanConvert(BlockSyntax? body, ArrowExpressionClauseSyntax? arrow, bool statementBody) =>
+            expression
+                ? body is { Statements: [ReturnStatementSyntax { Expression: not null }] } && !statementBody
+                    || body is { Statements: [ExpressionStatementSyntax] } && statementBody
+                : arrow is not null;
+
+        bool CanConvert(PropertyDeclarationSyntax node) => expression
+            ? node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body.Statements: [ReturnStatementSyntax { Expression: not null }] }]
+            : node.ExpressionBody is not null;
+
+        bool CanConvert(IndexerDeclarationSyntax node) => expression
+            ? node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body.Statements: [ReturnStatementSyntax { Expression: not null }] }]
+            : node.ExpressionBody is not null;
 
         static bool TryExpression(BlockSyntax body, bool statementBody, [NotNullWhen(true)] out ExpressionSyntax? expression)
         {

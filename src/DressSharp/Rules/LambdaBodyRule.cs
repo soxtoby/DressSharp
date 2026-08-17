@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class LambdaBodyRule(int order) : IFormattingRule
+sealed class LambdaBodyRule(int order) : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         "dress_lambda_body",
@@ -13,6 +13,9 @@ sealed class LambdaBodyRule(int order) : IFormattingRule
         RuleSafetyClass.SyntaxTransformation,
         "A single return or expression statement and its expression-bodied form represent the same expression.",
         order);
+
+    public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } =
+        [SyntaxKind.SimpleLambdaExpression, SyntaxKind.ParenthesizedLambdaExpression];
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context) =>
         new Rewriter(preference.Equals("expression", StringComparison.OrdinalIgnoreCase), context).Visit(root)!;
@@ -24,6 +27,8 @@ sealed class LambdaBodyRule(int order) : IFormattingRule
 
         T Rewrite<T>(T node) where T : LambdaExpressionSyntax
         {
+            if (!CanConvert(node))
+                return node;
             if (!SyntaxRuleSafety.CanRewrite(node, context))
                 return node;
             if (expression)
@@ -46,5 +51,11 @@ sealed class LambdaBodyRule(int order) : IFormattingRule
             // Choosing return versus an expression-statement can change overload resolution, so block conversion is unsafe.
             return node;
         }
+
+        bool CanConvert(LambdaExpressionSyntax node) => expression
+            && node.Body is BlockSyntax
+                {
+                    Statements: [ReturnStatementSyntax { Expression: not null } or ExpressionStatementSyntax]
+                };
     }
 }

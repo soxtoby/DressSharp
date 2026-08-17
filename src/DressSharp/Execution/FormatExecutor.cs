@@ -15,10 +15,6 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
     readonly TextWriter _output = output ?? Console.Out;
     readonly TextWriter _error = error ?? Console.Error;
 
-    /// <summary>
-    /// Whether to reparse each result and confirm formatting only moved whitespace.
-    /// </summary>
-    static bool VerifyTokens { get; } = Environment.GetEnvironmentVariable("DRESSSHARP_VERIFY_TOKENS") == "1";
 
     internal async Task<int> RunAsync(CommandRequest request, IReadOnlyList<SelectedFile> selected, CancellationToken cancellationToken = default)
     {
@@ -34,6 +30,23 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         stageStart = Stopwatch.GetTimestamp();
         var contexts = await new ParseContextResolver(_invocationDirectory).ResolveAsync(paths, request.BuildConfiguration, cancellationToken);
         timing.MsBuild = Stopwatch.GetElapsedTime(stageStart);
+
+        var emitterPreparations = new EmitterPreparation[selected.Count];
+        var byConfiguration = new Dictionary<FormattingConfiguration, EmitterPreparation>(ReferenceEqualityComparer.Instance);
+        for (var index = 0; index < selected.Count; index++)
+        {
+            var configuration = configurations[selected[index].FullPath];
+            if (!byConfiguration.TryGetValue(configuration, out var preparation))
+            {
+                preparation = new(
+                    EmitterPlan.From(RuleCatalog.BuiltIn, configuration),
+                    MemberRuleSet.From(RuleCatalog.BuiltIn.MemberScopedStructural, configuration),
+                    RuleSettings.From(configuration));
+                byConfiguration.Add(configuration, preparation);
+            }
+
+            emitterPreparations[index] = preparation;
+        }
 
         var prepared = new PreparedFile?[selected.Count];
         var failed = false;
@@ -64,42 +77,32 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
                         string formatted;
                         var skipped = 0;
 
-                        // What the layout stage was handed, which is what its output must still tokenise
-                        // to. That is the tree after the syntax-transformation rules, not the parse.
-                        Microsoft.CodeAnalysis.SyntaxNode? layoutInput = null;
                         var transformStart = Stopwatch.GetTimestamp();
-                        if (SinglePassEmitter.Enabled)
-                        {
-                            // Rules that change the token sequence still run as tree rewrites; the
-                            // emitter then decides the whitespace around whatever they produced.
-                            var structural = new TransformationPipeline(RuleCatalog.BuiltIn.Structural)
-                                .Transform(root, configuration);
-                            if (!structural.Succeeded)
-                                throw structural.Failure!;
-                            var shaped = structural.Root;
-                            layoutInput = shaped;
-                            var text = ReferenceEquals(shaped, root) ? document.Text : shaped.ToFullString();
-                            formatted = SinglePassEmitter.Emit(shaped, EmitterPlan.From(RuleCatalog.BuiltIn, configuration), text);
-                            skipped = structural.SkippedOccurrences;
-                            timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
-                        }
-                        else
-                        {
-                            var transformation = new TransformationPipeline(RuleCatalog.BuiltIn, BenchmarkDiagnostics.Enabled ? timing.RecordRule : null)
-                                .Transform(root, configuration);
-                            timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
-                            if (!transformation.Succeeded)
-                                throw transformation.Failure!;
-                            formatted = transformation.Root.ToFullString();
-                            skipped = transformation.SkippedOccurrences;
-                        }
+                        // Whole-file syntax rules still rewrite the tree, because their effect is
+                        // not contained in a member. There are three and they rarely apply.
+                        var structural = FileScopedStructuralRules.Transform(
+                            root, RuleCatalog.BuiltIn.FileScopedStructural, configuration);
+                        if (!structural.Succeeded)
+                            throw structural.Failure!;
+                        var shaped = structural.Root;
+                        var text = ReferenceEquals(shaped, root) ? document.Text : shaped.ToFullString();
 
-                        // The layout stage must leave the token stream alone. The invariant belongs to
-                        // that stage rather than to the catalog, because the syntax-transformation rules
-                        // are meant to change tokens, so it is checked against what layout was handed.
-                        if (VerifyTokens && layoutInput is not null
-                            && TokenEquivalence.FirstDifference(layoutInput, formatted, context.Options!) is { } difference)
-                            throw new InvalidOperationException($"formatting altered the token stream: {difference}");
+                        // The rest are scoped to the member they change, so a member no rule wants
+                        // is never copied and the file's tree is never rebuilt around one that is.
+                        var preparation = emitterPreparations[index];
+                        var ruleContext = new RuleContext(shaped, preparation.Settings);
+                        var rewrites = SyntaxRewritePlan.For(
+                            shaped,
+                            preparation.MemberRules,
+                            ruleContext);
+                        formatted = SinglePassEmitter.Emit(
+                            shaped,
+                            preparation.EmitterPlan,
+                            ruleContext,
+                            text,
+                            rewrites);
+                        skipped = structural.SkippedOccurrences;
+                        timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
 
                         var encodeStart = Stopwatch.GetTimestamp();
                         var bytes = document.Encode(formatted, Representation(configuration));
@@ -190,6 +193,8 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
 
     static bool? Boolean(string? value) => bool.TryParse(value, out var parsed) ? parsed : null;
 
+    sealed record EmitterPreparation(EmitterPlan EmitterPlan, MemberRuleSet MemberRules, RuleSettings Settings);
+
     sealed class PreparedFile
     {
         internal PreparedFile(SourceDocument document, byte[] content, int skippedOccurrences)
@@ -207,42 +212,30 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         internal int SkippedOccurrences { get; }
         internal bool Changed => Failure is null && !Content.Span.SequenceEqual(Document!.OriginalBytes.Span);
     }
+
 }
 
 sealed class BenchmarkTiming
 {
-    readonly object _gate = new();
-    readonly Dictionary<string, TimeSpan> _rules = [];
-    TimeSpan _read;
-    TimeSpan _parse;
-    TimeSpan _transform;
-    TimeSpan _encode;
-    TimeSpan _write;
+    long _readTicks;
+    long _parseTicks;
+    long _transformTicks;
+    long _encodeTicks;
+    long _writeTicks;
 
     internal TimeSpan Wall { get; set; }
     internal TimeSpan MsBuild { get; set; }
     internal TimeSpan EditorConfig { get; set; }
-    internal TimeSpan Read => _read;
-    internal TimeSpan Parse => _parse;
-    internal TimeSpan Transform => _transform;
-    internal TimeSpan Encode => _encode;
-    internal TimeSpan Write => _write;
-    internal IReadOnlyDictionary<string, TimeSpan> Rules => _rules;
+    internal TimeSpan Read => TimeSpan.FromTicks(Volatile.Read(ref _readTicks));
+    internal TimeSpan Parse => TimeSpan.FromTicks(Volatile.Read(ref _parseTicks));
+    internal TimeSpan Transform => TimeSpan.FromTicks(Volatile.Read(ref _transformTicks));
+    internal TimeSpan Encode => TimeSpan.FromTicks(Volatile.Read(ref _encodeTicks));
+    internal TimeSpan Write => TimeSpan.FromTicks(Volatile.Read(ref _writeTicks));
 
-    internal void AddRead(TimeSpan value) => Add(ref _read, value);
-    internal void AddParse(TimeSpan value) => Add(ref _parse, value);
-    internal void AddTransform(TimeSpan value) => Add(ref _transform, value);
-    internal void AddEncode(TimeSpan value) => Add(ref _encode, value);
-    internal void AddWrite(TimeSpan value) => Add(ref _write, value);
-    internal void RecordRule(string name, TimeSpan value)
-    {
-        lock (_gate)
-            _rules[name] = _rules.GetValueOrDefault(name) + value;
-    }
-
-    void Add(ref TimeSpan target, TimeSpan value)
-    {
-        lock (_gate)
-            target += value;
-    }
+    internal void AddRead(TimeSpan value) => Add(ref _readTicks, value);
+    internal void AddParse(TimeSpan value) => Add(ref _parseTicks, value);
+    internal void AddTransform(TimeSpan value) => Add(ref _transformTicks, value);
+    internal void AddEncode(TimeSpan value) => Add(ref _encodeTicks, value);
+    internal void AddWrite(TimeSpan value) => Add(ref _writeTicks, value);
+    static void Add(ref long target, TimeSpan value) => Interlocked.Add(ref target, value.Ticks);
 }

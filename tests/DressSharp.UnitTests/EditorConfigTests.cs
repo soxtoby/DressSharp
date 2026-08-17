@@ -71,6 +71,27 @@ public sealed class EditorConfigTests : IDisposable
     }
 
     [Fact]
+    public async Task Batch_reuses_only_identical_effective_configurations()
+    {
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            "root = true\n[*.cs]\nindent_style = space\n[Generated*.cs]\nindent_style = tab\n",
+            TestContext.Current.CancellationToken);
+        var resolver = new EditorConfigResolver();
+
+        var result = resolver.ResolveAll(
+            [
+                Path.Combine(_directory, "First.cs"),
+                Path.Combine(_directory, "Second.cs"),
+                Path.Combine(_directory, "GeneratedFirst.cs")
+            ],
+            TestContext.Current.CancellationToken);
+
+        Assert.Same(result[0], result[1]);
+        Assert.NotSame(result[0], result[2]);
+    }
+
+    [Fact]
     public async Task Resolver_rejects_invalid_effective_value()
     {
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[*.cs]\nindent_style = invalid\n", TestContext.Current.CancellationToken);

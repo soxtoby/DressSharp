@@ -33,23 +33,37 @@ sealed record RuleSettings(int MaximumLineLength, int TabWidth, string IndentUni
 
 sealed class RuleContext
 {
-    readonly ImmutableArray<TextSpan> _malformedRegions;
+    readonly SyntaxNode _root;
+    readonly bool _knownWellFormed;
+    ImmutableArray<TextSpan>? _regions;
     int _skippedOccurrences;
 
     internal RuleContext(SyntaxNode root, RuleSettings settings, bool knownWellFormed = false)
     {
+        _root = root;
+        _knownWellFormed = knownWellFormed;
         MaximumLineLength = settings.MaximumLineLength;
         TabWidth = settings.TabWidth;
         IndentUnit = settings.IndentUnit;
         LineEnding = FirstLineEnding(root);
-        _malformedRegions = knownWellFormed ? [] : MalformedRegions(root);
     }
+
+    /// <summary>
+    /// The spans formatting must not touch, found the first time anything asks.
+    /// </summary>
+    /// <remarks>
+    /// Finding them means reading every diagnostic, token and trivia in the file. Most files are
+    /// never asked, because most rules never reach a construct whose safety is in doubt, so paying
+    /// for the scan up front is paying for nothing.
+    /// </remarks>
+    ImmutableArray<TextSpan> MalformedRegions =>
+        _regions ??= _knownWellFormed ? [] : ScanMalformedRegions(_root);
 
     internal int MaximumLineLength { get; }
     internal int TabWidth { get; }
     internal string IndentUnit { get; }
     internal string LineEnding { get; }
-    internal bool HasMalformedRegions => !_malformedRegions.IsEmpty;
+    internal bool HasMalformedRegions => !MalformedRegions.IsEmpty;
 
     internal int TakeSkippedOccurrences()
     {
@@ -65,10 +79,11 @@ sealed class RuleContext
     {
         // The overwhelmingly common case is a file with no malformed regions at all, and rules ask
         // this per token, so answer it without touching the region list.
-        if (_malformedRegions.IsEmpty)
+        var regions = MalformedRegions;
+        if (regions.IsEmpty)
             return false;
 
-        foreach (var region in _malformedRegions)
+        foreach (var region in regions)
         {
             if (Intersects(region, occurrence))
             {
@@ -91,19 +106,22 @@ sealed class RuleContext
                     _ => "\n"
                 };
 
-    static ImmutableArray<TextSpan> MalformedRegions(SyntaxNode root)
+    static ImmutableArray<TextSpan> ScanMalformedRegions(SyntaxNode root)
     {
-        var regions = root.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Location.IsInSource)
-            .Select(diagnostic => diagnostic.Location.SourceSpan)
-            .Concat(root.DescendantTokens(descendIntoTrivia: true)
-                .Where(token => token.IsMissing)
-                .Select(token => token.Span))
-            .Concat(root.DescendantTrivia(descendIntoTrivia: true)
-                .Where(trivia => trivia.IsKind(SyntaxKind.SkippedTokensTrivia) || trivia.IsKind(SyntaxKind.DisabledTextTrivia))
-                .Select(trivia => trivia.Span));
+        if (!root.ContainsDiagnostics && !root.ContainsDirectives)
+            return [];
 
-        return regions.Distinct().OrderBy(span => span.Start).ToImmutableArray();
+        var diagnosticRegions = root.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Location.IsInSource)
+            .Select(diagnostic => diagnostic.Location.SourceSpan);
+        if (root.ContainsDirectives)
+        {
+            diagnosticRegions = diagnosticRegions.Concat(root.DescendantTrivia()
+                .Where(trivia => trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                .Select(trivia => trivia.Span));
+        }
+
+        return diagnosticRegions.Distinct().OrderBy(span => span.Start).ToImmutableArray();
     }
 
     static bool Intersects(TextSpan left, TextSpan right) =>

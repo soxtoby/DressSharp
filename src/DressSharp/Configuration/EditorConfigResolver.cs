@@ -21,23 +21,74 @@ sealed class EditorConfigResolver : IConfigurationResolver
         try
         {
             resolved = _parser.Parse(fullPath);
-            foreach (var config in resolved.EditorConfigFiles)
-            {
-                var configPath = Path.Combine(config.Directory, config.FileName);
-                _ = _validated.GetOrAdd(
-                    configPath,
-                    key => new Lazy<bool>(() =>
-                        {
-                            EditorConfigSyntaxValidator.Validate(key, File.ReadAllText(key));
-                            return true;
-                        })).Value;
-            }
+            Validate(resolved);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             throw new ConfigurationException($"{fullPath}: invalid EditorConfig: {exception.Message}");
         }
 
+        return ValueTask.FromResult(ToConfiguration(fullPath, resolved));
+    }
+
+    internal IReadOnlyList<FormattingConfiguration> ResolveAll(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var fullPaths = paths.Select(Path.GetFullPath).ToArray();
+        try
+        {
+            var resolvedFiles = _parser.Parse(fullPaths);
+            return Canonicalize(resolvedFiles);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new ConfigurationException($"invalid EditorConfig: {exception.Message}");
+        }
+    }
+
+    FormattingConfiguration[] Canonicalize(IEnumerable<FileConfiguration> resolvedFiles)
+    {
+        var byRawProperties = new Dictionary<IReadOnlyDictionary<string, string>, FormattingConfiguration>(
+            EffectivePropertyComparer.Instance);
+        var canonical = new Dictionary<FormattingConfiguration, FormattingConfiguration>(
+            FormattingConfigurationValueComparer.Instance);
+        var configurations = new List<FormattingConfiguration>();
+        foreach (var resolved in resolvedFiles)
+        {
+            Validate(resolved);
+            if (!byRawProperties.TryGetValue(resolved.Properties, out var configuration))
+            {
+                configuration = ToConfiguration(resolved.FileName, resolved);
+                byRawProperties.Add(resolved.Properties, configuration);
+            }
+
+            if (canonical.TryGetValue(configuration, out var existing))
+                configuration = existing;
+            else
+                canonical.Add(configuration, configuration);
+            configurations.Add(configuration);
+        }
+
+        return configurations.ToArray();
+    }
+
+    void Validate(FileConfiguration resolved)
+    {
+        foreach (var config in resolved.EditorConfigFiles)
+        {
+            var configPath = Path.Combine(config.Directory, config.FileName);
+            _ = _validated.GetOrAdd(
+                configPath,
+                key => new Lazy<bool>(() =>
+                    {
+                        EditorConfigSyntaxValidator.Validate(key, File.ReadAllText(key));
+                        return true;
+                    })).Value;
+        }
+    }
+
+    static FormattingConfiguration ToConfiguration(string fullPath, FileConfiguration resolved)
+    {
         var preferences = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in resolved.Properties)
         {
@@ -49,7 +100,43 @@ sealed class EditorConfigResolver : IConfigurationResolver
                 preferences[key] = PreferenceCatalog.Normalize(key, value);
         }
 
-        return ValueTask.FromResult(new FormattingConfiguration(preferences));
+        return new FormattingConfiguration(preferences);
+    }
+
+    sealed class EffectivePropertyComparer : IEqualityComparer<IReadOnlyDictionary<string, string>>
+    {
+        internal static EffectivePropertyComparer Instance { get; } = new();
+
+        public bool Equals(
+            IReadOnlyDictionary<string, string>? left,
+            IReadOnlyDictionary<string, string>? right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+            if (left is null || right is null || left.Count != right.Count)
+                return false;
+            foreach (var (key, value) in left)
+            {
+                if (!right.TryGetValue(key, out var other)
+                    || !value.Equals(other, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            return true;
+        }
+
+        public int GetHashCode(IReadOnlyDictionary<string, string> properties)
+        {
+            var hash = 0;
+            foreach (var (key, value) in properties)
+            {
+                hash ^= HashCode.Combine(
+                    StringComparer.OrdinalIgnoreCase.GetHashCode(key),
+                    StringComparer.OrdinalIgnoreCase.GetHashCode(value));
+            }
+
+            return hash;
+        }
     }
 }
 
@@ -59,6 +146,13 @@ static class ConfigurationPreflight
         IEnumerable<string> paths, IConfigurationResolver resolver, CancellationToken cancellationToken)
     {
         var ordered = paths as IReadOnlyList<string> ?? [.. paths];
+        if (resolver is EditorConfigResolver editorConfig)
+        {
+            var batch = editorConfig.ResolveAll(ordered, cancellationToken);
+            return ordered.Select((path, index) => (path, configuration: batch[index]))
+                .ToDictionary(pair => pair.path, pair => pair.configuration, StringComparer.OrdinalIgnoreCase);
+        }
+
         var resolved = new FormattingConfiguration[ordered.Count];
         await Parallel.ForAsync(
             0,

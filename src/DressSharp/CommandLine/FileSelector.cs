@@ -15,34 +15,46 @@ sealed class FileSelector(string invocationDirectory)
             RejectUnsupportedOperand(operand);
             var fullPath = Path.GetFullPath(operand, _invocationDirectory);
             if (File.Exists(fullPath))
-                await AddExplicitFileAsync(fullPath, candidates, cancellationToken);
+                AddExplicitFile(fullPath, candidates);
             else if (Directory.Exists(fullPath))
-                await AddDirectoryAsync(fullPath, candidates, cancellationToken);
+                AddDirectory(fullPath, candidates, cancellationToken);
             else
                 throw new FileSelectionException($"Path does not exist or is inaccessible: {Display(fullPath)}");
         }
 
-        return candidates
+        var eligible = candidates.ToArray();
+        var generated = new bool[eligible.Length];
+        await Parallel.ForAsync(
+            0,
+            eligible.Length,
+            new ParallelOptions
+                {
+                    CancellationToken = cancellationToken,
+                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                },
+            async (index, token) => generated[index] = await IsGeneratedAsync(eligible[index].Key, token));
+
+        return eligible
+            .Where((_, index) => !generated[index])
             .Select(pair => new SelectedFile(pair.Key, pair.Value))
             .OrderBy(file => file.DisplayPath, StringComparer.Ordinal)
             .ToArray();
     }
 
-    async Task AddExplicitFileAsync(string path, Dictionary<string, string> candidates, CancellationToken cancellationToken)
+    void AddExplicitFile(string path, Dictionary<string, string> candidates)
     {
         if (!IsCSharp(path))
             throw new FileSelectionException($"Unsupported file path: {Display(path)}");
-        if (!await IsGeneratedAsync(path, cancellationToken))
-            candidates.TryAdd(Path.GetFullPath(path), Display(path));
+        candidates.TryAdd(Path.GetFullPath(path), Display(path));
     }
 
-    async Task AddDirectoryAsync(string root, Dictionary<string, string> candidates, CancellationToken cancellationToken)
+    void AddDirectory(string root, Dictionary<string, string> candidates, CancellationToken cancellationToken)
     {
         var rules = new GitIgnoreRules();
-        await VisitAsync(root, root, rules, candidates, cancellationToken);
+        Visit(root, root, rules, candidates, cancellationToken);
     }
 
-    async Task VisitAsync(
+    void Visit(
         string directory,
         string root,
         GitIgnoreRules rules,
@@ -72,9 +84,9 @@ sealed class FileSelector(string invocationDirectory)
                     continue;
                 if (rules.IsIgnored(relativePath, directory: true))
                     continue;
-                await VisitAsync(entry, root, rules, candidates, cancellationToken);
+                Visit(entry, root, rules, candidates, cancellationToken);
             }
-            else if (IsCSharp(entry) && !rules.IsIgnored(relativePath, directory: false) && !await IsGeneratedAsync(entry, cancellationToken))
+            else if (IsCSharp(entry) && !rules.IsIgnored(relativePath, directory: false))
             {
                 var fullPath = Path.GetFullPath(entry);
                 candidates.TryAdd(fullPath, Display(fullPath));

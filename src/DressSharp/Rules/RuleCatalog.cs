@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace DressSharp.Rules;
 
@@ -29,27 +30,10 @@ sealed class RuleCatalog
             new LambdaBodyRule(160),
             new NamespaceStyleRule(170),
             new ConditionalBracesRule(180),
-            new BlankLineRule("dress_blank_lines_around_namespaces", BlankLineKind.AroundNamespaces, 200),
-            new BlankLineRule("dress_blank_lines_around_types", BlankLineKind.AroundTypes, 210),
-            new BlankLineRule("dress_blank_lines_between_members", BlankLineKind.BetweenMembers, 220),
-            new BlankLineRule("dress_blank_lines_between_using_groups", BlankLineKind.BetweenUsingGroups, 230),
-            new BlankLineRule("dress_blank_lines_between_member_categories", BlankLineKind.BetweenMemberCategories, 240),
-            new BlankLineRule("dress_max_consecutive_blank_lines", BlankLineKind.Maximum, 250),
-            new CommentRule("dress_line_comment_spacing", CommentKind.LineSpacing, ["none", "single"], 260),
-            new CommentRule("dress_block_comment_spacing", CommentKind.BlockSpacing, ["none", "single"], 270),
-            new CommentRule("dress_attached_comment_placement", CommentKind.AttachedPlacement, ["same_line", "own_line", "auto"], 280),
-            new CommentRule("dress_xml_comment_placement", CommentKind.XmlPlacement, ["attached", "separated"], 290),
-            new CommentRule("dress_xml_element_layout", CommentKind.XmlElementLayout, ["single_line", "multi_line"], 300),
             new UsingOrderRule("dress_global_using_order", 310),
             new UsingOrderRule("dress_using_kind_order", 320),
             new ModifierOrderRule(330),
-            new InitializerIndentationRule("dress_object_initializer_indentation", InitializerKind.Object, 340),
-            new InitializerIndentationRule("dress_collection_initializer_indentation", InitializerKind.Collection, 350),
-            new InitializerIndentationRule("dress_array_initializer_indentation", InitializerKind.Array, 360),
-            new InitializerIndentationRule("dress_with_initializer_indentation", InitializerKind.With, 370),
-            // Kept with its sibling initializer rules rather than at 380, which fell inside the
-            // token-spacing range and split those rules into two passes over the file.
-            new InitializerIndentationRule("dress_collection_expression_indentation", InitializerKind.CollectionExpression, 371),
+            new SystemUsingSortRule(372),
             new NewLineRule("csharp_new_line_before_open_brace", NewLineKind.OpenBrace, ["all", "none", "accessors", "anonymous_methods", "anonymous_types", "control_blocks", "events", "indexers", "lambdas", "local_functions", "methods", "object_collection_array_initializers", "properties", "types"], 600),
             new NewLineRule("csharp_new_line_before_else", NewLineKind.Else, ["true", "false"], 601),
             new NewLineRule("csharp_new_line_before_catch", NewLineKind.Catch, ["true", "false"], 602),
@@ -57,12 +41,6 @@ sealed class RuleCatalog
             new NewLineRule("csharp_new_line_before_members_in_object_initializers", NewLineKind.ObjectInitializerMembers, ["true", "false"], 604),
             new NewLineRule("csharp_new_line_before_members_in_anonymous_types", NewLineKind.AnonymousTypeMembers, ["true", "false"], 605),
             new NewLineRule("csharp_new_line_between_query_expression_clauses", NewLineKind.QueryClauses, ["true", "false"], 606),
-            new IndentationRule("csharp_indent_switch_labels", IndentationKind.SwitchLabels, ["true", "false"], 607),
-            new IndentationRule("csharp_indent_case_contents", IndentationKind.CaseContents, ["true", "false"], 608),
-            new IndentationRule("csharp_indent_labels", IndentationKind.Labels, ["flush_left", "no_change", "one_less_than_current"], 609),
-            new IndentationRule("csharp_indent_block_contents", IndentationKind.BlockContents, ["true", "false"], 610),
-            new IndentationRule("csharp_indent_braces", IndentationKind.Braces, ["true", "false"], 611),
-            new IndentationRule("csharp_indent_case_contents_when_block", IndentationKind.CaseBlock, ["true", "false"], 612),
             new CastSpacingRule(374),
             new ControlFlowKeywordSpacingRule(375),
             new ParenthesisSpacingRule(376),
@@ -83,37 +61,29 @@ sealed class RuleCatalog
             new ForSemicolonSpacingRule(SpacingSide.Before, 392),
             new DeclarationSpacingRule(393),
             new BracketSpacingRule(BracketSpacingKind.BeforeOpening, 394),
-            new BracketSpacingRule(BracketSpacingKind.EmptyContents, 395),
-            new BracketSpacingRule(BracketSpacingKind.Contents, 396),
-            new SingleLineBlockPreservationRule(397),
-            new SingleLineStatementPreservationRule(398),
-            new SystemUsingSortRule(372),
-            new ImportGroupSeparationRule(373),
-            new ConstructLayoutRule("dress_arguments_layout", ConstructLayoutKind.Arguments, 400),
-            new ConstructLayoutRule("dress_parameters_layout", ConstructLayoutKind.Parameters, 410),
-            new ConstructLayoutRule("dress_initializers_layout", ConstructLayoutKind.Initializers, 420),
-            new ConstructLayoutRule("dress_collection_expressions_layout", ConstructLayoutKind.CollectionExpressions, 430),
-            new ConstructLayoutRule("dress_base_type_lists_layout", ConstructLayoutKind.BaseTypeLists, 440),
-            new ConstructLayoutRule("dress_constraint_clauses_layout", ConstructLayoutKind.ConstraintClauses, 450),
-            new ConstructLayoutRule("dress_member_access_chains_layout", ConstructLayoutKind.MemberAccessChains, 460),
-            new ConstructLayoutRule("dress_binary_expressions_layout", ConstructLayoutKind.BinaryExpressions, 470),
-            new ConstructLayoutRule("dress_conditional_expressions_layout", ConstructLayoutKind.ConditionalExpressions, 480),
-            new ConstructLayoutRule("dress_query_clauses_layout", ConstructLayoutKind.QueryClauses, 490),
-            new ConstructLayoutRule("dress_attributes_layout", ConstructLayoutKind.Attributes, 500)
+            new BracketSpacingRule(BracketSpacingKind.Contents, 396)
         ]);
 
     /// <summary>
-    /// The rules that change the sequence of tokens rather than the whitespace between them.
+    /// Structural rules that act on a whole file rather than on one member, so they cannot be scoped
+    /// to a member the way the rest can.
     /// </summary>
-    /// <remarks>
-    /// The emitter writes whitespace and must leave the token stream alone, so these run ahead of it
-    /// as tree rewrites. Reordering rules count even though they are classed as layout, because
-    /// moving a using directive or a modifier moves tokens.
-    /// </remarks>
+    internal RuleCatalog FileScopedStructural => _fileScoped ??= new(
+        Structural.Rules.Where(rule => rule is NamespaceStyleRule or UsingOrderRule or SystemUsingSortRule),
+        Version);
+
+    /// <summary>
+    /// Structural rules whose effect is contained within a single member.
+    /// </summary>
+    internal RuleCatalog MemberScopedStructural => _memberScoped ??= new(
+        Structural.Rules.Where(rule => rule is not (NamespaceStyleRule or UsingOrderRule or SystemUsingSortRule)),
+        Version);
+
+    RuleCatalog? _fileScoped;
+    RuleCatalog? _memberScoped;
+
     internal RuleCatalog Structural => _structural ??= new(
-        Rules.Where(rule =>
-            rule.Metadata.SafetyClass == RuleSafetyClass.SyntaxTransformation
-            || rule is UsingOrderRule or ModifierOrderRule or SystemUsingSortRule),
+        Rules.Where(rule => rule is ISyntaxFormattingRule or UsingOrderRule or ModifierOrderRule or SystemUsingSortRule),
         Version);
 
     RuleCatalog? _structural;
@@ -154,6 +124,21 @@ interface IFormattingRule
 {
     RuleMetadata Metadata { get; }
 
+    /// <summary>
+    /// The syntax kinds this rule can transform. A file containing none of them cannot be changed by
+    /// the rule, so it need not be run over it. An empty set means the rule may always apply.
+    /// </summary>
+    /// <remarks>
+    /// Most rules cost the same to run over a file that has nothing for them as over one that does,
+    /// because finding their targets means walking the whole tree. Declaring what they look for lets
+    /// that walk be shared and the rule skipped outright.
+    /// </remarks>
+    ImmutableArray<SyntaxKind> TargetKinds => [];
+
+}
+
+interface ISyntaxFormattingRule : IFormattingRule
+{
     Microsoft.CodeAnalysis.SyntaxNode Transform(
         Microsoft.CodeAnalysis.SyntaxNode root,
         string preference,

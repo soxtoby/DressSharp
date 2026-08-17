@@ -1,5 +1,3 @@
-using DressSharp.Architecture;
-using DressSharp.Rules;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Text.RegularExpressions;
@@ -80,13 +78,7 @@ public class SyntaxConversionRuleTests
     }
 
     static string Transform(string source, params (string Key, string Value)[] preferences)
-    {
-        var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
-        var configuration = new FormattingConfiguration(preferences.Select(pair => new KeyValuePair<string, string>(pair.Key, pair.Value)));
-        var result = new TransformationPipeline(RuleCatalog.BuiltIn).Transform(root, configuration);
-        Assert.True(result.Succeeded, result.Failure?.ToString());
-        return result.Root.ToFullString();
-    }
+        => EmitterTestHarness.Format(source, preferences);
 
     static void AssertEquivalent(string expected, string actual, bool wrap = false)
     {
