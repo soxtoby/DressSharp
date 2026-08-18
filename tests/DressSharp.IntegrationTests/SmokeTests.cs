@@ -33,7 +33,7 @@ public sealed class SmokeTests
         {
             var target = Path.Combine(directory, ".editorconfig");
 
-            var exitCode = await Program.CreateCommand().Parse(["init", target]).InvokeAsync(
+            var exitCode = await Program.CreateCommand().Parse(["init", "--target", target]).InvokeAsync(
                 cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(0, exitCode);
@@ -58,7 +58,7 @@ public sealed class SmokeTests
         {
             await File.WriteAllTextAsync(target, original, TestContext.Current.CancellationToken);
 
-            var exitCode = await Program.CreateCommand().Parse(["init", target]).InvokeAsync(
+            var exitCode = await Program.CreateCommand().Parse(["init", "--target", target]).InvokeAsync(
                 cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(2, exitCode);

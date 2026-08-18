@@ -8,6 +8,6 @@ enum CommandKind
 
 sealed record CommandRequest(
     CommandKind Kind,
-    IReadOnlyList<string> Paths,
+    IReadOnlyList<string> Includes,
     bool Verbose,
     string? BuildConfiguration);

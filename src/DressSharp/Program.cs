@@ -9,18 +9,14 @@ static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        var invalidOption = FindInvalidOption(args);
-        if (invalidOption is not null)
-        {
-            await Console.Error.WriteLineAsync($"Unrecognized option: {invalidOption}");
-            return 2;
-        }
-
-        return await CreateCommand().Parse(args).InvokeAsync();
+        var result = CreateCommand().Parse(args);
+        var exitCode = await result.InvokeAsync();
+        return result.Errors.Count == 0 ? exitCode : 2;
     }
 
     internal static RootCommand CreateCommand()
     {
+        var includes = CreateIncludeOption();
         var verbose = new Option<bool>("--verbose") { Description = "List changed files and report an empty selection.", Recursive = true };
         var configuration = new Option<string?>("--configuration")
             {
@@ -28,13 +24,11 @@ static class Program
                 Recursive = true,
                 Aliases = { "--config" },
             };
-        var rootPaths = new Argument<string[]>("paths") { Arity = ArgumentArity.ZeroOrMore };
 
         var root = new RootCommand("Format C# using explicit syntax-only preferences.")
             {
                 TreatUnmatchedTokensAsErrors = true,
-                Options = { verbose, configuration },
-                Arguments = { rootPaths },
+                Options = { includes, verbose, configuration },
                 Subcommands =
                     {
                         CreateFileCommand("format", "Format selected C# files.", CommandKind.Format, verbose, configuration),
@@ -42,8 +36,16 @@ static class Program
                         CreateInitCommand(),
                     },
             };
+        foreach (var command in root.Subcommands)
+        {
+            command.Validators.Add(result =>
+                {
+                    if (result.GetResult(includes) is not null)
+                        result.AddError("Option '--include' must follow an explicit command.");
+                });
+        }
         root.SetAction(parseResult => RunSelectionAsync(
-            new CommandRequest(CommandKind.Format, parseResult.GetValue(rootPaths) ?? [], parseResult.GetValue(verbose), parseResult.GetValue(configuration)),
+            new CommandRequest(CommandKind.Format, parseResult.GetValue(includes) ?? [], parseResult.GetValue(verbose), parseResult.GetValue(configuration)),
             Environment.CurrentDirectory));
 
         return root;
@@ -51,7 +53,7 @@ static class Program
 
     static Command CreateInitCommand()
     {
-        var target = new Argument<string?>("target") { Arity = ArgumentArity.ZeroOrOne };
+        var target = new Option<string?>("--target") { Description = "EditorConfig file to initialize." };
         var force = new Option<bool>("--force");
         var init = new Command("init", "Write the complete Familiar preset to a managed EditorConfig block.") { target, force };
         init.SetAction(async (parseResult, cancellationToken) =>
@@ -86,20 +88,31 @@ static class Program
         Option<bool> verbose,
         Option<string?> configuration)
     {
-        var paths = new Argument<string[]>("paths") { Arity = ArgumentArity.ZeroOrMore };
-        var command = new Command(name, description) { paths };
+        var includes = CreateIncludeOption();
+        var command = new Command(name, description) { includes };
         command.TreatUnmatchedTokensAsErrors = true;
         command.SetAction(parseResult => RunSelectionAsync(
-            new CommandRequest(kind, parseResult.GetValue(paths) ?? [], parseResult.GetValue(verbose), parseResult.GetValue(configuration)),
+            new CommandRequest(
+                kind,
+                parseResult.GetValue(includes) ?? [],
+                parseResult.GetValue(verbose),
+                parseResult.GetValue(configuration)),
             Environment.CurrentDirectory));
         return command;
     }
+
+    static Option<string[]> CreateIncludeOption() => new("--include")
+        {
+            Description = "Select a literal path or invocation-directory-relative glob. Repeat to combine selections.",
+            Arity = ArgumentArity.OneOrMore,
+            AllowMultipleArgumentsPerToken = false,
+        };
 
     static async Task<int> RunSelectionAsync(CommandRequest request, string invocationDirectory)
     {
         try
         {
-            var selected = await new FileSelector(invocationDirectory).SelectAsync(request.Paths);
+            var selected = await new FileSelector(invocationDirectory).SelectAsync(request.Includes);
             if (request.Verbose && selected.Count == 0)
                 await Console.Out.WriteLineAsync("No eligible C# files selected.");
             return await new FormatExecutor(invocationDirectory).RunAsync(request, selected);
@@ -109,35 +122,5 @@ static class Program
             await Console.Error.WriteLineAsync(exception.Message);
             return 2;
         }
-    }
-
-    static string? FindInvalidOption(IReadOnlyList<string> args)
-    {
-        var afterDelimiter = false;
-        for (var index = 0; index < args.Count; index++)
-        {
-            var argument = args[index];
-            if (argument == "--")
-            {
-                afterDelimiter = true;
-                continue;
-            }
-
-            if (afterDelimiter || !argument.StartsWith("-", StringComparison.Ordinal) || argument == "-")
-                continue;
-            if (argument is "--help" or "-h" or "-?" or "--version" or "--verbose" or "--force")
-                continue;
-            if (argument is "--configuration" or "--config")
-            {
-                index++;
-                continue;
-            }
-
-            if (argument.StartsWith("--configuration=", StringComparison.Ordinal) || argument.StartsWith("--config=", StringComparison.Ordinal))
-                continue;
-            return argument;
-        }
-
-        return null;
     }
 }

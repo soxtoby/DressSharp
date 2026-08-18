@@ -167,7 +167,7 @@ try
             Dictionary<string, string?>? environment = null;
             if (tool == "DressSharp")
             {
-                arguments = [Do.RootDirectory / "src/DressSharp/bin/Release/net10.0/DressSharp.dll", mode, runRoot];
+                arguments = [Do.RootDirectory / "src/DressSharp/bin/Release/net10.0/DressSharp.dll", mode, "--include", runRoot];
                 environment = new() { ["DRESSSHARP_BENCHMARK_WORKERS"] = workers.ToString(), ["DRESSSHARP_BENCHMARK_TIMING"] = timingPath };
             }
             else

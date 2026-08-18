@@ -1,3 +1,5 @@
+using Microsoft.Extensions.FileSystemGlobbing;
+
 namespace DressSharp.CommandLine;
 
 sealed class FileSelector(string invocationDirectory)
@@ -6,14 +8,21 @@ sealed class FileSelector(string invocationDirectory)
     static readonly string[] GeneratedSuffixes = [".g.cs", ".generated.cs", ".designer.cs"];
     readonly string _invocationDirectory = Path.GetFullPath(invocationDirectory);
 
-    internal async Task<IReadOnlyList<SelectedFile>> SelectAsync(IReadOnlyList<string> operands, CancellationToken cancellationToken = default)
+    internal async Task<IReadOnlyList<SelectedFile>> SelectAsync(IReadOnlyList<string> includes, CancellationToken cancellationToken = default)
     {
         var candidates = new Dictionary<string, string>(PathIdentityComparer());
-        foreach (var operand in operands.Count == 0 ? [_invocationDirectory] : operands)
+        var patterns = new List<string>();
+        foreach (var include in includes.Count == 0 ? [_invocationDirectory] : includes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            RejectUnsupportedOperand(operand);
-            var fullPath = Path.GetFullPath(operand, _invocationDirectory);
+            RejectUnsupportedInclude(include);
+            if (IsGlob(include))
+            {
+                patterns.Add(NormalizeGlob(include));
+                continue;
+            }
+
+            var fullPath = Path.GetFullPath(include, _invocationDirectory);
             if (File.Exists(fullPath))
                 AddExplicitFile(fullPath, candidates);
             else if (Directory.Exists(fullPath))
@@ -21,6 +30,8 @@ sealed class FileSelector(string invocationDirectory)
             else
                 throw new FileSelectionException($"Path does not exist or is inaccessible: {Display(fullPath)}");
         }
+
+        AddGlobMatches(patterns, candidates, cancellationToken);
 
         var eligible = candidates.ToArray();
         var generated = new bool[eligible.Length];
@@ -39,6 +50,34 @@ sealed class FileSelector(string invocationDirectory)
             .Select(pair => new SelectedFile(pair.Key, pair.Value))
             .OrderBy(file => file.DisplayPath, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    void AddGlobMatches(
+        IReadOnlyList<string> patterns,
+        Dictionary<string, string> candidates,
+        CancellationToken cancellationToken)
+    {
+        if (patterns.Count == 0)
+            return;
+
+        var discovered = new Dictionary<string, string>(PathIdentityComparer());
+        AddDirectory(_invocationDirectory, discovered, cancellationToken);
+        var matcher = new Matcher(PathComparison());
+        try
+        {
+            foreach (var pattern in patterns)
+                matcher.AddInclude(pattern);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new FileSelectionException($"Invalid include glob: {exception.Message}");
+        }
+
+        var matches = matcher.Match(discovered.Values).Files
+            .Select(match => match.Path)
+            .ToHashSet(PathIdentityComparer());
+        foreach (var candidate in discovered.Where(candidate => matches.Contains(candidate.Value)))
+            candidates.TryAdd(candidate.Key, candidate.Value);
     }
 
     void AddExplicitFile(string path, Dictionary<string, string> candidates)
@@ -103,12 +142,24 @@ sealed class FileSelector(string invocationDirectory)
         return display.Replace('\\', '/');
     }
 
-    static void RejectUnsupportedOperand(string operand)
+    static void RejectUnsupportedInclude(string include)
     {
-        if (operand == "-")
+        if (string.IsNullOrWhiteSpace(include))
+            throw new FileSelectionException("Include cannot be empty.");
+        if (include == "-")
             throw new FileSelectionException("Standard input is not supported.");
-        if (operand.IndexOfAny(['*', '?']) >= 0)
-            throw new FileSelectionException($"Globs are not supported: {operand}");
+        if (IsGlob(include) && Path.IsPathRooted(include))
+            throw new FileSelectionException($"Include globs must be relative to the invocation directory: {include}");
+    }
+
+    static bool IsGlob(string include) => include.Contains('*', StringComparison.Ordinal);
+
+    static string NormalizeGlob(string include)
+    {
+        var pattern = include.Replace('\\', '/');
+        if (pattern.Split('/').Contains("..", StringComparer.Ordinal))
+            throw new FileSelectionException($"Include globs cannot leave the invocation directory: {include}");
+        return pattern.StartsWith("./", StringComparison.Ordinal) ? pattern[2..] : pattern;
     }
 
     static bool IsCSharp(string path) => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
@@ -133,4 +184,8 @@ sealed class FileSelector(string invocationDirectory)
     static StringComparer PathIdentityComparer() => OperatingSystem.IsWindows()
         ? StringComparer.OrdinalIgnoreCase
         : StringComparer.Ordinal;
+
+    static StringComparison PathComparison() => OperatingSystem.IsWindows()
+        ? StringComparison.OrdinalIgnoreCase
+        : StringComparison.Ordinal;
 }

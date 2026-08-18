@@ -5,17 +5,17 @@ This document describes DressSharp 0.x. The executable is distributed by the `Dr
 ## Commands
 
 ```text
-dotnet dress [paths] [--verbose] [--configuration <name>]
-dotnet dress format [paths] [--verbose] [--configuration <name>]
-dotnet dress check [paths] [--verbose] [--configuration <name>]
-dotnet dress init [target] [--force]
+dotnet dress [--include <pattern>]... [--verbose] [--configuration <name>]
+dotnet dress format [--include <pattern>]... [--verbose] [--configuration <name>]
+dotnet dress check [--include <pattern>]... [--verbose] [--configuration <name>]
+dotnet dress init [--target <path>] [--force]
 ```
 
-The root command aliases `format`. An omitted path selects the invocation directory. Paths are literal files or directories; use `--` before a path beginning with `-`. Selection includes ordinary `.cs` files, honors nested `.gitignore` rules, and excludes generated files, `.csx`, VCS directories, and linked directories. Overlapping paths are deduplicated.
+The root command aliases `format`. An omitted include selects the invocation directory. `--include` accepts either a literal file/directory or an invocation-directory-relative glob and may be repeated. With an explicit command, place `--include` after the command name. Glob patterns use `/`, `*`, and `**`; quote them to prevent shell expansion. Globs cannot leave the invocation directory. Selection includes ordinary `.cs` files, honors nested `.gitignore` rules, and excludes generated files, `.csx`, VCS directories, and linked directories. Overlapping includes are deduplicated.
 
 `format` writes changed files. `check` writes nothing and lists files requiring changes. `--verbose` lists changed files and reports an empty selection. `--configuration` (alias `--config`) selects the MSBuild configuration; the default is `Debug`.
 
-`init` writes the complete Familiar preset into one EOF block delimited by `# DressSharp Begin` and `# DressSharp End`. Its default target is `.editorconfig` in the invocation directory. Existing conflicting keys require `--force`; malformed or duplicate managed markers always fail.
+`init` writes the complete Familiar preset into one EOF block delimited by `# DressSharp Begin` and `# DressSharp End`. `--target` defaults to `.editorconfig` in the invocation directory. Existing conflicting keys require `--force`; malformed or duplicate managed markers always fail.
 
 ## Exit codes
 
