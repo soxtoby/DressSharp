@@ -33,9 +33,6 @@ sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
         var startInfo = new ProcessStartInfo("dotnet")
             {
                 WorkingDirectory = Path.GetDirectoryName(target)!,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
             };
         startInfo.ArgumentList.Add("build");
         startInfo.ArgumentList.Add(target);
@@ -48,18 +45,14 @@ sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
         startInfo.ArgumentList.Add($"--getProperty:{string.Join(',', PropertyNames)}");
         startInfo.ArgumentList.Add("--getItem:Compile");
 
-        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start dotnet.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var output = await outputTask;
-        var error = await errorTask;
-        if (process.ExitCode != 0)
-            return new(false, new Dictionary<string, string>(), [], FirstDiagnostic(error, output));
+        var result = await ProcessRunner.TryRunAsync(startInfo, cancellationToken)
+            ?? throw new InvalidOperationException("Could not start dotnet.");
+        if (result.ExitCode != 0)
+            return new(false, new Dictionary<string, string>(), [], FirstDiagnostic(result.StandardError, result.StandardOutput));
 
         try
         {
-            using var document = JsonDocument.Parse(output);
+            using var document = JsonDocument.Parse(result.StandardOutput);
             var properties = document.RootElement.GetProperty("Properties").EnumerateObject()
                 .ToDictionary(property => property.Name, property => property.Value.GetString() ?? "", StringComparer.OrdinalIgnoreCase);
             var compileItems = document.RootElement.GetProperty("Items").GetProperty("Compile").EnumerateArray()

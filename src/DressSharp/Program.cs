@@ -103,7 +103,7 @@ static class Program
 
     static Option<string[]> CreateIncludeOption() => new("--include")
         {
-            Description = "Select a literal path or invocation-directory-relative glob. Repeat to combine selections.",
+            Description = "Select an invocation-directory-relative glob. Repeat to combine selections.",
             Arity = ArgumentArity.OneOrMore,
             AllowMultipleArgumentsPerToken = false,
         };

@@ -11,7 +11,9 @@ dotnet dress check [--include <pattern>]... [--verbose] [--configuration <name>]
 dotnet dress init [--target <path>] [--force]
 ```
 
-The root command aliases `format`. An omitted include selects the invocation directory. `--include` accepts either a literal file/directory or an invocation-directory-relative glob and may be repeated. With an explicit command, place `--include` after the command name. Glob patterns use `/`, `*`, and `**`; quote them to prevent shell expansion. Globs cannot leave the invocation directory. Selection includes ordinary `.cs` files, honors nested `.gitignore` rules, and excludes generated files, `.csx`, VCS directories, and linked directories. Overlapping includes are deduplicated.
+The root command aliases `format`. An omitted include selects `**/*.cs` beneath the invocation directory. `--include` accepts an invocation-directory-relative glob and may be repeated; an exact file name is also a valid pattern. With an explicit command, place `--include` after the command name. Patterns use `/`, `*`, and `**`; quote them to prevent shell expansion. They cannot leave the invocation directory.
+
+Inside a Git worktree, DressSharp selects tracked files plus nonignored untracked files using Git's standard excludes, including nested `.gitignore`, `.git/info/exclude`, and the user's global excludes. Outside a Git worktree it searches the filesystem directly. Both modes include only ordinary `.cs` files and exclude generated files, `.csx`, VCS directories, and linked paths. Overlapping includes are deduplicated.
 
 `format` writes changed files. `check` writes nothing and lists files requiring changes. `--verbose` lists changed files and reports an empty selection. `--configuration` (alias `--config`) selects the MSBuild configuration; the default is `Debug`.
 

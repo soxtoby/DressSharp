@@ -2,160 +2,91 @@ using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace DressSharp.CommandLine;
 
-sealed class FileSelector(string invocationDirectory)
+sealed class FileSelector(string invocationDirectory, GitFileDiscovery? git = null)
 {
     static readonly HashSet<string> VcsDirectories = new(StringComparer.OrdinalIgnoreCase) { ".git", ".hg", ".svn" };
     static readonly string[] GeneratedSuffixes = [".g.cs", ".generated.cs", ".designer.cs"];
     readonly string _invocationDirectory = Path.GetFullPath(invocationDirectory);
+    readonly GitFileDiscovery _git = git ?? new();
 
     internal async Task<IReadOnlyList<SelectedFile>> SelectAsync(IReadOnlyList<string> includes, CancellationToken cancellationToken = default)
     {
-        var candidates = new Dictionary<string, string>(PathIdentityComparer());
-        var patterns = new List<string>();
-        foreach (var include in includes.Count == 0 ? [_invocationDirectory] : includes)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            RejectUnsupportedInclude(include);
-            if (IsGlob(include))
-            {
-                patterns.Add(NormalizeGlob(include));
-                continue;
-            }
+        var matcher = CreateMatcher(includes);
+        var discovered = await _git.TryListAsync(_invocationDirectory, cancellationToken)
+            ?? EnumerateFiles();
+        var candidates = discovered
+            .Where(IsCSharp)
+            .Where(path => !IsVcsPath(path))
+            .Where(path => File.Exists(Path.GetFullPath(path, _invocationDirectory)))
+            .Distinct(PathIdentityComparer())
+            .ToArray();
+        var selected = matcher.Match(candidates).Files
+            .Select(match => match.Path.Replace('\\', '/'))
+            .Distinct(PathIdentityComparer())
+            .Select(path => new SelectedFile(Path.GetFullPath(path, _invocationDirectory), path))
+            .OrderBy(file => file.DisplayPath, StringComparer.Ordinal)
+            .ToArray();
 
-            var fullPath = Path.GetFullPath(include, _invocationDirectory);
-            if (File.Exists(fullPath))
-                AddExplicitFile(fullPath, candidates);
-            else if (Directory.Exists(fullPath))
-                AddDirectory(fullPath, candidates, cancellationToken);
-            else
-                throw new FileSelectionException($"Path does not exist or is inaccessible: {Display(fullPath)}");
-        }
-
-        AddGlobMatches(patterns, candidates, cancellationToken);
-
-        var eligible = candidates.ToArray();
-        var generated = new bool[eligible.Length];
+        var generated = new bool[selected.Length];
         await Parallel.ForAsync(
             0,
-            eligible.Length,
+            selected.Length,
             new ParallelOptions
                 {
                     CancellationToken = cancellationToken,
                     MaxDegreeOfParallelism = Environment.ProcessorCount
                 },
-            async (index, token) => generated[index] = await IsGeneratedAsync(eligible[index].Key, token));
+            async (index, token) => generated[index] = await IsGeneratedAsync(selected[index].FullPath, token));
 
-        return eligible
-            .Where((_, index) => !generated[index])
-            .Select(pair => new SelectedFile(pair.Key, pair.Value))
-            .OrderBy(file => file.DisplayPath, StringComparer.Ordinal)
-            .ToArray();
+        return selected.Where((_, index) => !generated[index]).ToArray();
     }
 
-    void AddGlobMatches(
-        IReadOnlyList<string> patterns,
-        Dictionary<string, string> candidates,
-        CancellationToken cancellationToken)
+    static Matcher CreateMatcher(IReadOnlyList<string> includes)
     {
-        if (patterns.Count == 0)
-            return;
-
-        var discovered = new Dictionary<string, string>(PathIdentityComparer());
-        AddDirectory(_invocationDirectory, discovered, cancellationToken);
         var matcher = new Matcher(PathComparison());
         try
         {
-            foreach (var pattern in patterns)
-                matcher.AddInclude(pattern);
+            foreach (var include in includes.Count == 0 ? ["**/*.cs"] : includes)
+                matcher.AddInclude(Normalize(include));
         }
         catch (ArgumentException exception)
         {
             throw new FileSelectionException($"Invalid include glob: {exception.Message}");
         }
-
-        var matches = matcher.Match(discovered.Values).Files
-            .Select(match => match.Path)
-            .ToHashSet(PathIdentityComparer());
-        foreach (var candidate in discovered.Where(candidate => matches.Contains(candidate.Value)))
-            candidates.TryAdd(candidate.Key, candidate.Value);
+        return matcher;
     }
 
-    void AddExplicitFile(string path, Dictionary<string, string> candidates)
+    string[] EnumerateFiles()
     {
-        if (!IsCSharp(path))
-            throw new FileSelectionException($"Unsupported file path: {Display(path)}");
-        candidates.TryAdd(Path.GetFullPath(path), Display(path));
-    }
-
-    void AddDirectory(string root, Dictionary<string, string> candidates, CancellationToken cancellationToken)
-    {
-        var rules = new GitIgnoreRules();
-        Visit(root, root, rules, candidates, cancellationToken);
-    }
-
-    void Visit(
-        string directory,
-        string root,
-        GitIgnoreRules rules,
-        Dictionary<string, string> candidates,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        rules.AddFile(directory, root);
-        IEnumerable<string> entries;
         try
         {
-            entries = Directory.EnumerateFileSystemEntries(directory).OrderBy(path => path, StringComparer.Ordinal).ToArray();
+            var options = new EnumerationOptions
+                {
+                    AttributesToSkip = FileAttributes.ReparsePoint,
+                    IgnoreInaccessible = false,
+                    MatchCasing = MatchCasing.CaseInsensitive,
+                    RecurseSubdirectories = true,
+                    ReturnSpecialDirectories = false,
+                };
+            return Directory.EnumerateFiles(_invocationDirectory, "*.cs", options)
+                .Select(path => Path.GetRelativePath(_invocationDirectory, path).Replace('\\', '/'))
+                .ToArray();
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
         {
-            throw new FileSelectionException($"Path is inaccessible: {Display(directory)}");
-        }
-
-        foreach (var entry in entries)
-        {
-            var attributes = File.GetAttributes(entry);
-            var isDirectory = attributes.HasFlag(FileAttributes.Directory);
-            var relativePath = Path.GetRelativePath(root, entry).Replace('\\', '/');
-            if (isDirectory)
-            {
-                if (VcsDirectories.Contains(Path.GetFileName(entry)) || attributes.HasFlag(FileAttributes.ReparsePoint))
-                    continue;
-                if (rules.IsIgnored(relativePath, directory: true))
-                    continue;
-                Visit(entry, root, rules, candidates, cancellationToken);
-            }
-            else if (IsCSharp(entry) && !rules.IsIgnored(relativePath, directory: false))
-            {
-                var fullPath = Path.GetFullPath(entry);
-                candidates.TryAdd(fullPath, Display(fullPath));
-            }
+            throw new FileSelectionException($"Path is inaccessible: {_invocationDirectory}");
         }
     }
 
-    string Display(string path)
-    {
-        var relative = Path.GetRelativePath(_invocationDirectory, path);
-        var display = relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || relative == ".."
-            ? Path.GetFullPath(path)
-            : relative;
-        return display.Replace('\\', '/');
-    }
-
-    static void RejectUnsupportedInclude(string include)
+    static string Normalize(string include)
     {
         if (string.IsNullOrWhiteSpace(include))
             throw new FileSelectionException("Include cannot be empty.");
         if (include == "-")
             throw new FileSelectionException("Standard input is not supported.");
-        if (IsGlob(include) && Path.IsPathRooted(include))
+        if (Path.IsPathRooted(include))
             throw new FileSelectionException($"Include globs must be relative to the invocation directory: {include}");
-    }
 
-    static bool IsGlob(string include) => include.Contains('*', StringComparison.Ordinal);
-
-    static string NormalizeGlob(string include)
-    {
         var pattern = include.Replace('\\', '/');
         if (pattern.Split('/').Contains("..", StringComparer.Ordinal))
             throw new FileSelectionException($"Include globs cannot leave the invocation directory: {include}");
@@ -163,6 +94,8 @@ sealed class FileSelector(string invocationDirectory)
     }
 
     static bool IsCSharp(string path) => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+
+    static bool IsVcsPath(string path) => path.Split('/').Any(VcsDirectories.Contains);
 
     static async Task<bool> IsGeneratedAsync(string path, CancellationToken cancellationToken)
     {
@@ -173,17 +106,14 @@ sealed class FileSelector(string invocationDirectory)
         for (var count = 0; count < 20 && await reader.ReadLineAsync(cancellationToken) is { } line; count++)
         {
             var trimmed = line.TrimStart();
-            if (trimmed.Length == 0)
-                continue;
-            return trimmed.StartsWith("//", StringComparison.Ordinal)
-                && trimmed.Contains("<auto-generated", StringComparison.OrdinalIgnoreCase);
+            if (trimmed.Length != 0)
+                return trimmed.StartsWith("//", StringComparison.Ordinal)
+                    && trimmed.Contains("<auto-generated", StringComparison.OrdinalIgnoreCase);
         }
         return false;
     }
 
-    static StringComparer PathIdentityComparer() => OperatingSystem.IsWindows()
-        ? StringComparer.OrdinalIgnoreCase
-        : StringComparer.Ordinal;
+    static StringComparer PathIdentityComparer() => StringComparer.FromComparison(PathComparison());
 
     static StringComparison PathComparison() => OperatingSystem.IsWindows()
         ? StringComparison.OrdinalIgnoreCase

@@ -4,13 +4,6 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DressSharp.Architecture;
 
-interface IFileSelector
-{
-    ValueTask<IReadOnlyList<string>> SelectAsync(
-        IReadOnlyList<string> paths,
-        CancellationToken cancellationToken);
-}
-
 interface IConfigurationResolver
 {
     ValueTask<FormattingConfiguration> ResolveAsync(

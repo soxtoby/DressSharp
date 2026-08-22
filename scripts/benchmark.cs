@@ -50,34 +50,24 @@ else
     await Do.Exec($"dotnet run --project {inspector.QuotedArgument()} -- {corpus.QuotedArgument()} {manifest.QuotedArgument()}");
 }
 
-await (DotNet.Restore with
-    {
-        Targets = [corpus / "Corpus.csproj"]
-    });
-
-var benchmarkCorpus = corpus;
-AbsolutePath? subset = null;
+var benchmarkCorpus = Do.CreateTempDirectory("DressSharp-corpus-");
 try
 {
-    if (fileCount < 1000)
-    {
-        subset = Do.CreateTempDirectory("DressSharp-subset-");
-        var subsetFiles = (subset / "files").EnsureDirectoryExists();
-        (corpus / "Corpus.csproj").CopyTo(subset / "Corpus.csproj");
-        (corpus / ".editorconfig").CopyTo(subset / ".editorconfig");
+    var benchmarkFiles = (benchmarkCorpus / "files").EnsureDirectoryExists();
+    (corpus / "Corpus.csproj").CopyTo(benchmarkCorpus / "Corpus.csproj");
+    (corpus / ".editorconfig").CopyTo(benchmarkCorpus / ".editorconfig");
+    (Do.RootDirectory / ".gitignore").CopyTo(benchmarkCorpus / ".gitignore");
 
-        var files = corpus.GlobFiles("**/*.cs").Take(fileCount);
-        var index = 0;
-        foreach (var file in files)
-            file.CopyTo(subsetFiles / $"{index++:D4}-{file.Name}");
+    var files = corpus.GlobFiles("**/*.cs").Take(fileCount);
+    var index = 0;
+    foreach (var file in files)
+        file.CopyTo(benchmarkFiles / $"{index++:D4}-{file.Name}");
 
-        await (DotNet.Restore with
-            {
-                Targets = [subset / "Corpus.csproj"]
-            });
-
-        benchmarkCorpus = subset;
-    }
+    await Do.Exec($"git -C {benchmarkCorpus.QuotedArgument()} init --quiet");
+    await (DotNet.Restore with
+        {
+            Targets = [benchmarkCorpus / "Corpus.csproj"]
+        });
 
     var logicalCores = Environment.ProcessorCount;
     workerProfiles ??= [Math.Min(Math.Max(logicalCores / 2, 1), 16), 1, logicalCores];
@@ -158,6 +148,7 @@ try
             scratch = Do.CreateTempDirectory("DressSharp-run-");
             benchmarkCorpus.CopyTo(scratch, new() { Overwrite = true });
             runRoot = scratch;
+            await Do.Exec($"git -C {runRoot.QuotedArgument()} init --quiet");
         }
 
         var timingPath = Do.CreateTempFile("DressSharp-timing-", ".json");
@@ -167,7 +158,7 @@ try
             Dictionary<string, string?>? environment = null;
             if (tool == "DressSharp")
             {
-                arguments = [Do.RootDirectory / "src/DressSharp/bin/Release/net10.0/DressSharp.dll", mode, "--include", runRoot];
+                arguments = [Do.RootDirectory / "src/DressSharp/bin/Release/net10.0/DressSharp.dll", mode];
                 environment = new() { ["DRESSSHARP_BENCHMARK_WORKERS"] = workers.ToString(), ["DRESSSHARP_BENCHMARK_TIMING"] = timingPath };
             }
             else
@@ -201,7 +192,7 @@ try
 }
 finally
 {
-    subset?.Delete();
+    benchmarkCorpus.Delete();
 }
 
 static SummaryResult Summary(IEnumerable<Measurement> runs, string tool)

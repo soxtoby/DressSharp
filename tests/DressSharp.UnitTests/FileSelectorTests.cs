@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DressSharp.CommandLine;
 using Xunit;
 
@@ -5,8 +6,10 @@ namespace DressSharp.UnitTests;
 
 public sealed class FileSelectorTests : IDisposable
 {
-    readonly string directory = Directory.CreateDirectory(
+    readonly string _directory = Directory.CreateDirectory(
         Path.Combine(Path.GetTempPath(), "DressSharp.UnitTests", Guid.NewGuid().ToString("N"))).FullName;
+
+    public FileSelectorTests() => RunGit(_directory, "init", "--quiet");
 
     [Fact]
     public async Task Empty_includes_recursively_select_eligible_files_in_display_order()
@@ -24,14 +27,14 @@ public sealed class FileSelectorTests : IDisposable
     }
 
     [Fact]
-    public async Task Explicit_generated_file_is_excluded_but_unsupported_file_fails()
+    public async Task Exact_patterns_still_filter_non_csharp_and_generated_files()
     {
         Write("code.designer.cs", "class Generated {}");
         Write("notes.txt", "no");
 
         Assert.Empty(await Select("code.designer.cs"));
-        var exception = await Assert.ThrowsAsync<FileSelectionException>(() => Select("notes.txt"));
-        Assert.Contains("Unsupported file path", exception.Message);
+        Assert.Empty(await Select("notes.txt"));
+        Assert.Empty(await Select("missing.cs"));
     }
 
     [Fact]
@@ -39,7 +42,7 @@ public sealed class FileSelectorTests : IDisposable
     {
         Write("src/code.cs", "class C {}");
 
-        var selected = await Select("src", "src/code.cs", ".");
+        var selected = await Select("src/**/*.cs", "src/code.cs", "**/*.cs");
 
         Assert.Single(selected);
         Assert.Equal("src/code.cs", selected[0].DisplayPath);
@@ -81,6 +84,28 @@ public sealed class FileSelectorTests : IDisposable
     }
 
     [Fact]
+    public async Task Filesystem_globbing_is_used_outside_a_git_worktree()
+    {
+        var root = Directory.CreateDirectory(
+            Path.Combine(Path.GetTempPath(), "DressSharp.UnitTests.Fallback", Guid.NewGuid().ToString("N"))).FullName;
+        try
+        {
+            Write(root, "root.cs", "class Root {}");
+            Write(root, "src/nested.cs", "class Nested {}");
+            Write(root, "src/generated.g.cs", "class Generated {}");
+
+            var selected = await new FileSelector(root).SelectAsync(
+                ["src/**/*.cs"], TestContext.Current.CancellationToken);
+
+            Assert.Equal(["src/nested.cs"], selected.Select(file => file.DisplayPath));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public async Task Nested_gitignore_rules_and_negation_are_honored()
     {
         Write(".gitignore", "ignored/\n*.skip.cs\n!keep.skip.cs\n");
@@ -94,6 +119,19 @@ public sealed class FileSelectorTests : IDisposable
         var selected = await Select();
 
         Assert.Equal(["keep.skip.cs", "nested/yes.cs"], selected.Select(file => file.DisplayPath));
+    }
+
+    [Fact]
+    public async Task Tracked_files_remain_eligible_when_ignored()
+    {
+        Write("tracked.cs", "class Tracked {}");
+        RunGit(_directory, "add", "--", "tracked.cs");
+        Write(".gitignore", "*.cs\n");
+        Write("untracked.cs", "class Untracked {}");
+
+        var selected = await Select();
+
+        Assert.Equal(["tracked.cs"], selected.Select(file => file.DisplayPath));
     }
 
     [Fact]
@@ -121,27 +159,58 @@ public sealed class FileSelectorTests : IDisposable
     }
 
     [Theory]
+    [InlineData("")]
     [InlineData("-")]
-    [InlineData("missing.cs")]
     [InlineData("../**/*.cs")]
     public async Task Invalid_includes_fail_preflight(string include)
     {
         await Assert.ThrowsAsync<FileSelectionException>(() => Select(include));
     }
 
+    [Fact]
+    public async Task Rooted_include_fails_preflight()
+    {
+        var include = Path.Combine(_directory, "**", "*.cs");
+
+        await Assert.ThrowsAsync<FileSelectionException>(() => Select(include));
+    }
+
     Task<IReadOnlyList<SelectedFile>> Select(params string[] includes) =>
-        new FileSelector(directory).SelectAsync(includes, TestContext.Current.CancellationToken);
+        new FileSelector(_directory).SelectAsync(includes, TestContext.Current.CancellationToken);
 
     void Write(string relativePath, string text)
+        => Write(_directory, relativePath, text);
+
+    static void Write(string root, string relativePath, string text)
     {
-        var path = Path.Combine(directory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var path = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, text);
     }
 
+    static void RunGit(string directory, params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("git")
+            {
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+        startInfo.ArgumentList.Add("-C");
+        startInfo.ArgumentList.Add(directory);
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+        using var process = Process.Start(startInfo)!;
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0, error);
+    }
+
     public void Dispose()
     {
-        Directory.Delete(directory, true);
+        foreach (var file in Directory.EnumerateFiles(_directory, "*", SearchOption.AllDirectories))
+            File.SetAttributes(file, FileAttributes.Normal);
+        Directory.Delete(_directory, true);
         GC.SuppressFinalize(this);
     }
 }
