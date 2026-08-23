@@ -4,21 +4,6 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DressSharp.Architecture;
 
-interface IConfigurationResolver
-{
-    ValueTask<FormattingConfiguration> ResolveAsync(
-        string path,
-        CancellationToken cancellationToken);
-}
-
-interface IParseContextResolver
-{
-    ValueTask<IReadOnlyDictionary<string, ParseContextResolution>> ResolveAsync(
-        IReadOnlyList<string> paths,
-        string? configuration,
-        CancellationToken cancellationToken);
-}
-
 sealed record ParseContextResolution(CSharpParseOptions? Options, IReadOnlyList<string> Diagnostics)
 {
     internal bool CanFormat => Options is not null;

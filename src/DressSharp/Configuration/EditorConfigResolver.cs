@@ -4,7 +4,7 @@ using EditorConfig.Core;
 
 namespace DressSharp.Configuration;
 
-sealed class EditorConfigResolver : IConfigurationResolver
+sealed class EditorConfigResolver
 {
     readonly EditorConfigParser _parser = new();
 
@@ -13,45 +13,30 @@ sealed class EditorConfigResolver : IConfigurationResolver
     // files and reading thousands.
     readonly ConcurrentDictionary<string, Lazy<bool>> _validated = new(StringComparer.OrdinalIgnoreCase);
 
-    public ValueTask<FormattingConfiguration> ResolveAsync(string path, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var fullPath = Path.GetFullPath(path);
-        FileConfiguration resolved;
-        try
-        {
-            resolved = _parser.Parse(fullPath);
-            Validate(resolved);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            throw new ConfigurationException($"{fullPath}: invalid EditorConfig: {exception.Message}");
-        }
-
-        return ValueTask.FromResult(ToConfiguration(fullPath, resolved));
-    }
-
-    internal IReadOnlyList<FormattingConfiguration> ResolveAll(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    internal IReadOnlyDictionary<string, FormattingConfiguration> ResolveAll(IReadOnlyList<string> paths, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var fullPaths = paths.Select(Path.GetFullPath).ToArray();
+        FormattingConfiguration[] configurations;
         try
         {
             var resolvedFiles = _parser.Parse(fullPaths);
-            return Canonicalize(resolvedFiles);
+            configurations = Canonicalize(resolvedFiles);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             throw new ConfigurationException($"invalid EditorConfig: {exception.Message}");
         }
+
+        return paths
+            .Select((path, index) => (path, configuration: configurations[index]))
+            .ToDictionary(pair => pair.path, pair => pair.configuration, StringComparer.OrdinalIgnoreCase);
     }
 
     FormattingConfiguration[] Canonicalize(IEnumerable<FileConfiguration> resolvedFiles)
     {
-        var byRawProperties = new Dictionary<IReadOnlyDictionary<string, string>, FormattingConfiguration>(
-            EffectivePropertyComparer.Instance);
-        var canonical = new Dictionary<FormattingConfiguration, FormattingConfiguration>(
-            FormattingConfigurationValueComparer.Instance);
+        var byRawProperties = new Dictionary<IReadOnlyDictionary<string, string>, FormattingConfiguration>(EffectivePropertyComparer.Instance);
+        var canonical = new Dictionary<FormattingConfiguration, FormattingConfiguration>(FormattingConfigurationValueComparer.Instance);
         var configurations = new List<FormattingConfiguration>();
         foreach (var resolved in resolvedFiles)
         {
@@ -137,32 +122,5 @@ sealed class EditorConfigResolver : IConfigurationResolver
 
             return hash;
         }
-    }
-}
-
-static class ConfigurationPreflight
-{
-    internal static async Task<IReadOnlyDictionary<string, FormattingConfiguration>> ResolveAllAsync(
-        IEnumerable<string> paths, IConfigurationResolver resolver, CancellationToken cancellationToken)
-    {
-        var ordered = paths as IReadOnlyList<string> ?? [.. paths];
-        if (resolver is EditorConfigResolver editorConfig)
-        {
-            var batch = editorConfig.ResolveAll(ordered, cancellationToken);
-            return ordered.Select((path, index) => (path, configuration: batch[index]))
-                .ToDictionary(pair => pair.path, pair => pair.configuration, StringComparer.OrdinalIgnoreCase);
-        }
-
-        var resolved = new FormattingConfiguration[ordered.Count];
-        await Parallel.ForAsync(
-            0,
-            ordered.Count,
-            cancellationToken,
-            async (index, token) => resolved[index] = await resolver.ResolveAsync(ordered[index], token));
-
-        var result = new Dictionary<string, FormattingConfiguration>(ordered.Count, StringComparer.OrdinalIgnoreCase);
-        for (var index = 0; index < ordered.Count; index++)
-            result[ordered[index]] = resolved[index];
-        return result;
     }
 }

@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DressSharp.Parsing;
 
-sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evaluator = null) : IParseContextResolver
+sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evaluator = null)
 {
     readonly string _discoveryRoot = Path.GetFullPath(discoveryRoot);
     readonly IMSBuildEvaluator _evaluator = evaluator ?? new MSBuildEvaluationCache(new DotNetMSBuildEvaluator());

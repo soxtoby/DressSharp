@@ -15,8 +15,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
     readonly TextWriter _output = output ?? Console.Out;
     readonly TextWriter _error = error ?? Console.Error;
 
-
-    internal async Task<int> RunAsync(CommandRequest request, IReadOnlyList<SelectedFile> selected, CancellationToken cancellationToken = default)
+    internal async Task<int> Run(CommandRequest request, IReadOnlyList<SelectedFile> selected, CancellationToken cancellationToken = default)
     {
         var timing = new BenchmarkTiming();
         var commandStart = Stopwatch.GetTimestamp();
@@ -25,7 +24,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
 
         var paths = selected.Select(file => file.FullPath).ToArray();
         var stageStart = Stopwatch.GetTimestamp();
-        var configurations = await ConfigurationPreflight.ResolveAllAsync(paths, new EditorConfigResolver(), cancellationToken);
+        var configurations = new EditorConfigResolver().ResolveAll(paths, cancellationToken);
         timing.EditorConfig = Stopwatch.GetElapsedTime(stageStart);
         stageStart = Stopwatch.GetTimestamp();
         var contexts = await new ParseContextResolver(_invocationDirectory).ResolveAsync(paths, request.BuildConfiguration, cancellationToken);

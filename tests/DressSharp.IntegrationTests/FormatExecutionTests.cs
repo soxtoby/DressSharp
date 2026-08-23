@@ -59,7 +59,7 @@ public sealed class FormatExecutionTests : IDisposable
         var error = new StringWriter();
         var selected = new[] { new SelectedFile(first, "A.cs"), new SelectedFile(second, "B.cs") };
         await Assert.ThrowsAsync<DressSharp.Configuration.ConfigurationException>(() =>
-            new FormatExecutor(_directory, output, error).RunAsync(new(CommandKind.Format, [], false, null), selected, Token));
+            new FormatExecutor(_directory, output, error).Run(new(CommandKind.Format, [], false, null), selected, Token));
 
         Assert.DoesNotContain("a, int", await File.ReadAllTextAsync(first, Token));
     }
@@ -68,7 +68,7 @@ public sealed class FormatExecutionTests : IDisposable
     {
         var output = new StringWriter();
         var error = new StringWriter();
-        var exitCode = await new FormatExecutor(_directory, output, error).RunAsync(
+        var exitCode = await new FormatExecutor(_directory, output, error).Run(
             new(kind, [], false, null), [new SelectedFile(path, Path.GetFileName(path))], Token);
         return (exitCode, output.ToString(), error.ToString());
     }

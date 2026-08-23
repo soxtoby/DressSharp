@@ -9,7 +9,7 @@ sealed class FileSelector(string invocationDirectory, GitFileDiscovery? git = nu
     readonly string _invocationDirectory = Path.GetFullPath(invocationDirectory);
     readonly GitFileDiscovery _git = git ?? new();
 
-    internal async Task<IReadOnlyList<SelectedFile>> SelectAsync(IReadOnlyList<string> includes, CancellationToken cancellationToken = default)
+    internal async Task<IReadOnlyList<SelectedFile>> Select(IReadOnlyList<string> includes, CancellationToken cancellationToken = default)
     {
         var matcher = CreateMatcher(includes);
         var discovered = await _git.TryListAsync(_invocationDirectory, cancellationToken)

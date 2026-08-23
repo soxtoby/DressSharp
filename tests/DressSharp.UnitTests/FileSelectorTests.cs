@@ -94,7 +94,7 @@ public sealed class FileSelectorTests : IDisposable
             Write(root, "src/nested.cs", "class Nested {}");
             Write(root, "src/generated.g.cs", "class Generated {}");
 
-            var selected = await new FileSelector(root).SelectAsync(
+            var selected = await new FileSelector(root).Select(
                 ["src/**/*.cs"], TestContext.Current.CancellationToken);
 
             Assert.Equal(["src/nested.cs"], selected.Select(file => file.DisplayPath));
@@ -176,7 +176,7 @@ public sealed class FileSelectorTests : IDisposable
     }
 
     Task<IReadOnlyList<SelectedFile>> Select(params string[] includes) =>
-        new FileSelector(_directory).SelectAsync(includes, TestContext.Current.CancellationToken);
+        new FileSelector(_directory).Select(includes, TestContext.Current.CancellationToken);
 
     void Write(string relativePath, string text)
         => Write(_directory, relativePath, text);

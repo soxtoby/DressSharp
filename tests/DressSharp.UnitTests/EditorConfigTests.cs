@@ -1,3 +1,4 @@
+using DressSharp.Architecture;
 using DressSharp.Configuration;
 using Xunit;
 
@@ -17,7 +18,7 @@ public sealed class EditorConfigTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(child, ".editorconfig"), "[*.cs]\nmax_line_length = 180\nindent_style = unset\n", TestContext.Current.CancellationToken);
         var source = Path.Combine(child, "Example.cs");
 
-        var result = await new EditorConfigResolver().ResolveAsync(source, TestContext.Current.CancellationToken);
+        var result = Resolve(source);
 
         Assert.Equal("180", result.Preferences["max_line_length"]);
         Assert.False(result.Preferences.ContainsKey("indent_style"));
@@ -36,8 +37,7 @@ public sealed class EditorConfigTests : IDisposable
             "root = true\n[*.cs]\nindent_style = space\n",
             TestContext.Current.CancellationToken);
 
-        var result = await new EditorConfigResolver().ResolveAsync(
-            Path.Combine(root, "Example.cs"), TestContext.Current.CancellationToken);
+        var result = Resolve(Path.Combine(root, "Example.cs"));
 
         Assert.False(result.Preferences.ContainsKey("max_line_length"));
     }
@@ -47,7 +47,7 @@ public sealed class EditorConfigTests : IDisposable
     {
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[*.cs]\nindent_style = invalid\nfuture_key = !anything!\nindent_style = tab\n", TestContext.Current.CancellationToken);
 
-        var result = await new EditorConfigResolver().ResolveAsync(Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken);
+        var result = Resolve(Path.Combine(_directory, "Example.cs"));
 
         Assert.Equal("tab", result.Preferences["indent_style"]);
         Assert.Equal("tab", result.Preferences["indent_size"]);
@@ -61,10 +61,8 @@ public sealed class EditorConfigTests : IDisposable
             "[{src,tests}/File{1..3}.cs]\nmax_line_length = 180\n",
             TestContext.Current.CancellationToken);
 
-        var matching = await new EditorConfigResolver().ResolveAsync(
-            Path.Combine(_directory, "src", "File2.cs"), TestContext.Current.CancellationToken);
-        var excluded = await new EditorConfigResolver().ResolveAsync(
-            Path.Combine(_directory, "src", "File4.cs"), TestContext.Current.CancellationToken);
+        var matching = Resolve(Path.Combine(_directory, "src", "File2.cs"));
+        var excluded = Resolve(Path.Combine(_directory, "src", "File4.cs"));
 
         Assert.Equal("180", matching.Preferences["max_line_length"]);
         Assert.False(excluded.Preferences.ContainsKey("max_line_length"));
@@ -87,16 +85,16 @@ public sealed class EditorConfigTests : IDisposable
             ],
             TestContext.Current.CancellationToken);
 
-        Assert.Same(result[0], result[1]);
-        Assert.NotSame(result[0], result[2]);
+        Assert.Same(result[Path.Combine(_directory, "First.cs")], result[Path.Combine(_directory, "Second.cs")]);
+        Assert.NotSame(result[Path.Combine(_directory, "First.cs")], result[Path.Combine(_directory, "GeneratedFirst.cs")]);
     }
 
     [Fact]
     public async Task Resolver_rejects_invalid_effective_value()
     {
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[*.cs]\nindent_style = invalid\n", TestContext.Current.CancellationToken);
-        await Assert.ThrowsAsync<ConfigurationException>(async () =>
-            await new EditorConfigResolver().ResolveAsync(Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken));
+        Assert.Throws<ConfigurationException>(() =>
+            Resolve(Path.Combine(_directory, "Example.cs")));
     }
 
     [Theory]
@@ -113,9 +111,8 @@ public sealed class EditorConfigTests : IDisposable
             $"[*.cs]\n{key} = {value}\n",
             TestContext.Current.CancellationToken);
 
-        await Assert.ThrowsAsync<ConfigurationException>(async () =>
-            await new EditorConfigResolver().ResolveAsync(
-                Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken));
+        Assert.Throws<ConfigurationException>(() =>
+            Resolve(Path.Combine(_directory, "Example.cs")));
     }
 
     [Theory]
@@ -131,8 +128,7 @@ public sealed class EditorConfigTests : IDisposable
             $"[*.cs]\n{key} = {value}\n",
             TestContext.Current.CancellationToken);
 
-        var result = await new EditorConfigResolver().ResolveAsync(
-            Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken);
+        var result = Resolve(Path.Combine(_directory, "Example.cs"));
 
         Assert.Equal(value, result.Preferences[key]);
     }
@@ -145,19 +141,18 @@ public sealed class EditorConfigTests : IDisposable
             "[*.cs]\nbad key = value\n",
             TestContext.Current.CancellationToken);
 
-        await Assert.ThrowsAsync<ConfigurationException>(async () =>
-            await new EditorConfigResolver().ResolveAsync(
-                Path.Combine(_directory, "Example.cs"), TestContext.Current.CancellationToken));
+        Assert.Throws<ConfigurationException>(() =>
+            Resolve(Path.Combine(_directory, "Example.cs")));
     }
 
     [Fact]
-    public async Task Preflight_returns_nothing_when_any_file_is_invalid()
+    public async Task Batch_resolution_fails_when_any_file_is_invalid()
     {
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[bad.cs]\nindent_style = invalid\n", TestContext.Current.CancellationToken);
         var paths = new[] { Path.Combine(_directory, "good.cs"), Path.Combine(_directory, "bad.cs") };
 
-        await Assert.ThrowsAsync<ConfigurationException>(async () =>
-            await ConfigurationPreflight.ResolveAllAsync(paths, new EditorConfigResolver(), TestContext.Current.CancellationToken));
+        Assert.Throws<ConfigurationException>(() =>
+            new EditorConfigResolver().ResolveAll(paths, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -298,6 +293,9 @@ public sealed class EditorConfigTests : IDisposable
         Assert.Equal(target, result.Path);
         Assert.True(File.Exists(target));
     }
+
+    static FormattingConfiguration Resolve(string path) =>
+        new EditorConfigResolver().ResolveAll([path], TestContext.Current.CancellationToken)[path];
 
     public void Dispose() => Directory.Delete(_directory, true);
 }

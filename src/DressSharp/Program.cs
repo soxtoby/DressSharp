@@ -112,10 +112,10 @@ static class Program
     {
         try
         {
-            var selected = await new FileSelector(invocationDirectory).SelectAsync(request.Includes);
+            var selected = await new FileSelector(invocationDirectory).Select(request.Includes);
             if (request.Verbose && selected.Count == 0)
                 await Console.Out.WriteLineAsync("No eligible C# files selected.");
-            return await new FormatExecutor(invocationDirectory).RunAsync(request, selected);
+            return await new FormatExecutor(invocationDirectory).Run(request, selected);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
