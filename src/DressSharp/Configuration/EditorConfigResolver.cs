@@ -74,13 +74,13 @@ sealed class EditorConfigResolver
 
     static FormattingConfiguration ToConfiguration(string fullPath, FileConfiguration resolved)
     {
-        var preferences = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, value) in resolved.Properties)
+        var preferences = new Dictionary<RuleKey, string>();
+        foreach (var (rawKey, value) in resolved.Properties)
         {
-            if (!PreferenceCatalog.IsKnown(key))
+            if (!RuleKeys.TryParse(rawKey, out var key))
                 continue;
             if (!PreferenceCatalog.IsValid(key, value))
-                throw new ConfigurationException($"{fullPath}: invalid effective value '{value}' for '{key}'.");
+                throw new ConfigurationException($"{fullPath}: invalid effective value '{value}' for '{rawKey}'.");
             if (!value.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 preferences[key] = PreferenceCatalog.Normalize(key, value);
         }

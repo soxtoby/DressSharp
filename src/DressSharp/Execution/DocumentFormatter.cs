@@ -88,10 +88,10 @@ sealed class DocumentFormatter
     }
 
     static RepresentationPreferences Representation(FormattingConfiguration configuration) => new(
-        Encoding(configuration.Preferences.GetValueOrDefault("charset")),
-        LineEnding(configuration.Preferences.GetValueOrDefault("end_of_line")),
-        Boolean(configuration.Preferences.GetValueOrDefault("insert_final_newline")),
-        Boolean(configuration.Preferences.GetValueOrDefault("trim_trailing_whitespace")));
+        Encoding(configuration.Preferences.GetValueOrDefault(RuleKey.Charset)),
+        LineEnding(configuration.Preferences.GetValueOrDefault(RuleKey.EndOfLine)),
+        Boolean(configuration.Preferences.GetValueOrDefault(RuleKey.InsertFinalNewline)),
+        Boolean(configuration.Preferences.GetValueOrDefault(RuleKey.TrimTrailingWhitespace)));
 
     static SourceEncoding? Encoding(string? value) => value switch
         {

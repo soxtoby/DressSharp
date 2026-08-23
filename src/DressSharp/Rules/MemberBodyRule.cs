@@ -1,14 +1,15 @@
 using System.Diagnostics.CodeAnalysis;
+using DressSharp.Architecture;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class MemberBodyRule(string key, MemberBodyKind kind) : ISyntaxFormattingRule
+sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
-        key,
+        ruleKey,
             ["block", "expression"],
         $"{kind.ToString().ToLowerInvariant()} bodies",
         "The selected body form preserves the represented statement or returned expression.");

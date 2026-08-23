@@ -1,4 +1,5 @@
 using System.Text;
+using DressSharp.Architecture;
 
 namespace DressSharp.Configuration;
 
@@ -25,7 +26,7 @@ static class EditorConfigInitializer
 
         var outside = RemoveManagedBlock(lines, begin, end);
         var conflicts = FindConflicts(path, outside);
-        if (conflicts.Count > 0 && !force)
+        if (conflicts.Count != 0 && !force)
             throw new ConfigurationException("DressSharp preference conflicts:" + Environment.NewLine + string.Join(Environment.NewLine, conflicts));
 
         var prefix = string.Join(newline, outside.Select(line => line.Text)).TrimEnd('\r', '\n');
@@ -42,7 +43,7 @@ static class EditorConfigInitializer
     internal static string BuildManagedBlock(string newline = "\n")
     {
         var lines = new List<string> { BeginMarker, "[*.cs]" };
-        lines.AddRange(PreferenceCatalog.Familiar.Select(item => $"{item.Key} = {item.Value}"));
+        lines.AddRange(PreferenceCatalog.Defaults.Select(item => $"{item.Key.ToName()} = {item.Default}"));
         lines.Add(EndMarker);
         return string.Join(newline, lines) + newline;
     }
@@ -84,7 +85,7 @@ static class EditorConfigInitializer
         if (begin.Count == 0)
             return numberedLines;
         var result = numberedLines.Take(begin[0]).Concat(numberedLines.Skip(end[0] + 1)).ToList();
-        while (result.Count > 0 && string.IsNullOrWhiteSpace(result[^1].Text))
+        while (result.Count != 0 && string.IsNullOrWhiteSpace(result[^1].Text))
         {
             result.RemoveAt(result.Count - 1);
         }
@@ -104,7 +105,7 @@ static class EditorConfigInitializer
                 if (separator > 0)
                 {
                     var key = line[..separator].Trim();
-                    if (PreferenceCatalog.Familiar.ContainsKey(key))
+                    if (RuleKeys.TryParse(key, out _))
                         conflicts.Add($"{path}({sourceLine.Number}): {key}");
                 }
             }

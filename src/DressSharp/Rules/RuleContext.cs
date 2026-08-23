@@ -13,17 +13,17 @@ sealed record RuleSettings(int MaximumLineLength, int TabWidth, string IndentUni
 {
     internal static RuleSettings From(FormattingConfiguration configuration)
     {
-        var maximum = configuration.Preferences.TryGetValue("max_line_length", out var configuredMaximum)
+        var maximum = configuration.Preferences.TryGetValue(RuleKey.MaxLineLength, out var configuredMaximum)
             && int.TryParse(configuredMaximum, out var parsedMaximum)
                 ? parsedMaximum
                 : int.MaxValue;
-        var tabWidth = configuration.Preferences.TryGetValue("tab_width", out var configuredTabWidth)
+        var tabWidth = configuration.Preferences.TryGetValue(RuleKey.TabWidth, out var configuredTabWidth)
             && int.TryParse(configuredTabWidth, out var parsedTabWidth)
                 ? parsedTabWidth
                 : 4;
-        var usesTabs = configuration.Preferences.TryGetValue("indent_style", out var indentStyle)
+        var usesTabs = configuration.Preferences.TryGetValue(RuleKey.IndentStyle, out var indentStyle)
             && indentStyle.Equals("tab", StringComparison.OrdinalIgnoreCase);
-        var indentSize = configuration.Preferences.TryGetValue("indent_size", out var configuredIndentSize)
+        var indentSize = configuration.Preferences.TryGetValue(RuleKey.IndentSize, out var configuredIndentSize)
             && int.TryParse(configuredIndentSize, out var parsedIndentSize)
                 ? parsedIndentSize
                 : 4;

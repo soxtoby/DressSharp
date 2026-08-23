@@ -21,11 +21,11 @@ static class FileScopedStructuralRules
 
             foreach (var rule in catalog.FileRules)
             {
-                if (configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+                if (configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                     && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
-                        throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.PreferenceKey}'.");
+                        throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.RuleKey.ToName()}'.");
 
                     var input = current;
                     current = rule.Transform(current, preference, context);
@@ -41,11 +41,11 @@ static class FileScopedStructuralRules
             var usingRules = new List<(IUsingFormattingRule Rule, string Preference)>();
             foreach (var rule in catalog.UsingRules)
             {
-                if (configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+                if (configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                     && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
-                        throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.PreferenceKey}'.");
+                        throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.RuleKey.ToName()}'.");
                     usingRules.Add((rule, preference));
                 }
             }

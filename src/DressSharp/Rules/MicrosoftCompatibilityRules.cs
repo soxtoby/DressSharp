@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using DressSharp.Architecture;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -6,13 +7,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace DressSharp.Rules;
 
 abstract class TokenSpacingRule(
-    string key,
+    RuleKey ruleKey,
     ImmutableArray<string> acceptedValues,
     string ownedSyntax
 ) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
-        key,
+        ruleKey,
         acceptedValues,
         ownedSyntax,
         "Only same-line whitespace changes");
@@ -42,7 +43,7 @@ sealed class TokenPair
 }
 
 sealed class CastSpacingRule() : TokenSpacingRule(
-    "csharp_space_after_cast",
+    RuleKey.CSharpSpaceAfterCast,
         ["true", "false"],
     "cast expressions")
 {
@@ -55,7 +56,7 @@ sealed class CastSpacingRule() : TokenSpacingRule(
 }
 
 sealed class ControlFlowKeywordSpacingRule() : TokenSpacingRule(
-    "csharp_space_after_keywords_in_control_flow_statements",
+    RuleKey.CSharpSpaceAfterKeywordsInControlFlowStatements,
         ["true", "false"],
     "control-flow keywords")
 {
@@ -78,7 +79,7 @@ sealed class ControlFlowKeywordSpacingRule() : TokenSpacingRule(
 }
 
 sealed class ParenthesisSpacingRule() : TokenSpacingRule(
-    "csharp_space_between_parentheses",
+    RuleKey.CSharpSpaceBetweenParentheses,
     AcceptedValues(),
     "parenthesized syntax")
 {
@@ -154,7 +155,7 @@ enum SpacingSide
 }
 
 sealed class BaseListColonSpacingRule(SpacingSide side) : TokenSpacingRule(
-    side == SpacingSide.Before ? "csharp_space_before_colon_in_inheritance_clause" : "csharp_space_after_colon_in_inheritance_clause",
+    side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeColonInInheritanceClause : RuleKey.CSharpSpaceAfterColonInInheritanceClause,
         ["true", "false"],
     "base-list colons")
 {
@@ -170,7 +171,7 @@ sealed class BaseListColonSpacingRule(SpacingSide side) : TokenSpacingRule(
 }
 
 sealed class BinaryOperatorSpacingRule() : TokenSpacingRule(
-    "csharp_space_around_binary_operators",
+    RuleKey.CSharpSpaceAroundBinaryOperators,
         ["before_and_after", "ignore", "none"],
     "binary and assignment operators")
 {
@@ -201,9 +202,9 @@ sealed class BinaryOperatorSpacingRule() : TokenSpacingRule(
 sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind) : TokenSpacingRule(
     kind switch
         {
-            ParenthesisSpacingKind.Contents => "csharp_space_between_method_declaration_parameter_list_parentheses",
-            ParenthesisSpacingKind.EmptyContents => "csharp_space_between_method_declaration_empty_parameter_list_parentheses",
-            _ => "csharp_space_between_method_declaration_name_and_open_parenthesis"
+            ParenthesisSpacingKind.Contents => RuleKey.CSharpSpaceBetweenMethodDeclarationParameterListParentheses,
+            ParenthesisSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenMethodDeclarationEmptyParameterListParentheses,
+            _ => RuleKey.CSharpSpaceBetweenMethodDeclarationNameAndOpenParenthesis
         },
         ["true", "false"],
     "method declaration parameter lists")
@@ -232,9 +233,9 @@ sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind) : TokenSp
 sealed class MethodCallSpacingRule(ParenthesisSpacingKind kind) : TokenSpacingRule(
     kind switch
         {
-            ParenthesisSpacingKind.Contents => "csharp_space_between_method_call_parameter_list_parentheses",
-            ParenthesisSpacingKind.EmptyContents => "csharp_space_between_method_call_empty_parameter_list_parentheses",
-            _ => "csharp_space_between_method_call_name_and_opening_parenthesis"
+            ParenthesisSpacingKind.Contents => RuleKey.CSharpSpaceBetweenMethodCallParameterListParentheses,
+            ParenthesisSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenMethodCallEmptyParameterListParentheses,
+            _ => RuleKey.CSharpSpaceBetweenMethodCallNameAndOpeningParenthesis
         },
         ["true", "false"],
     "invocation argument lists")
@@ -265,8 +266,8 @@ enum ParenthesisSpacingKind
     BeforeOpening
 }
 
-abstract class PunctuationSpacingRule(string key, SyntaxKind tokenKind, SpacingSide side, string ownedSyntax)
-    : TokenSpacingRule(key, ["true", "false"], ownedSyntax)
+abstract class PunctuationSpacingRule(RuleKey ruleKey, SyntaxKind tokenKind, SpacingSide side, string ownedSyntax)
+    : TokenSpacingRule(ruleKey, ["true", "false"], ownedSyntax)
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [tokenKind];
 
@@ -280,19 +281,19 @@ abstract class PunctuationSpacingRule(string key, SyntaxKind tokenKind, SpacingS
 }
 
 sealed class CommaSpacingRule(SpacingSide side) : PunctuationSpacingRule(
-    side == SpacingSide.Before ? "csharp_space_before_comma" : "csharp_space_after_comma",
+    side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeComma : RuleKey.CSharpSpaceAfterComma,
     SyntaxKind.CommaToken,
     side,
     "comma separators");
 
 sealed class DotSpacingRule(SpacingSide side) : PunctuationSpacingRule(
-    side == SpacingSide.Before ? "csharp_space_before_dot" : "csharp_space_after_dot",
+    side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeDot : RuleKey.CSharpSpaceAfterDot,
     SyntaxKind.DotToken,
     side,
     "member-access dots");
 
 sealed class ForSemicolonSpacingRule(SpacingSide side) : PunctuationSpacingRule(
-    side == SpacingSide.Before ? "csharp_space_before_semicolon_in_for_statement" : "csharp_space_after_semicolon_in_for_statement",
+    side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeSemicolonInForStatement : RuleKey.CSharpSpaceAfterSemicolonInForStatement,
     SyntaxKind.SemicolonToken,
     side,
     "for-statement semicolons")
@@ -301,7 +302,7 @@ sealed class ForSemicolonSpacingRule(SpacingSide side) : PunctuationSpacingRule(
 }
 
 sealed class DeclarationSpacingRule() : TokenSpacingRule(
-    "csharp_space_around_declaration_statements",
+    RuleKey.CSharpSpaceAroundDeclarationStatements,
         ["true", "false"],
     "declaration equals tokens")
 {
@@ -325,8 +326,8 @@ enum BracketSpacingKind
 sealed class BracketSpacingRule(BracketSpacingKind kind) : TokenSpacingRule(
     kind switch
         {
-            BracketSpacingKind.BeforeOpening => "csharp_space_before_open_square_brackets",
-            _ => "csharp_space_between_square_brackets"
+            BracketSpacingKind.BeforeOpening => RuleKey.CSharpSpaceBeforeOpenSquareBrackets,
+            _ => RuleKey.CSharpSpaceBetweenSquareBrackets
         },
         ["true", "false"],
     "array and element-access brackets")
@@ -354,9 +355,9 @@ sealed class BracketSpacingRule(BracketSpacingKind kind) : TokenSpacingRule(
         && rank.Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression);
 }
 
-abstract class UsingDirectiveRule(string key, string invariant) : IUsingFormattingRule
+abstract class UsingDirectiveRule(RuleKey ruleKey, string invariant) : IUsingFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(key, ["true", "false"], "using directive groups", invariant);
+    public RuleMetadata Metadata { get; } = new(ruleKey, ["true", "false"], "using directive groups", invariant);
 
     public SyntaxList<UsingDirectiveSyntax> Rewrite(
         SyntaxList<UsingDirectiveSyntax> source,
@@ -376,7 +377,7 @@ abstract class UsingDirectiveRule(string key, string invariant) : IUsingFormatti
 }
 
 sealed class SystemUsingSortRule() : UsingDirectiveRule(
-    "dotnet_sort_system_directives_first",
+    RuleKey.DotnetSortSystemDirectivesFirst,
     "Using directives remain stable within System groups")
 {
     protected override SyntaxList<UsingDirectiveSyntax> Rewrite(SyntaxList<UsingDirectiveSyntax> source, bool enabled, RuleContext context) =>

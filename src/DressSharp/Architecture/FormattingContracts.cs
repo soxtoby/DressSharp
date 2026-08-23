@@ -12,21 +12,23 @@ sealed record ParseContextResolution(CSharpParseOptions? Options, IReadOnlyList<
 
 sealed record FormattingConfiguration
 {
-    internal FormattingConfiguration(IEnumerable<KeyValuePair<string, string>> preferences)
+    // Values reach this record already normalized by the resolver (trimmed and lowercased), so the
+    // dictionary needs no case-insensitive comparer.
+    internal FormattingConfiguration(IEnumerable<KeyValuePair<RuleKey, string>> preferences)
     {
-        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
+        var builder = ImmutableDictionary.CreateBuilder<RuleKey, string>();
         foreach (var (key, value) in preferences)
         {
             builder.Add(key, value);
             ValueHashCode ^= HashCode.Combine(
-                StringComparer.OrdinalIgnoreCase.GetHashCode(key),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(key.ToString()),
                 StringComparer.OrdinalIgnoreCase.GetHashCode(value));
         }
 
         Preferences = builder.ToImmutable();
     }
 
-    internal ImmutableDictionary<string, string> Preferences { get; }
+    internal ImmutableDictionary<RuleKey, string> Preferences { get; }
     internal int ValueHashCode { get; }
 }
 
@@ -44,8 +46,7 @@ sealed class FormattingConfigurationValueComparer : IEqualityComparer<Formatting
         foreach (var (key, value) in left.Preferences)
         {
             if (!right.Preferences.TryGetValue(key, out var other)
-                || !value.Equals(other, StringComparison.OrdinalIgnoreCase))
-                return false;
+                || !value.Equals(other, StringComparison.OrdinalIgnoreCase))                return false;
         }
 
         return true;

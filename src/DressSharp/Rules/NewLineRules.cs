@@ -1,14 +1,15 @@
 using System.Collections.Immutable;
+using DressSharp.Architecture;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> values) : IFormattingRule
+sealed class NewLineRule(RuleKey ruleKey, NewLineKind kind, ImmutableArray<string> values) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
-        key,
+        ruleKey,
         values,
         "owned token boundaries",
         "Only boundary whitespace changes");

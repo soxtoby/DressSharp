@@ -142,7 +142,7 @@ sealed class MemberRuleSet
         var enabled = new List<(ISyntaxFormattingRule, string)>();
         foreach (var rule in catalog.MemberRules)
         {
-            if (configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+            if (configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                 && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 enabled.Add((rule, preference));
         }

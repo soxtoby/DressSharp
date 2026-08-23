@@ -1,3 +1,4 @@
+using DressSharp.Architecture;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,7 +8,7 @@ namespace DressSharp.Rules;
 sealed class ConditionalBracesRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
-        "dress_conditional_braces",
+        RuleKey.DressConditionalBraces,
             ["compact", "always", "balanced"],
         "complete if/else-if/else chains",
         "Branch statements and else-if chain shape are preserved, and braces are removed only when unambiguous.");

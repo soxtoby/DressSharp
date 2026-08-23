@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using DressSharp.Architecture;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -17,18 +18,18 @@ sealed class RuleCatalog
             ];
         UsingRules =
             [
-                new UsingOrderRule("dress_global_using_order"),
-                new UsingOrderRule("dress_using_kind_order"),
+                new UsingOrderRule(RuleKey.DressGlobalUsingOrder),
+                new UsingOrderRule(RuleKey.DressUsingKindOrder),
                 new SystemUsingSortRule()
             ];
         MemberRules =
             [
-                new MemberBodyRule("dress_method_body", MemberBodyKind.Method),
-                new MemberBodyRule("dress_constructor_body", MemberBodyKind.Constructor),
-                new MemberBodyRule("dress_operator_body", MemberBodyKind.Operator),
-                new MemberBodyRule("dress_property_body", MemberBodyKind.Property),
-                new MemberBodyRule("dress_indexer_body", MemberBodyKind.Indexer),
-                new MemberBodyRule("dress_accessor_body", MemberBodyKind.Accessor),
+                new MemberBodyRule(RuleKey.DressMethodBody, MemberBodyKind.Method),
+                new MemberBodyRule(RuleKey.DressConstructorBody, MemberBodyKind.Constructor),
+                new MemberBodyRule(RuleKey.DressOperatorBody, MemberBodyKind.Operator),
+                new MemberBodyRule(RuleKey.DressPropertyBody, MemberBodyKind.Property),
+                new MemberBodyRule(RuleKey.DressIndexerBody, MemberBodyKind.Indexer),
+                new MemberBodyRule(RuleKey.DressAccessorBody, MemberBodyKind.Accessor),
                 new LambdaBodyRule(),
                 new ConditionalBracesRule(),
                 new ModifierOrderRule()
@@ -59,13 +60,13 @@ sealed class RuleCatalog
             ];
         NewLineRules =
             [
-                new NewLineRule("csharp_new_line_before_open_brace", NewLineKind.OpenBrace, ["all", "none", "accessors", "anonymous_methods", "anonymous_types", "control_blocks", "events", "indexers", "lambdas", "local_functions", "methods", "object_collection_array_initializers", "properties", "types"]),
-                new NewLineRule("csharp_new_line_before_else", NewLineKind.Else, ["true", "false"]),
-                new NewLineRule("csharp_new_line_before_catch", NewLineKind.Catch, ["true", "false"]),
-                new NewLineRule("csharp_new_line_before_finally", NewLineKind.Finally, ["true", "false"]),
-                new NewLineRule("csharp_new_line_before_members_in_object_initializers", NewLineKind.ObjectInitializerMembers, ["true", "false"]),
-                new NewLineRule("csharp_new_line_before_members_in_anonymous_types", NewLineKind.AnonymousTypeMembers, ["true", "false"]),
-                new NewLineRule("csharp_new_line_between_query_expression_clauses", NewLineKind.QueryClauses, ["true", "false"])
+                new NewLineRule(RuleKey.CSharpNewLineBeforeOpenBrace, NewLineKind.OpenBrace, ["all", "none", "accessors", "anonymous_methods", "anonymous_types", "control_blocks", "events", "indexers", "lambdas", "local_functions", "methods", "object_collection_array_initializers", "properties", "types"]),
+                new NewLineRule(RuleKey.CSharpNewLineBeforeElse, NewLineKind.Else, ["true", "false"]),
+                new NewLineRule(RuleKey.CSharpNewLineBeforeCatch, NewLineKind.Catch, ["true", "false"]),
+                new NewLineRule(RuleKey.CSharpNewLineBeforeFinally, NewLineKind.Finally, ["true", "false"]),
+                new NewLineRule(RuleKey.CSharpNewLineBeforeMembersInObjectInitializers, NewLineKind.ObjectInitializerMembers, ["true", "false"]),
+                new NewLineRule(RuleKey.CSharpNewLineBeforeMembersInAnonymousTypes, NewLineKind.AnonymousTypeMembers, ["true", "false"]),
+                new NewLineRule(RuleKey.CSharpNewLineBetweenQueryExpressionClauses, NewLineKind.QueryClauses, ["true", "false"])
             ];
 
         var allRules = FileRules.Cast<IFormattingRule>()
@@ -88,15 +89,14 @@ sealed class RuleCatalog
 
     static void Validate(ImmutableArray<IFormattingRule> rules)
     {
-        if (rules.Any(rule => string.IsNullOrWhiteSpace(rule.Metadata.PreferenceKey) ||
-            rule.Metadata.AcceptedValues.IsDefaultOrEmpty ||
+        if (rules.Any(rule => rule.Metadata.AcceptedValues.IsDefaultOrEmpty ||
             string.IsNullOrWhiteSpace(rule.Metadata.OwnedSyntax) ||
             string.IsNullOrWhiteSpace(rule.Metadata.Invariant)))
         {
             throw new ArgumentException("Every rule requires complete catalog metadata.", nameof(rules));
         }
 
-        if (rules.Select(rule => rule.Metadata.PreferenceKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() != rules.Length)
+        if (rules.Select(rule => rule.Metadata.RuleKey).Distinct().Count() != rules.Length)
             throw new ArgumentException("Rule preference keys must be unique.", nameof(rules));
         if (rules.Any(rule => rule.Metadata.AcceptedValues.Distinct(StringComparer.OrdinalIgnoreCase).Count() != rule.Metadata.AcceptedValues.Length))
             throw new ArgumentException("Rule accepted values must be unique.", nameof(rules));
@@ -104,7 +104,7 @@ sealed class RuleCatalog
 }
 
 sealed record RuleMetadata(
-    string PreferenceKey,
+    RuleKey RuleKey,
     ImmutableArray<string> AcceptedValues,
     string OwnedSyntax,
     string Invariant);

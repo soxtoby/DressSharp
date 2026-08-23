@@ -20,8 +20,8 @@ public sealed class EditorConfigTests : IDisposable
 
         var result = Resolve(source);
 
-        Assert.Equal("180", result.Preferences["max_line_length"]);
-        Assert.False(result.Preferences.ContainsKey("indent_style"));
+        Assert.Equal("180", result.Preferences[RuleKey.MaxLineLength]);
+        Assert.False(result.Preferences.ContainsKey(RuleKey.IndentStyle));
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public sealed class EditorConfigTests : IDisposable
 
         var result = Resolve(Path.Combine(root, "Example.cs"));
 
-        Assert.False(result.Preferences.ContainsKey("max_line_length"));
+        Assert.False(result.Preferences.ContainsKey(RuleKey.MaxLineLength));
     }
 
     [Fact]
@@ -49,8 +49,8 @@ public sealed class EditorConfigTests : IDisposable
 
         var result = Resolve(Path.Combine(_directory, "Example.cs"));
 
-        Assert.Equal("tab", result.Preferences["indent_style"]);
-        Assert.Equal("tab", result.Preferences["indent_size"]);
+        Assert.Equal("tab", result.Preferences[RuleKey.IndentStyle]);
+        Assert.Equal("tab", result.Preferences[RuleKey.IndentSize]);
     }
 
     [Fact]
@@ -64,8 +64,8 @@ public sealed class EditorConfigTests : IDisposable
         var matching = Resolve(Path.Combine(_directory, "src", "File2.cs"));
         var excluded = Resolve(Path.Combine(_directory, "src", "File4.cs"));
 
-        Assert.Equal("180", matching.Preferences["max_line_length"]);
-        Assert.False(excluded.Preferences.ContainsKey("max_line_length"));
+        Assert.Equal("180", matching.Preferences[RuleKey.MaxLineLength]);
+        Assert.False(excluded.Preferences.ContainsKey(RuleKey.MaxLineLength));
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public sealed class EditorConfigTests : IDisposable
 
         var result = Resolve(Path.Combine(_directory, "Example.cs"));
 
-        Assert.Equal(value, result.Preferences[key]);
+        Assert.Equal(value, result.Preferences[RuleKeys.Parse(key)]);
     }
 
     [Fact]
@@ -166,9 +166,9 @@ public sealed class EditorConfigTests : IDisposable
         Assert.DoesNotContain("root = true", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dress_conditional_braces = balanced\n", text);
         Assert.DoesNotContain("dress_control_flow_braces", text);
-        foreach (var pair in PreferenceCatalog.Familiar)
+        foreach (var (key, value) in PreferenceCatalog.Defaults)
         {
-            Assert.Contains($"{pair.Key} = {pair.Value}\n", text);
+            Assert.Contains($"{key.ToName()} = {value}\n", text);
         }
     }
 

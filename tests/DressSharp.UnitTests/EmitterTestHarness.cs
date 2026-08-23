@@ -10,7 +10,7 @@ static class EmitterTestHarness
     {
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var configuration = new FormattingConfiguration(
-            preferences.Select(pair => new KeyValuePair<string, string>(pair.Key, pair.Value)));
+            preferences.Select(pair => new KeyValuePair<RuleKey, string>(RuleKeys.Parse(pair.Key), pair.Value)));
         var structural = FileScopedStructuralRules.Transform(root, RuleCatalog.BuiltIn, configuration);
         if (!structural.Succeeded)
             throw structural.Failure!;

@@ -1,18 +1,19 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using DressSharp.Architecture;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class UsingOrderRule(string key) : IUsingFormattingRule
+sealed class UsingOrderRule(RuleKey ruleKey) : IUsingFormattingRule
 {
     static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 
     public RuleMetadata Metadata { get; } = new(
-        key,
-        key == "dress_global_using_order"
+        ruleKey,
+        ruleKey == RuleKey.DressGlobalUsingOrder
             ? ["first", "last", "mixed"]
             : Permutations(),
         "contiguous using directive runs",
@@ -24,14 +25,14 @@ sealed class UsingOrderRule(string key) : IUsingFormattingRule
     {
         if (preference == "mixed" || source.Any(HasBoundary))
             return source;
-        var ranks = key == "dress_global_using_order" 
-            ? null 
+        var ranks = ruleKey == RuleKey.DressGlobalUsingOrder
+            ? null
             : Ranks(preference);
         return IsOrdered(source, RankOf)
-            ? source 
+            ? source
             : SyntaxFactory.List(source.OrderBy(RankOf));
 
-        int RankOf(UsingDirectiveSyntax directive) => key == "dress_global_using_order"
+        int RankOf(UsingDirectiveSyntax directive) => ruleKey == RuleKey.DressGlobalUsingOrder
             ? preference == "first" == !directive.GlobalKeyword.IsKind(SyntaxKind.None) ? 0 : 1
             : Rank(directive, ranks!);
     }
@@ -77,7 +78,7 @@ sealed class UsingOrderRule(string key) : IUsingFormattingRule
 
 sealed class ModifierOrderRule : ISyntaxFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new("csharp_preferred_modifier_order", ["public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"], "member modifier lists", "Only modifier token order changes");
+    public RuleMetadata Metadata { get; } = new(RuleKey.CSharpPreferredModifierOrder, ["public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"], "member modifier lists", "Only modifier token order changes");
 
     static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 

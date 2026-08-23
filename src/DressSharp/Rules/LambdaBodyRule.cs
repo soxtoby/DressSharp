@@ -1,3 +1,4 @@
+using DressSharp.Architecture;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,7 +8,7 @@ namespace DressSharp.Rules;
 sealed class LambdaBodyRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
-        "dress_lambda_body",
+        RuleKey.DressLambdaBody,
             ["block", "expression"],
         "lambda bodies",
         "A single return or expression statement and its expression-bodied form represent the same expression.");

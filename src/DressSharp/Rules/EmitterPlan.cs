@@ -56,7 +56,7 @@ sealed class EmitterPlan
         var newLines = new List<(NewLineRule, NewLineRule.BraceCategories)>();
         foreach (var rule in catalog.SpacingRules)
         {
-            if (!configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+            if (!configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                 || preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 continue;
             spacing.Add((rule, preference));
@@ -64,7 +64,7 @@ sealed class EmitterPlan
 
         foreach (var rule in catalog.NewLineRules)
         {
-            if (configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+            if (configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                 && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
             {
                 newLines.Add((rule, NewLineRule.BraceCategories.From(rule.Kind, preference)));
@@ -103,10 +103,10 @@ sealed class EmitterPlan
             newLineWildcards,
             laterElementRules,
             RuleSettings.From(configuration),
-            IsTrue(configuration, "csharp_indent_braces"),
-            IsTrue(configuration, "csharp_indent_block_contents"));
+            IsTrue(configuration, RuleKey.CSharpIndentBraces),
+            IsTrue(configuration, RuleKey.CSharpIndentBlockContents));
     }
 
-    static bool IsTrue(FormattingConfiguration configuration, string key) =>
+    static bool IsTrue(FormattingConfiguration configuration, RuleKey key) =>
         configuration.Preferences.GetValueOrDefault(key, "false").Equals("true", StringComparison.OrdinalIgnoreCase);
 }

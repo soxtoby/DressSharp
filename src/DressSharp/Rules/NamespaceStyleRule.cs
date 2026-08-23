@@ -1,3 +1,4 @@
+using DressSharp.Architecture;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,7 +8,7 @@ namespace DressSharp.Rules;
 sealed class NamespaceStyleRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
-        "dress_namespace_style",
+        RuleKey.DressNamespaceStyle,
             ["file_scoped", "block_scoped"],
         "compilation-unit namespace declaration",
         "The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.");
