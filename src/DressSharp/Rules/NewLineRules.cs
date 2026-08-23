@@ -5,15 +5,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> values, int order) : IFormattingRule
+sealed class NewLineRule(string key, NewLineKind kind, ImmutableArray<string> values) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         key,
         values,
         "owned token boundaries",
-        RuleSafetyClass.Layout,
-        "Only boundary whitespace changes",
-        order);
+        "Only boundary whitespace changes");
 
     internal NewLineKind Kind => kind;
     internal bool RequiresLaterElement => kind is NewLineKind.ObjectInitializerMembers or NewLineKind.AnonymousTypeMembers;

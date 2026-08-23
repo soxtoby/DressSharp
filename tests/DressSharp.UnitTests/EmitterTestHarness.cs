@@ -11,8 +11,7 @@ static class EmitterTestHarness
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var configuration = new FormattingConfiguration(
             preferences.Select(pair => new KeyValuePair<string, string>(pair.Key, pair.Value)));
-        var structural = FileScopedStructuralRules.Transform(
-            root, RuleCatalog.BuiltIn.FileScopedStructural, configuration);
+        var structural = FileScopedStructuralRules.Transform(root, RuleCatalog.BuiltIn, configuration);
         if (!structural.Succeeded)
             throw structural.Failure!;
 
@@ -22,9 +21,8 @@ static class EmitterTestHarness
         var context = new RuleContext(shaped, settings);
         var rewrites = SyntaxRewritePlan.For(
             shaped,
-            MemberRuleSet.From(RuleCatalog.BuiltIn.MemberScopedStructural, configuration),
+            MemberRuleSet.From(RuleCatalog.BuiltIn, configuration),
             context);
-        return SinglePassEmitter.Emit(
-            shaped, EmitterPlan.From(RuleCatalog.BuiltIn, configuration), context, text, rewrites);
+        return SinglePassEmitter.Emit(shaped, EmitterPlan.From(RuleCatalog.BuiltIn, configuration), context, text, rewrites);
     }
 }

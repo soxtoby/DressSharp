@@ -4,15 +4,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class LambdaBodyRule(int order) : ISyntaxFormattingRule
+sealed class LambdaBodyRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         "dress_lambda_body",
             ["block", "expression"],
         "lambda bodies",
-        RuleSafetyClass.SyntaxTransformation,
-        "A single return or expression statement and its expression-bodied form represent the same expression.",
-        order);
+        "A single return or expression statement and its expression-bodied form represent the same expression.");
 
     public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } =
         [SyntaxKind.SimpleLambdaExpression, SyntaxKind.ParenthesizedLambdaExpression];

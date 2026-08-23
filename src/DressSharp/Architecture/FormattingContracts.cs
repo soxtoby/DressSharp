@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -55,5 +56,6 @@ sealed class FormattingConfigurationValueComparer : IEqualityComparer<Formatting
 
 sealed record TransformationResult(SyntaxNode Root, Exception? Failure = null, int SkippedOccurrences = 0)
 {
+    [MemberNotNullWhen(false, nameof(Failure))]
     internal bool Succeeded => Failure is null;
 }

@@ -4,15 +4,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class ConditionalBracesRule(int order) : ISyntaxFormattingRule
+sealed class ConditionalBracesRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         "dress_conditional_braces",
             ["compact", "always", "balanced"],
         "complete if/else-if/else chains",
-        RuleSafetyClass.SyntaxTransformation,
-        "Branch statements and else-if chain shape are preserved, and braces are removed only when unambiguous.",
-        order);
+        "Branch statements and else-if chain shape are preserved, and braces are removed only when unambiguous.");
 
     public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } = [SyntaxKind.IfStatement];
 

@@ -21,7 +21,7 @@ sealed class DocumentFormatter
         _configuration = configuration;
         _timing = timing;
         _emitterPlan = EmitterPlan.From(RuleCatalog.BuiltIn, configuration);
-        _memberRules = MemberRuleSet.From(RuleCatalog.BuiltIn.MemberScopedStructural, configuration);
+        _memberRules = MemberRuleSet.From(RuleCatalog.BuiltIn, configuration);
         _settings = RuleSettings.From(configuration);
         _representation = Representation(configuration);
     }
@@ -59,11 +59,10 @@ sealed class DocumentFormatter
     {
         // Whole-file syntax rules still rewrite the tree because their effect is
         // not contained in a member. There are three, and they rarely apply.
-        var structural = FileScopedStructuralRules.Transform(
-            root, RuleCatalog.BuiltIn.FileScopedStructural, _configuration);
-        if (!structural.Succeeded)
-            throw structural.Failure!;
-        return structural;
+        var structural = FileScopedStructuralRules.Transform(root, RuleCatalog.BuiltIn, _configuration);
+        return structural.Succeeded
+            ? structural
+            : throw structural.Failure;
     }
 
     string Emit(SyntaxNode root, string text)

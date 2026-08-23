@@ -8,17 +8,14 @@ namespace DressSharp.Rules;
 abstract class TokenSpacingRule(
     string key,
     ImmutableArray<string> acceptedValues,
-    string ownedSyntax,
-    int order
+    string ownedSyntax
 ) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         key,
         acceptedValues,
         ownedSyntax,
-        RuleSafetyClass.Layout,
-        "Only same-line whitespace changes",
-        order);
+        "Only same-line whitespace changes");
 
     /// <summary>
     /// The token kinds that can make <see cref="DesiredSpace"/> claim a pair, on either side. A pair
@@ -44,11 +41,10 @@ sealed class TokenPair
     }
 }
 
-sealed class CastSpacingRule(int order) : TokenSpacingRule(
+sealed class CastSpacingRule() : TokenSpacingRule(
     "csharp_space_after_cast",
         ["true", "false"],
-    "cast expressions",
-    order)
+    "cast expressions")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.CloseParenToken];
 
@@ -58,11 +54,10 @@ sealed class CastSpacingRule(int order) : TokenSpacingRule(
             : null;
 }
 
-sealed class ControlFlowKeywordSpacingRule(int order) : TokenSpacingRule(
+sealed class ControlFlowKeywordSpacingRule() : TokenSpacingRule(
     "csharp_space_after_keywords_in_control_flow_statements",
         ["true", "false"],
-    "control-flow keywords",
-    order)
+    "control-flow keywords")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken];
 
@@ -82,11 +77,10 @@ sealed class ControlFlowKeywordSpacingRule(int order) : TokenSpacingRule(
         || token.IsKind(SyntaxKind.CatchKeyword);
 }
 
-sealed class ParenthesisSpacingRule(int order) : TokenSpacingRule(
+sealed class ParenthesisSpacingRule() : TokenSpacingRule(
     "csharp_space_between_parentheses",
     AcceptedValues(),
-    "parenthesized syntax",
-    order)
+    "parenthesized syntax")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
 
@@ -159,11 +153,10 @@ enum SpacingSide
     After
 }
 
-sealed class BaseListColonSpacingRule(SpacingSide side, int order) : TokenSpacingRule(
+sealed class BaseListColonSpacingRule(SpacingSide side) : TokenSpacingRule(
     side == SpacingSide.Before ? "csharp_space_before_colon_in_inheritance_clause" : "csharp_space_after_colon_in_inheritance_clause",
         ["true", "false"],
-    "base-list colons",
-    order)
+    "base-list colons")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.ColonToken];
 
@@ -176,11 +169,10 @@ sealed class BaseListColonSpacingRule(SpacingSide side, int order) : TokenSpacin
     }
 }
 
-sealed class BinaryOperatorSpacingRule(int order) : TokenSpacingRule(
+sealed class BinaryOperatorSpacingRule() : TokenSpacingRule(
     "csharp_space_around_binary_operators",
         ["before_and_after", "ignore", "none"],
-    "binary and assignment operators",
-    order)
+    "binary and assignment operators")
 {
     // Derived from Roslyn rather than hand-listed so the trigger set cannot drift from IsOperator.
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } =
@@ -206,7 +198,7 @@ sealed class BinaryOperatorSpacingRule(int order) : TokenSpacingRule(
         };
 }
 
-sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind, int order) : TokenSpacingRule(
+sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind) : TokenSpacingRule(
     kind switch
         {
             ParenthesisSpacingKind.Contents => "csharp_space_between_method_declaration_parameter_list_parentheses",
@@ -214,8 +206,7 @@ sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind, int order
             _ => "csharp_space_between_method_declaration_name_and_open_parenthesis"
         },
         ["true", "false"],
-    "method declaration parameter lists",
-    order)
+    "method declaration parameter lists")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
 
@@ -238,7 +229,7 @@ sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind, int order
         : null;
 }
 
-sealed class MethodCallSpacingRule(ParenthesisSpacingKind kind, int order) : TokenSpacingRule(
+sealed class MethodCallSpacingRule(ParenthesisSpacingKind kind) : TokenSpacingRule(
     kind switch
         {
             ParenthesisSpacingKind.Contents => "csharp_space_between_method_call_parameter_list_parentheses",
@@ -246,8 +237,7 @@ sealed class MethodCallSpacingRule(ParenthesisSpacingKind kind, int order) : Tok
             _ => "csharp_space_between_method_call_name_and_opening_parenthesis"
         },
         ["true", "false"],
-    "invocation argument lists",
-    order)
+    "invocation argument lists")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
 
@@ -275,8 +265,8 @@ enum ParenthesisSpacingKind
     BeforeOpening
 }
 
-abstract class PunctuationSpacingRule(string key, SyntaxKind tokenKind, SpacingSide side, string ownedSyntax, int order)
-    : TokenSpacingRule(key, ["true", "false"], ownedSyntax, order)
+abstract class PunctuationSpacingRule(string key, SyntaxKind tokenKind, SpacingSide side, string ownedSyntax)
+    : TokenSpacingRule(key, ["true", "false"], ownedSyntax)
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [tokenKind];
 
@@ -289,35 +279,31 @@ abstract class PunctuationSpacingRule(string key, SyntaxKind tokenKind, SpacingS
     protected virtual bool IsOwned(SyntaxToken token) => true;
 }
 
-sealed class CommaSpacingRule(SpacingSide side, int order) : PunctuationSpacingRule(
+sealed class CommaSpacingRule(SpacingSide side) : PunctuationSpacingRule(
     side == SpacingSide.Before ? "csharp_space_before_comma" : "csharp_space_after_comma",
     SyntaxKind.CommaToken,
     side,
-    "comma separators",
-    order);
+    "comma separators");
 
-sealed class DotSpacingRule(SpacingSide side, int order) : PunctuationSpacingRule(
+sealed class DotSpacingRule(SpacingSide side) : PunctuationSpacingRule(
     side == SpacingSide.Before ? "csharp_space_before_dot" : "csharp_space_after_dot",
     SyntaxKind.DotToken,
     side,
-    "member-access dots",
-    order);
+    "member-access dots");
 
-sealed class ForSemicolonSpacingRule(SpacingSide side, int order) : PunctuationSpacingRule(
+sealed class ForSemicolonSpacingRule(SpacingSide side) : PunctuationSpacingRule(
     side == SpacingSide.Before ? "csharp_space_before_semicolon_in_for_statement" : "csharp_space_after_semicolon_in_for_statement",
     SyntaxKind.SemicolonToken,
     side,
-    "for-statement semicolons",
-    order)
+    "for-statement semicolons")
 {
     protected override bool IsOwned(SyntaxToken token) => token.Parent is ForStatementSyntax;
 }
 
-sealed class DeclarationSpacingRule(int order) : TokenSpacingRule(
+sealed class DeclarationSpacingRule() : TokenSpacingRule(
     "csharp_space_around_declaration_statements",
         ["true", "false"],
-    "declaration equals tokens",
-    order)
+    "declaration equals tokens")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.EqualsToken];
 
@@ -336,15 +322,14 @@ enum BracketSpacingKind
     Contents
 }
 
-sealed class BracketSpacingRule(BracketSpacingKind kind, int order) : TokenSpacingRule(
+sealed class BracketSpacingRule(BracketSpacingKind kind) : TokenSpacingRule(
     kind switch
         {
             BracketSpacingKind.BeforeOpening => "csharp_space_before_open_square_brackets",
             _ => "csharp_space_between_square_brackets"
         },
         ["true", "false"],
-    "array and element-access brackets",
-    order)
+    "array and element-access brackets")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } =
             [SyntaxKind.OpenBracketToken, SyntaxKind.CloseBracketToken];
@@ -369,11 +354,11 @@ sealed class BracketSpacingRule(BracketSpacingKind kind, int order) : TokenSpaci
         && rank.Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression);
 }
 
-abstract class UsingDirectiveRule(string key, string invariant, int order) : IFormattingRule
+abstract class UsingDirectiveRule(string key, string invariant) : IUsingFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(key, ["true", "false"], "using directive groups", RuleSafetyClass.Layout, invariant, order);
+    public RuleMetadata Metadata { get; } = new(key, ["true", "false"], "using directive groups", invariant);
 
-    internal SyntaxList<UsingDirectiveSyntax> Rewrite(
+    public SyntaxList<UsingDirectiveSyntax> Rewrite(
         SyntaxList<UsingDirectiveSyntax> source,
         string preference,
         RuleContext context) => RewriteSafe(source, preference == "true", context);
@@ -390,10 +375,9 @@ abstract class UsingDirectiveRule(string key, string invariant, int order) : IFo
             : Rewrite(source, enabled, context);
 }
 
-sealed class SystemUsingSortRule(int order) : UsingDirectiveRule(
+sealed class SystemUsingSortRule() : UsingDirectiveRule(
     "dotnet_sort_system_directives_first",
-    "Using directives remain stable within System groups",
-    order)
+    "Using directives remain stable within System groups")
 {
     protected override SyntaxList<UsingDirectiveSyntax> Rewrite(SyntaxList<UsingDirectiveSyntax> source, bool enabled, RuleContext context) =>
         enabled && IsOutOfOrder(source)

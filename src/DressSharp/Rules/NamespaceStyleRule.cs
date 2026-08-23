@@ -4,15 +4,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class NamespaceStyleRule(int order) : ISyntaxFormattingRule
+sealed class NamespaceStyleRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         "dress_namespace_style",
             ["file_scoped", "block_scoped"],
         "compilation-unit namespace declaration",
-        RuleSafetyClass.SyntaxTransformation,
-        "The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.",
-        order);
+        "The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.");
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {

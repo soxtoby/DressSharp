@@ -54,15 +54,21 @@ sealed class EmitterPlan
     {
         var spacing = new List<(TokenSpacingRule, string)>();
         var newLines = new List<(NewLineRule, NewLineRule.BraceCategories)>();
-        foreach (var rule in catalog.Rules)
+        foreach (var rule in catalog.SpacingRules)
         {
             if (!configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
                 || preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 continue;
-            if (rule is TokenSpacingRule spacingRule)
-                spacing.Add((spacingRule, preference));
-            else if (rule is NewLineRule newLine)
-                newLines.Add((newLine, NewLineRule.BraceCategories.From(newLine.Kind, preference)));
+            spacing.Add((rule, preference));
+        }
+
+        foreach (var rule in catalog.NewLineRules)
+        {
+            if (configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+                && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
+            {
+                newLines.Add((rule, NewLineRule.BraceCategories.From(rule.Kind, preference)));
+            }
         }
 
         var triggers = new Dictionary<int, ulong>();

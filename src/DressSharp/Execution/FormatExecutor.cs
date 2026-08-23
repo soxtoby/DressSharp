@@ -41,7 +41,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         timing.EditorConfig = Stopwatch.GetElapsedTime(stageStart);
 
         stageStart = Stopwatch.GetTimestamp();
-        var contexts = await new ParseContextResolver(_invocationDirectory).ResolveAsync(paths, request.BuildConfiguration, cancellationToken);
+        var contexts = await new ParseContextResolver(_invocationDirectory).Resolve(paths, request.BuildConfiguration, cancellationToken);
         timing.MsBuild = Stopwatch.GetElapsedTime(stageStart);
 
         return new(contexts, CreateFormatters(selected, configurations, timing));

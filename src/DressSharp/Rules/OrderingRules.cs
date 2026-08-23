@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -5,9 +6,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class UsingOrderRule(string key, int order) : IFormattingRule
+sealed class UsingOrderRule(string key) : IUsingFormattingRule
 {
-    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
+    static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 
     public RuleMetadata Metadata { get; } = new(
         key,
@@ -15,23 +16,24 @@ sealed class UsingOrderRule(string key, int order) : IFormattingRule
             ? ["first", "last", "mixed"]
             : Permutations(),
         "contiguous using directive runs",
-        RuleSafetyClass.Layout,
-        "Directives and comments remain boundaries",
-        order);
+        "Directives and comments remain boundaries");
 
-    public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } = [SyntaxKind.UsingDirective];
+    public ImmutableArray<SyntaxKind> TargetKinds { get; } = [SyntaxKind.UsingDirective];
 
-    internal SyntaxList<UsingDirectiveSyntax> Rewrite(SyntaxList<UsingDirectiveSyntax> source, string preference)
+    public SyntaxList<UsingDirectiveSyntax> Rewrite(SyntaxList<UsingDirectiveSyntax> source, string preference, RuleContext context)
     {
         if (preference == "mixed" || source.Any(HasBoundary))
             return source;
-        var ranks = key == "dress_global_using_order" ? null : Ranks(preference);
+        var ranks = key == "dress_global_using_order" 
+            ? null 
+            : Ranks(preference);
+        return IsOrdered(source, RankOf)
+            ? source 
+            : SyntaxFactory.List(source.OrderBy(RankOf));
+
         int RankOf(UsingDirectiveSyntax directive) => key == "dress_global_using_order"
             ? preference == "first" == !directive.GlobalKeyword.IsKind(SyntaxKind.None) ? 0 : 1
             : Rank(directive, ranks!);
-        if (IsOrdered(source, RankOf))
-            return source;
-        return SyntaxFactory.List(source.OrderBy(RankOf));
     }
 
     static bool HasBoundary(UsingDirectiveSyntax x) => x.DescendantTrivia(descendIntoTrivia: true).Any(t => t.IsDirective || t.IsComment());
@@ -73,13 +75,13 @@ sealed class UsingOrderRule(string key, int order) : IFormattingRule
             .ToImmutableArray();
 }
 
-sealed class ModifierOrderRule(int order) : IFormattingRule
+sealed class ModifierOrderRule : ISyntaxFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new("csharp_preferred_modifier_order", ["public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"], "member modifier lists", RuleSafetyClass.Layout, "Only modifier token order changes", order);
+    public RuleMetadata Metadata { get; } = new("csharp_preferred_modifier_order", ["public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"], "member modifier lists", "Only modifier token order changes");
 
-    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
+    static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 
-    internal SyntaxNode TransformMember(SyntaxNode root, string preference, RuleContext context)
+    public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {
         if (root is not MemberDeclarationSyntax member)
             return root;

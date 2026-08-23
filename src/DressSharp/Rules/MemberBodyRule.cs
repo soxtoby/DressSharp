@@ -5,15 +5,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class MemberBodyRule(string key, MemberBodyKind kind, int order) : ISyntaxFormattingRule
+sealed class MemberBodyRule(string key, MemberBodyKind kind) : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new(
         key,
             ["block", "expression"],
         $"{kind.ToString().ToLowerInvariant()} bodies",
-        RuleSafetyClass.SyntaxTransformation,
-        "The selected body form preserves the represented statement or returned expression.",
-        order);
+        "The selected body form preserves the represented statement or returned expression.");
 
     /// <summary>
     /// The declaration kinds this rule's rewriter visits, which follow directly from its member kind.

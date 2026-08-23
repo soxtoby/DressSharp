@@ -79,11 +79,11 @@ sealed class SyntaxRewritePlan
 /// </summary>
 sealed class MemberRuleSet
 {
-    readonly (IFormattingRule Rule, string Preference, ulong Wanted)[] _rules;
+    readonly (ISyntaxFormattingRule Rule, string Preference, ulong Wanted)[] _rules;
     readonly Dictionary<int, ulong> _kindBits;
     readonly ulong _allWanted;
 
-    MemberRuleSet((IFormattingRule, string, ulong)[] rules, Dictionary<int, ulong> kindBits, ulong allWanted)
+    MemberRuleSet((ISyntaxFormattingRule, string, ulong)[] rules, Dictionary<int, ulong> kindBits, ulong allWanted)
     {
         _rules = rules;
         _kindBits = kindBits;
@@ -94,9 +94,7 @@ sealed class MemberRuleSet
     internal int Count => _rules.Length;
 
     internal SyntaxNode Transform(int index, SyntaxNode node, RuleContext context) =>
-        _rules[index].Rule is ModifierOrderRule modifier
-            ? modifier.TransformMember(node, _rules[index].Preference, context)
-            : ((ISyntaxFormattingRule)_rules[index].Rule).Transform(node, _rules[index].Preference, context);
+        _rules[index].Rule.Transform(node, _rules[index].Preference, context);
 
     /// <summary>
     /// The bit set of rules that have something to look at in this member.
@@ -141,8 +139,8 @@ sealed class MemberRuleSet
 
     internal static MemberRuleSet From(RuleCatalog catalog, Architecture.FormattingConfiguration configuration)
     {
-        var enabled = new List<(IFormattingRule, string)>();
-        foreach (var rule in catalog.Rules)
+        var enabled = new List<(ISyntaxFormattingRule, string)>();
+        foreach (var rule in catalog.MemberRules)
         {
             if (configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
                 && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
@@ -161,7 +159,7 @@ sealed class MemberRuleSet
         }
 
         var allWanted = next == 64 ? ulong.MaxValue : (1UL << next) - 1;
-        var prepared = new (IFormattingRule, string, ulong)[enabled.Count];
+        var prepared = new (ISyntaxFormattingRule, string, ulong)[enabled.Count];
         for (var index = 0; index < enabled.Count; index++)
         {
             var wanted = 0UL;

@@ -10,10 +10,7 @@ namespace DressSharp.Rules;
 /// </summary>
 static class FileScopedStructuralRules
 {
-    internal static TransformationResult Transform(
-        SyntaxNode root,
-        RuleCatalog catalog,
-        FormattingConfiguration configuration)
+    internal static TransformationResult Transform(SyntaxNode root, RuleCatalog catalog, FormattingConfiguration configuration)
     {
         try
         {
@@ -21,20 +18,17 @@ static class FileScopedStructuralRules
             var context = new RuleContext(root, settings);
             var current = root;
             var skipped = 0;
-            var usingRules = new List<(IFormattingRule Rule, string Preference)>();
 
-            foreach (var rule in catalog.Rules)
+            foreach (var rule in catalog.FileRules)
             {
-                if (!configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
-                    || preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
-                    throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.PreferenceKey}'.");
-
-                if (rule is NamespaceStyleRule namespaceStyle)
+                if (configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+                    && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
+                        throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.PreferenceKey}'.");
+
                     var input = current;
-                    current = namespaceStyle.Transform(current, preference, context);
+                    current = rule.Transform(current, preference, context);
                     skipped += context.TakeSkippedOccurrences();
                     if (!ReferenceEquals(input, current))
                     {
@@ -42,13 +36,21 @@ static class FileScopedStructuralRules
                         context = new RuleContext(current, settings, knownWellFormed);
                     }
                 }
-                else
+            }
+
+            var usingRules = new List<(IUsingFormattingRule Rule, string Preference)>();
+            foreach (var rule in catalog.UsingRules)
+            {
+                if (configuration.Preferences.TryGetValue(rule.Metadata.PreferenceKey, out var preference)
+                    && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
+                        throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.PreferenceKey}'.");
                     usingRules.Add((rule, preference));
                 }
             }
 
-            if (usingRules.Count > 0)
+            if (usingRules.Count != 0)
                 current = new UsingTree(usingRules, context).Rewrite((CompilationUnitSyntax)current);
             skipped += context.TakeSkippedOccurrences();
             return new(current, SkippedOccurrences: skipped);
@@ -61,25 +63,18 @@ static class FileScopedStructuralRules
 
     static SyntaxList<UsingDirectiveSyntax> RewriteUsings(
         SyntaxList<UsingDirectiveSyntax> source,
-        IReadOnlyList<(IFormattingRule Rule, string Preference)> rules,
+        IReadOnlyList<(IUsingFormattingRule Rule, string Preference)> rules,
         RuleContext context)
     {
         var current = source;
         foreach (var (rule, preference) in rules)
-        {
-            current = rule switch
-                {
-                    UsingOrderRule ordering => ordering.Rewrite(current, preference),
-                    UsingDirectiveRule directive => directive.Rewrite(current, preference, context),
-                    _ => throw new InvalidOperationException($"Unsupported file-scoped rule '{rule.GetType().Name}'.")
-                };
-        }
+            current = rule.Rewrite(current, preference, context);
 
         return current;
     }
 
     sealed class UsingTree(
-        IReadOnlyList<(IFormattingRule Rule, string Preference)> rules,
+        IReadOnlyList<(IUsingFormattingRule Rule, string Preference)> rules,
         RuleContext context)
     {
         internal CompilationUnitSyntax Rewrite(CompilationUnitSyntax unit)

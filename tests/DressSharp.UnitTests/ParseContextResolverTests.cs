@@ -54,7 +54,7 @@ public sealed class ParseContextResolverTests : IDisposable
         File("Second.csproj");
         var evaluator = new ConcurrentEvaluator(file, 2);
 
-        await new ParseContextResolver(root, evaluator).ResolveAsync([file], null, TestContext.Current.CancellationToken);
+        await new ParseContextResolver(root, evaluator).Resolve([file], null, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, evaluator.MaximumConcurrency);
     }
@@ -112,7 +112,7 @@ public sealed class ParseContextResolverTests : IDisposable
         var projectRoot = Path.Combine(directory.FullName, "src", "DressSharp");
         var file = Path.Combine(projectRoot, "Program.cs");
 
-        var results = await new ParseContextResolver(projectRoot).ResolveAsync([file], null, TestContext.Current.CancellationToken);
+        var results = await new ParseContextResolver(projectRoot).Resolve([file], null, TestContext.Current.CancellationToken);
 
         Assert.True(results[file].CanFormat, string.Join(Environment.NewLine, results[file].Diagnostics));
         var options = Assert.IsType<CSharpParseOptions>(results[file].Options);
@@ -123,7 +123,7 @@ public sealed class ParseContextResolverTests : IDisposable
 
     async Task<DressSharp.Architecture.ParseContextResolution> Resolve(FakeEvaluator evaluator, string file, string? configuration = null)
     {
-        var results = await new ParseContextResolver(root, evaluator).ResolveAsync([file], configuration, TestContext.Current.CancellationToken);
+        var results = await new ParseContextResolver(root, evaluator).Resolve([file], configuration, TestContext.Current.CancellationToken);
         return results[file];
     }
 

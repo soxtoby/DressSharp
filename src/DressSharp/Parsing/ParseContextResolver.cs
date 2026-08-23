@@ -9,7 +9,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
     readonly string _discoveryRoot = Path.GetFullPath(discoveryRoot);
     readonly IMSBuildEvaluator _evaluator = evaluator ?? new MSBuildEvaluationCache(new DotNetMSBuildEvaluator());
 
-    public async ValueTask<IReadOnlyDictionary<string, ParseContextResolution>> ResolveAsync(
+    public async ValueTask<IReadOnlyDictionary<string, ParseContextResolution>> Resolve(
         IReadOnlyList<string> paths,
         string? configuration,
         CancellationToken cancellationToken)
