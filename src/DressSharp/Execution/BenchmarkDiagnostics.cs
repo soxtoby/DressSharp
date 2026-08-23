@@ -45,3 +45,28 @@ static class BenchmarkDiagnostics
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(payload), cancellationToken);
     }
 }
+
+sealed class BenchmarkTiming
+{
+    long _readTicks;
+    long _parseTicks;
+    long _transformTicks;
+    long _encodeTicks;
+    long _writeTicks;
+
+    internal TimeSpan Wall { get; set; }
+    internal TimeSpan MsBuild { get; set; }
+    internal TimeSpan EditorConfig { get; set; }
+    internal TimeSpan Read => TimeSpan.FromTicks(Volatile.Read(ref _readTicks));
+    internal TimeSpan Parse => TimeSpan.FromTicks(Volatile.Read(ref _parseTicks));
+    internal TimeSpan Transform => TimeSpan.FromTicks(Volatile.Read(ref _transformTicks));
+    internal TimeSpan Encode => TimeSpan.FromTicks(Volatile.Read(ref _encodeTicks));
+    internal TimeSpan Write => TimeSpan.FromTicks(Volatile.Read(ref _writeTicks));
+
+    internal void AddRead(TimeSpan value) => Add(ref _readTicks, value);
+    internal void AddParse(TimeSpan value) => Add(ref _parseTicks, value);
+    internal void AddTransform(TimeSpan value) => Add(ref _transformTicks, value);
+    internal void AddEncode(TimeSpan value) => Add(ref _encodeTicks, value);
+    internal void AddWrite(TimeSpan value) => Add(ref _writeTicks, value);
+    static void Add(ref long target, TimeSpan value) => Interlocked.Add(ref target, value.Ticks);
+}
