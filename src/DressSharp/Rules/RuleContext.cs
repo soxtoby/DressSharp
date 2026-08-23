@@ -83,13 +83,10 @@ sealed class RuleContext
         if (regions.IsEmpty)
             return false;
 
-        foreach (var region in regions)
+        if (regions.Any(region => Intersects(region, occurrence)))
         {
-            if (Intersects(region, occurrence))
-            {
-                _skippedOccurrences++;
-                return true;
-            }
+            _skippedOccurrences++;
+            return true;
         }
 
         return false;
@@ -108,7 +105,7 @@ sealed class RuleContext
 
     static ImmutableArray<TextSpan> ScanMalformedRegions(SyntaxNode root)
     {
-        if (!root.ContainsDiagnostics && !root.ContainsDirectives)
+        if (root is { ContainsDiagnostics: false, ContainsDirectives: false })
             return [];
 
         var diagnosticRegions = root.GetDiagnostics()

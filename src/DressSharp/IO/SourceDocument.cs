@@ -106,10 +106,13 @@ sealed class SourceDocument
     {
         for (var index = 0; index < text.Length; index++)
         {
-            if (text[index] == '\r')
-                return index + 1 < text.Length && text[index + 1] == '\n' ? "\r\n" : "\r";
-            if (text[index] == '\n')
-                return "\n";
+            switch (text[index])
+            {
+                case '\r':
+                    return index + 1 < text.Length && text[index + 1] == '\n' ? "\r\n" : "\r";
+                case '\n':
+                    return "\n";
+            }
         }
         return null;
     }

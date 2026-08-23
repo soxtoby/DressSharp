@@ -21,7 +21,7 @@ sealed class SyntaxRewritePlan
     /// </summary>
     internal IReadOnlyList<Replacement> Replacements { get; }
 
-    internal static SyntaxRewritePlan Empty { get; } = new([]);
+    static SyntaxRewritePlan Empty { get; } = new([]);
 
     SyntaxRewritePlan(IReadOnlyList<Replacement> replacements) => Replacements = replacements;
 
@@ -107,9 +107,7 @@ sealed class MemberRuleSet
         for (var index = 0; index < _rules.Length; index++)
         {
             var wanted = _rules[index].Wanted;
-            if (wanted == 0)
-                claims |= 1UL << index;
-            else if ((wanted & present) != 0)
+            if (wanted == 0 || (wanted & present) != 0)
                 claims |= 1UL << index;
             else
                 unresolved = true;

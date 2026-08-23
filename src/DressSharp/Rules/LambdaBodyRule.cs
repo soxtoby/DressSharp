@@ -26,9 +26,7 @@ sealed class LambdaBodyRule : ISyntaxFormattingRule
 
         T Rewrite<T>(T node) where T : LambdaExpressionSyntax
         {
-            if (!CanConvert(node))
-                return node;
-            if (!SyntaxRuleSafety.CanRewrite(node, context))
+            if (!CanConvert(node) || !SyntaxRuleSafety.CanRewrite(node, context))
                 return node;
             if (expression)
             {
