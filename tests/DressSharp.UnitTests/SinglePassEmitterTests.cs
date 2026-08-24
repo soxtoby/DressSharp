@@ -13,6 +13,19 @@ public class SinglePassEmitterTests
         Assert.Contains("public static int M()", result);
     }
 
+    [Fact]
+    public void Malformed_sibling_does_not_suppress_emitter_rules_in_rewritten_member()
+    {
+        const string source = "class C { int BrokenNam = ; static public int M() => 1+2; }";
+
+        var result = Emit(
+            source,
+            ("csharp_preferred_modifier_order", "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"),
+            ("csharp_space_around_binary_operators", "before_and_after"));
+
+        Assert.Contains("public static int M() => 1 + 2;", result);
+    }
+
     [Theory]
     [InlineData("csharp_new_line_before_open_brace", "all", "class C { }", "C\n{")]
     [InlineData("csharp_new_line_before_else", "true", "class C { void M() { if (true) { } else { } } }", "}\nelse")]

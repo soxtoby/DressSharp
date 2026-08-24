@@ -14,6 +14,7 @@ sealed class DocumentFormatter
     readonly EmitterPlan _emitterPlan;
     readonly MemberRuleSet _memberRules;
     readonly RuleSettings _settings;
+    readonly TriviaLayoutPlan.PreparedSettings _triviaSettings;
     readonly RepresentationPreferences _representation;
 
     internal DocumentFormatter(FormattingConfiguration configuration, BenchmarkTiming timing)
@@ -23,6 +24,7 @@ sealed class DocumentFormatter
         _emitterPlan = EmitterPlan.From(RuleCatalog.BuiltIn, configuration);
         _memberRules = MemberRuleSet.From(RuleCatalog.BuiltIn, configuration);
         _settings = RuleSettings.From(configuration);
+        _triviaSettings = TriviaLayoutPlan.Prepare(RuleCatalog.BuiltIn, configuration);
         _representation = Representation(configuration);
     }
 
@@ -50,9 +52,11 @@ sealed class DocumentFormatter
         var transformStart = Stopwatch.GetTimestamp();
         var structural = ApplyFileScopedRules(root);
         var text = ReferenceEquals(structural.Root, root) ? source : structural.Root.ToFullString();
-        var formatted = Emit(structural.Root, text);
+        var emitted = Emit(structural.Root, text);
         _timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
-        return new(formatted, structural.SkippedOccurrences);
+        return new(
+            emitted.Text,
+            structural.SkippedOccurrences + emitted.SkippedOccurrences);
     }
 
     TransformationResult ApplyFileScopedRules(SyntaxNode root)
@@ -65,18 +69,41 @@ sealed class DocumentFormatter
             : throw structural.Failure;
     }
 
-    string Emit(SyntaxNode root, string text)
+    EmittedDocument Emit(SyntaxNode root, string text)
     {
         // The rest are scoped to the member they change, so a member no rule wants
         // is never copied, and the file's tree is never rebuilt around one that is.
         var ruleContext = new RuleContext(root, _settings);
         var rewrites = SyntaxRewritePlan.For(root, _memberRules, ruleContext);
-        return SinglePassEmitter.Emit(
+        var constructPreparation = ConstructLayoutPlan.Prepare(
+            root,
+            text,
+            rewrites,
+            RuleCatalog.BuiltIn.ConstructLayoutRules,
+            _configuration,
+            _settings,
+            _emitterPlan,
+            ruleContext);
+        var stream = constructPreparation.Stream;
+        var trivia = TriviaLayoutPlan.For(
+            root,
+            stream,
+            _triviaSettings,
+            ruleContext);
+        var constructs = constructPreparation.Finish(trivia);
+        var formatted = SinglePassEmitter.Emit(
             root,
             _emitterPlan,
             ruleContext,
             text,
-            rewrites);
+            stream,
+            trivia,
+            constructs);
+        return new(
+            formatted,
+            trivia.SkippedOccurrences
+            + constructs.SkippedOccurrences
+            + ruleContext.TakeSkippedOccurrences());
     }
 
     ReadOnlyMemory<byte> Encode(SourceDocument document, string formatted)
@@ -115,4 +142,5 @@ sealed class DocumentFormatter
 }
 
 sealed record TransformedDocument(string Text, int SkippedOccurrences);
+sealed record EmittedDocument(string Text, int SkippedOccurrences);
 sealed record FormattedDocument(ReadOnlyMemory<byte> Content, int SkippedOccurrences);

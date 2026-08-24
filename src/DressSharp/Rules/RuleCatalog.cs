@@ -20,7 +20,8 @@ sealed class RuleCatalog
             [
                 new UsingOrderRule(RuleKey.DressGlobalUsingOrder),
                 new UsingOrderRule(RuleKey.DressUsingKindOrder),
-                new SystemUsingSortRule()
+                new SystemUsingSortRule(),
+                new ImportGroupSeparationRule()
             ];
         MemberRules =
             [
@@ -56,6 +57,7 @@ sealed class RuleCatalog
                 new ForSemicolonSpacingRule(SpacingSide.Before),
                 new DeclarationSpacingRule(),
                 new BracketSpacingRule(BracketSpacingKind.BeforeOpening),
+                new BracketSpacingRule(BracketSpacingKind.EmptyContents),
                 new BracketSpacingRule(BracketSpacingKind.Contents)
             ];
         NewLineRules =
@@ -68,28 +70,94 @@ sealed class RuleCatalog
                 new NewLineRule(RuleKey.CSharpNewLineBeforeMembersInAnonymousTypes, NewLineKind.AnonymousTypeMembers, ["true", "false"]),
                 new NewLineRule(RuleKey.CSharpNewLineBetweenQueryExpressionClauses, NewLineKind.QueryClauses, ["true", "false"])
             ];
+        IndentationRules =
+            [
+                new IndentationRule(RuleKey.CSharpIndentSwitchLabels, ["true", "false"]),
+                new IndentationRule(RuleKey.CSharpIndentCaseContents, ["true", "false"]),
+                new IndentationRule(RuleKey.CSharpIndentLabels, ["flush_left", "no_change", "one_less_than_current"]),
+                new IndentationRule(RuleKey.CSharpIndentBlockContents, ["true", "false"]),
+                new IndentationRule(RuleKey.CSharpIndentBraces, ["true", "false"]),
+                new IndentationRule(RuleKey.CSharpIndentCaseContentsWhenBlock, ["true", "false"])
+            ];
+        PreservationRules =
+            [
+                new SingleLinePreservationRule(SingleLinePreservationKind.Blocks),
+                new SingleLinePreservationRule(SingleLinePreservationKind.Statements)
+            ];
+        InitializerIndentationRules =
+            [
+                new InitializerIndentationRule(RuleKey.DressObjectInitializerIndentation, InitializerKind.Object),
+                new InitializerIndentationRule(RuleKey.DressCollectionInitializerIndentation, InitializerKind.Collection),
+                new InitializerIndentationRule(RuleKey.DressArrayInitializerIndentation, InitializerKind.Array),
+                new InitializerIndentationRule(RuleKey.DressWithInitializerIndentation, InitializerKind.With),
+                new InitializerIndentationRule(RuleKey.DressCollectionExpressionIndentation, InitializerKind.CollectionExpression)
+            ];
+        ConstructLayoutRules =
+            [
+                new ConstructLayoutRule(RuleKey.DressArgumentsLayout, ConstructLayoutKind.Arguments),
+                new ConstructLayoutRule(RuleKey.DressParametersLayout, ConstructLayoutKind.Parameters),
+                new ConstructLayoutRule(RuleKey.DressInitializersLayout, ConstructLayoutKind.Initializers),
+                new ConstructLayoutRule(RuleKey.DressCollectionExpressionsLayout, ConstructLayoutKind.CollectionExpressions),
+                new ConstructLayoutRule(RuleKey.DressBaseTypeListsLayout, ConstructLayoutKind.BaseTypeLists),
+                new ConstructLayoutRule(RuleKey.DressConstraintClausesLayout, ConstructLayoutKind.ConstraintClauses),
+                new ConstructLayoutRule(RuleKey.DressMemberAccessChainsLayout, ConstructLayoutKind.MemberAccessChains),
+                new ConstructLayoutRule(RuleKey.DressBinaryExpressionsLayout, ConstructLayoutKind.BinaryExpressions),
+                new ConstructLayoutRule(RuleKey.DressConditionalExpressionsLayout, ConstructLayoutKind.ConditionalExpressions),
+                new ConstructLayoutRule(RuleKey.DressQueryClausesLayout, ConstructLayoutKind.QueryClauses),
+                new ConstructLayoutRule(RuleKey.DressAttributesLayout, ConstructLayoutKind.Attributes)
+            ];
+        BlankLineRules =
+            [
+                new BlankLineRule(RuleKey.DressBlankLinesAroundNamespaces, BlankLineKind.AroundNamespaces),
+                new BlankLineRule(RuleKey.DressBlankLinesAroundTypes, BlankLineKind.AroundTypes),
+                new BlankLineRule(RuleKey.DressBlankLinesBetweenMembers, BlankLineKind.BetweenMembers),
+                new BlankLineRule(RuleKey.DressBlankLinesBetweenUsingGroups, BlankLineKind.BetweenUsingGroups),
+                new BlankLineRule(RuleKey.DressBlankLinesBetweenMemberCategories, BlankLineKind.BetweenMemberCategories),
+                new BlankLineRule(RuleKey.DressMaxConsecutiveBlankLines, BlankLineKind.Maximum)
+            ];
+        CommentRules =
+            [
+                new CommentRule(RuleKey.DressLineCommentSpacing, CommentKind.LineSpacing, ["none", "single"]),
+                new CommentRule(RuleKey.DressBlockCommentSpacing, CommentKind.BlockSpacing, ["none", "single"]),
+                new CommentRule(RuleKey.DressAttachedCommentPlacement, CommentKind.AttachedPlacement, ["same_line", "own_line", "auto"]),
+                new CommentRule(RuleKey.DressXmlCommentPlacement, CommentKind.XmlPlacement, ["attached", "separated"]),
+                new CommentRule(RuleKey.DressXmlElementLayout, CommentKind.XmlElementLayout, ["single_line", "multi_line"])
+            ];
 
-        var allRules = FileRules.Cast<IFormattingRule>()
+        Rules = FileRules.Cast<IFormattingRule>()
             .Concat(UsingRules)
+            .Concat(BlankLineRules)
+            .Concat(CommentRules)
             .Concat(MemberRules)
+            .Concat(InitializerIndentationRules)
             .Concat(SpacingRules)
+            .Concat(PreservationRules)
+            .Concat(ConstructLayoutRules)
             .Concat(NewLineRules)
+            .Concat(IndentationRules)
             .ToImmutableArray();
-        Validate(allRules);
+        Validate(Rules);
     }
 
     internal int Version { get; } = CurrentVersion;
+    internal ImmutableArray<IFormattingRule> Rules { get; }
     internal ImmutableArray<ISyntaxFormattingRule> FileRules { get; }
     internal ImmutableArray<IUsingFormattingRule> UsingRules { get; }
     internal ImmutableArray<ISyntaxFormattingRule> MemberRules { get; }
     internal ImmutableArray<TokenSpacingRule> SpacingRules { get; }
     internal ImmutableArray<NewLineRule> NewLineRules { get; }
+    internal ImmutableArray<IndentationRule> IndentationRules { get; }
+    internal ImmutableArray<SingleLinePreservationRule> PreservationRules { get; }
+    internal ImmutableArray<InitializerIndentationRule> InitializerIndentationRules { get; }
+    internal ImmutableArray<ConstructLayoutRule> ConstructLayoutRules { get; }
+    internal ImmutableArray<BlankLineRule> BlankLineRules { get; }
+    internal ImmutableArray<CommentRule> CommentRules { get; }
 
     internal static RuleCatalog BuiltIn { get; } = new();
 
     static void Validate(ImmutableArray<IFormattingRule> rules)
     {
-        if (rules.Any(rule => rule.Metadata.AcceptedValues.IsDefaultOrEmpty ||
+        if (rules.Any(rule => rule.Metadata.AcceptedValueForms.IsDefaultOrEmpty ||
             string.IsNullOrWhiteSpace(rule.Metadata.OwnedSyntax) ||
             string.IsNullOrWhiteSpace(rule.Metadata.Invariant)))
         {
@@ -98,16 +166,28 @@ sealed class RuleCatalog
 
         if (rules.Select(rule => rule.Metadata.RuleKey).Distinct().Count() != rules.Length)
             throw new ArgumentException("Rule preference keys must be unique.", nameof(rules));
-        if (rules.Any(rule => rule.Metadata.AcceptedValues.Distinct(StringComparer.OrdinalIgnoreCase).Count() != rule.Metadata.AcceptedValues.Length))
+        if (rules.Any(rule => rule.Metadata.AcceptedValueForms.Distinct(StringComparer.OrdinalIgnoreCase).Count() != rule.Metadata.AcceptedValueForms.Length))
             throw new ArgumentException("Rule accepted values must be unique.", nameof(rules));
     }
 }
 
+enum RuleSafetyClass
+{
+    Layout,
+    SyntaxTransformation
+}
+
 sealed record RuleMetadata(
     RuleKey RuleKey,
-    ImmutableArray<string> AcceptedValues,
+    ImmutableArray<string> AcceptedValueForms,
     string OwnedSyntax,
-    string Invariant);
+    string Invariant)
+{
+    internal Func<string, bool>? ValueValidator { get; init; }
+
+    internal bool Accepts(string value) => ValueValidator?.Invoke(value)
+        ?? AcceptedValueForms.Contains(value, StringComparer.OrdinalIgnoreCase);
+}
 
 interface IFormattingRule
 {

@@ -78,7 +78,11 @@ sealed class UsingOrderRule(RuleKey ruleKey) : IUsingFormattingRule
 
 sealed class ModifierOrderRule : ISyntaxFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(RuleKey.CSharpPreferredModifierOrder, ["public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"], "member modifier lists", "Only modifier token order changes");
+    public RuleMetadata Metadata { get; } = new(
+        RuleKey.CSharpPreferredModifierOrder,
+        ["public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"],
+        "member modifier lists",
+        "Only modifier token order changes");
 
     static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 

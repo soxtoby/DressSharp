@@ -25,8 +25,8 @@ abstract class TokenSpacingRule(
     internal abstract ImmutableArray<SyntaxKind> TriggerKinds { get; }
 
     internal abstract bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference);
-
 }
+
 /// <summary>
 /// One adjacent token pair under consideration. The instance is reused across the emitter walk.
 /// </summary>
@@ -320,6 +320,7 @@ sealed class DeclarationSpacingRule() : TokenSpacingRule(
 enum BracketSpacingKind
 {
     BeforeOpening,
+    EmptyContents,
     Contents
 }
 
@@ -327,6 +328,7 @@ sealed class BracketSpacingRule(BracketSpacingKind kind) : TokenSpacingRule(
     kind switch
         {
             BracketSpacingKind.BeforeOpening => RuleKey.CSharpSpaceBeforeOpenSquareBrackets,
+            BracketSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenEmptySquareBrackets,
             _ => RuleKey.CSharpSpaceBetweenSquareBrackets
         },
         ["true", "false"],
@@ -340,6 +342,7 @@ sealed class BracketSpacingRule(BracketSpacingKind kind) : TokenSpacingRule(
             BracketSpacingKind.BeforeOpening when right.IsKind(SyntaxKind.OpenBracketToken)
                 && right.Parent is BracketedArgumentListSyntax or BracketedParameterListSyntax or ArrayRankSpecifierSyntax
                 => preference == "true",
+            BracketSpacingKind.EmptyContents => DesiredEmptyRankSpace(left, right, preference),
             BracketSpacingKind.Contents when IsNonEmptyEdge(left, right) => preference == "true",
             _ => null
         };
@@ -353,11 +356,64 @@ sealed class BracketSpacingRule(BracketSpacingKind kind) : TokenSpacingRule(
     static bool IsEmptyRank(SyntaxToken token) =>
         token.Parent?.FirstAncestorOrSelf<ArrayRankSpecifierSyntax>() is { Sizes.Count: 1 } rank
         && rank.Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression);
+
+    static bool? DesiredEmptyRankSpace(SyntaxToken left, SyntaxToken right, string preference)
+    {
+        var leftRank = EmptyRankFor(left);
+        var rightRank = EmptyRankFor(right);
+        if (leftRank is null || rightRank is null || leftRank.Span != rightRank.Span)
+            return null;
+
+        if (left.IsKind(SyntaxKind.OpenBracketToken)
+            && right.IsKind(SyntaxKind.OmittedArraySizeExpressionToken))
+        {
+            return false;
+        }
+
+        return left.IsKind(SyntaxKind.OmittedArraySizeExpressionToken)
+            && right.IsKind(SyntaxKind.CloseBracketToken)
+                ? preference == "true"
+                : null;
+    }
+
+    static ArrayRankSpecifierSyntax? EmptyRankFor(SyntaxToken token) =>
+        token.Parent?.FirstAncestorOrSelf<ArrayRankSpecifierSyntax>() is { Sizes.Count: 1 } rank
+        && rank.Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression)
+            ? rank
+            : null;
 }
 
-abstract class UsingDirectiveRule(RuleKey ruleKey, string invariant) : IUsingFormattingRule
+enum SingleLinePreservationKind
 {
-    public RuleMetadata Metadata { get; } = new(ruleKey, ["true", "false"], "using directive groups", invariant);
+    Blocks,
+    Statements
+}
+
+sealed class SingleLinePreservationRule(SingleLinePreservationKind kind) : IFormattingRule
+{
+    public RuleMetadata Metadata { get; } = new(
+        kind == SingleLinePreservationKind.Blocks
+            ? RuleKey.CSharpPreserveSingleLineBlocks
+            : RuleKey.CSharpPreserveSingleLineStatements,
+            ["true", "false"],
+        kind == SingleLinePreservationKind.Blocks
+            ? "existing single-line blocks and accessor lists"
+            : "adjacent statements and member declarations",
+        kind == SingleLinePreservationKind.Blocks
+            ? "False expands safe single-line blocks and accessor lists"
+            : "False separates safe adjacent statements and members");
+}
+
+abstract class UsingDirectiveRule(
+    RuleKey ruleKey,
+    string invariant
+) : IUsingFormattingRule
+{
+    public RuleMetadata Metadata { get; } = new(
+        ruleKey,
+            ["true", "false"],
+        "using directive groups",
+        invariant);
 
     public SyntaxList<UsingDirectiveSyntax> Rewrite(
         SyntaxList<UsingDirectiveSyntax> source,
@@ -397,5 +453,73 @@ sealed class SystemUsingSortRule() : UsingDirectiveRule(
         }
 
         return false;
+    }
+}
+
+sealed class ImportGroupSeparationRule() : UsingDirectiveRule(
+    RuleKey.DotnetSeparateImportDirectiveGroups,
+    "Only System and non-System group boundaries change")
+{
+    protected override SyntaxList<UsingDirectiveSyntax> Rewrite(
+        SyntaxList<UsingDirectiveSyntax> source,
+        bool enabled,
+        RuleContext context)
+    {
+        UsingDirectiveSyntax[]? result = null;
+        for (var index = 1; index < source.Count; index++)
+        {
+            var previous = result?[index - 1] ?? source[index - 1];
+            var current = result?[index] ?? source[index];
+            if (IsSystem(previous) == IsSystem(current))
+                continue;
+
+            var trailing = previous.GetTrailingTrivia();
+            var leading = current.GetLeadingTrivia();
+            var trailingEndOfLines = trailing.Count(trivia => trivia.IsKind(SyntaxKind.EndOfLineTrivia));
+            var leadingEndOfLines = leading.Count(trivia => trivia.IsKind(SyntaxKind.EndOfLineTrivia));
+            var endOfLines = trailingEndOfLines + leadingEndOfLines;
+            var desired = enabled ? 2 : 1;
+            if (endOfLines == desired)
+                continue;
+
+            while (endOfLines < desired)
+            {
+                leading = leading.Insert(0, SyntaxFactory.EndOfLine(context.LineEnding));
+                endOfLines++;
+            }
+
+            while (endOfLines > desired)
+            {
+                if (leadingEndOfLines > 0)
+                {
+                    leading = RemoveFirstEndOfLine(leading);
+                    leadingEndOfLines--;
+                }
+                else
+                {
+                    trailing = RemoveFirstEndOfLine(trailing);
+                    trailingEndOfLines--;
+                }
+
+                endOfLines--;
+            }
+
+            result ??= source.ToArray();
+            result[index - 1] = result[index - 1].WithTrailingTrivia(trailing);
+            result[index] = result[index].WithLeadingTrivia(leading);
+        }
+
+        return result is null ? source : SyntaxFactory.List(result);
+    }
+
+    static SyntaxTriviaList RemoveFirstEndOfLine(SyntaxTriviaList trivia)
+    {
+        for (var index = 0; index < trivia.Count; index++)
+        {
+            if (trivia[index].IsKind(SyntaxKind.EndOfLineTrivia))
+                return trivia.RemoveAt(index);
+        }
+
+        return trivia;
     }
 }

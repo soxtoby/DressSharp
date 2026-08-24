@@ -123,6 +123,197 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Theory]
+    [InlineData("true", "class C { int[] x; int[,] y; }", "int[ ] x; int[,] y;")]
+    [InlineData("false", "class C { int[ ] x; int[,] y; }", "int[] x; int[,] y;")]
+    [InlineData("true", "class C { int[] [] x; }", "int[ ] [ ] x;")]
+    [InlineData("false", "class C { int[ ] [ ] x; }", "int[] [] x;")]
+    public void Applies_empty_square_bracket_spacing(string value, string source, string expected)
+    {
+        var first = Transform(source, ("csharp_space_between_empty_square_brackets", value));
+        Assert.Contains(expected, first);
+        Assert.Equal(first, Transform(first, ("csharp_space_between_empty_square_brackets", value)));
+    }
+
+    [Theory]
+    [InlineData("true", "class C { void M() { int x = 1; } }", "{ int x = 1; }")]
+    [InlineData("false", "class C { void M() { int x = 1; } }", "{\nint x = 1;\n}")]
+    public void Applies_single_line_block_preservation(string value, string source, string expected)
+    {
+        var first = Transform(source, ("csharp_preserve_single_line_blocks", value));
+        Assert.Contains(expected, first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_blocks", value)));
+    }
+
+    [Fact]
+    public void Expands_an_empty_single_line_block_without_a_blank_line()
+    {
+        const string source = "class C { void M() { } }";
+        var first = Transform(source, ("csharp_preserve_single_line_blocks", "false"));
+        Assert.Contains("M() {\n}", first.Replace("\r\n", "\n"));
+        Assert.DoesNotContain("{\n\n}", first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_blocks", "false")));
+    }
+
+    [Fact]
+    public void Expands_a_single_line_property_accessor_list()
+    {
+        const string source = "class C { int Value { get; set; } }";
+
+        var first = Transform(source, ("csharp_preserve_single_line_blocks", "false"));
+
+        Assert.Contains("Value {\nget; set;\n}", first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_blocks", "false")));
+    }
+
+    [Fact]
+    public void Accessor_list_expansion_skips_comments_and_malformed_accessors()
+    {
+        const string source = "class C { int Commented { get; /* keep */ set; } int Broken { get; set } int Safe { get; set; } }";
+
+        var first = Transform(source, ("csharp_preserve_single_line_blocks", "false"));
+
+        Assert.Contains("Commented { get; /* keep */ set; }", first);
+        Assert.Contains("Broken { get; set }", first);
+        Assert.Contains("Safe {\nget; set;\n}", first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_blocks", "false")));
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r")]
+    [InlineData("\r\n")]
+    public void Block_expansion_uses_the_source_line_ending(string lineEnding)
+    {
+        var source = $"class C{lineEnding}{{{lineEnding}void Empty() {{ }}{lineEnding}void NonEmpty() {{ int x; }}{lineEnding}}}";
+        var first = Transform(source, ("csharp_preserve_single_line_blocks", "false"));
+        Assert.Contains($"Empty() {{{lineEnding}}}", first);
+        Assert.Contains($"NonEmpty() {{{lineEnding}int x;{lineEnding}}}", first);
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_blocks", "false")));
+    }
+
+    [Theory]
+    [InlineData("true", "class C { void M() { int x = 1; int y = 2; } }", "int x = 1; int y")]
+    [InlineData("false", "class C { void M() { int x = 1; int y = 2; } }", "int x = 1;\nint y")]
+    public void Applies_single_line_statement_preservation(string value, string source, string expected)
+    {
+        var first = Transform(source, ("csharp_preserve_single_line_statements", value));
+        Assert.Contains(expected, first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_statements", value)));
+    }
+
+    [Fact]
+    public void Separates_only_adjacent_statements_sharing_a_line_in_a_multiline_block()
+    {
+        const string source = "class C\n{\nvoid M()\n{\nint a = 1; int b = 2;\nint c = 3;\n}\n}";
+        const string expected = "class C\n{\nvoid M()\n{\nint a = 1;\nint b = 2;\nint c = 3;\n}\n}";
+
+        var first = Transform(source, ("csharp_preserve_single_line_statements", "false"));
+        Assert.Equal(expected, first);
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_statements", "false")));
+    }
+
+    [Fact]
+    public void Separates_adjacent_statements_directly_under_a_switch_section()
+    {
+        const string source = "class C\n{\nvoid M(int value)\n{\nswitch (value)\n{\ncase 1: First(); Second(); break;\ndefault: Third(); Fourth(); break;\n}\n}\nvoid First() { }\nvoid Second() { }\nvoid Third() { }\nvoid Fourth() { }\n}";
+        const string expected = "class C\n{\nvoid M(int value)\n{\nswitch (value)\n{\ncase 1: First();\nSecond();\nbreak;\ndefault: Third();\nFourth();\nbreak;\n}\n}\nvoid First() { }\nvoid Second() { }\nvoid Third() { }\nvoid Fourth() { }\n}";
+
+        var first = Transform(source, ("csharp_preserve_single_line_statements", "false"));
+
+        Assert.Equal(expected, first);
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_statements", "false")));
+    }
+
+    [Fact]
+    public void Switch_section_separation_skips_comments_directives_and_malformed_sections()
+    {
+        const string source = "class C\n{\nvoid M(int value)\n{\nswitch (value)\n{\ncase 0: First(); /* keep */ Second(); break;\ncase 1:\n#if X\nFirst(); Second();\n#endif\nbreak;\ncase 2: int broken = ; int valid = 2; break;\ndefault: Third(); Fourth(); break;\n}\n}\nvoid First() { }\nvoid Second() { }\nvoid Third() { }\nvoid Fourth() { }\n}";
+
+        var first = Transform(source, ("csharp_preserve_single_line_statements", "false"));
+
+        Assert.Contains("case 0: First(); /* keep */ Second(); break;", first);
+        Assert.Contains("#if X\nFirst(); Second();\n#endif", first);
+        Assert.Contains("case 2: int broken = ; int valid = 2; break;", first);
+        Assert.Contains("default: Third();\nFourth();\nbreak;", first);
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_statements", "false")));
+    }
+
+    [Fact]
+    public void Statements_already_on_separate_lines_are_unchanged()
+    {
+        const string source = "class C\n{\nvoid M()\n{\nint a = 1;\nint b = 2;\n}\n}";
+        Assert.Equal(source, Transform(source, ("csharp_preserve_single_line_statements", "false")));
+    }
+
+    [Fact]
+    public void Separates_member_declarations_sharing_a_line()
+    {
+        const string source = "class C\n{\nint First; int Second;\n}";
+        const string expected = "class C\n{\nint First;\nint Second;\n}";
+
+        var first = Transform(source, ("csharp_preserve_single_line_statements", "false"));
+
+        Assert.Equal(expected, first);
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_statements", "false")));
+    }
+
+    [Fact]
+    public void Member_separation_skips_comments_directives_and_malformed_members()
+    {
+        const string source = "class Commented\n{\nint First; /* keep */ int Second;\n}\nclass Directed\n{\n#if X\nint First; int Second;\n#endif\n}\nclass Broken\n{\nint First = ; int Second;\n}\nclass Safe\n{\nint First; int Second;\n}";
+
+        var first = Transform(source, ("csharp_preserve_single_line_statements", "false"));
+
+        Assert.Contains("int First; /* keep */ int Second;", first);
+        Assert.Contains("#if X\nint First; int Second;\n#endif", first);
+        Assert.Contains("int First = ; int Second;", first);
+        Assert.Contains("class Safe\n{\nint First;\nint Second;\n}", first);
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_statements", "false")));
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r")]
+    [InlineData("\r\n")]
+    public void Statement_separation_uses_the_source_line_ending(string lineEnding)
+    {
+        var source = $"class C{lineEnding}{{{lineEnding}void M() {{ int a = 1; int b = 2; }}{lineEnding}}}";
+        var first = Transform(source, ("csharp_preserve_single_line_statements", "false"));
+        Assert.Contains($"int a = 1;{lineEnding}int b = 2;", first);
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_statements", "false")));
+    }
+
+    [Fact]
+    public void Preservation_rules_compose_with_block_indentation()
+    {
+        const string source = "class C\n{\nvoid Empty() { }\nvoid M() { int a = 1; int b = 2; }\n}";
+        const string expected = "class C\n{\n    void Empty() {\n    }\n    void M() {\n        int a = 1;\n        int b = 2;\n    }\n}";
+        (string, string)[] preferences =
+        [
+            ("csharp_preserve_single_line_blocks", "false"),
+            ("csharp_preserve_single_line_statements", "false"),
+            ("csharp_indent_block_contents", "true")
+        ];
+
+        var first = Transform(source, preferences);
+        Assert.Equal(expected, first);
+        Assert.Equal(first, Transform(first, preferences));
+    }
+
+    [Fact]
+    public void Statement_separation_skips_unsafe_multiline_blocks_and_formats_a_safe_block()
+    {
+        const string source = "class C\n{\nvoid Commented()\n{\nint a = 1; /* keep */ int b = 2;\n}\nvoid Directed()\n{\n#if X\nint a = 1; int b = 2;\n#endif\n}\nvoid Broken()\n{\nint a = ; int b = 2;\n}\nvoid Safe()\n{\nint a = 1; int b = 2;\n}\n}";
+        var first = Transform(source, ("csharp_preserve_single_line_statements", "false"));
+
+        Assert.Contains("int a = 1; /* keep */ int b = 2;", first);
+        Assert.Contains("#if X\nint a = 1; int b = 2;\n#endif", first);
+        Assert.Contains("int a = ; int b = 2;", first);
+        Assert.Contains("void Safe()\n{\nint a = 1;\nint b = 2;\n}", first);
+        Assert.Equal(first, Transform(first, ("csharp_preserve_single_line_statements", "false")));
+    }
+
+    [Theory]
     [InlineData("false", "( true )", "(true)")]
     [InlineData("control_flow_statements", "(true)", "( true )")]
     [InlineData("expressions", "(1 + 2)", "( 1 + 2 )")]
@@ -142,13 +333,101 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Theory]
+    [InlineData("true", "using System;\nusing Zoo;\n", "using System;\n\nusing Zoo;")]
+    [InlineData("false", "using System;\n\n\nusing Zoo;\n", "using System;\nusing Zoo;")]
+    public void Separates_import_directive_groups(string value, string source, string expected)
+    {
+        var first = Transform(source, ("dotnet_separate_import_directive_groups", value));
+        Assert.Contains(expected, first.Replace("\r\n", "\n"));
+        Assert.Equal(first, Transform(first, ("dotnet_separate_import_directive_groups", value)));
+    }
+
+    [Theory]
+    [InlineData("true", "using System;\nusing Zoo;\nusing System.Text;\n", "using System;\n\nusing Zoo;\n\nusing System.Text;\n")]
+    [InlineData("false", "using System;\n\n\nusing Zoo;\n\n\nusing System.Text;\n", "using System;\nusing Zoo;\nusing System.Text;\n")]
+    public void Separates_each_alternating_import_group_boundary(string value, string source, string expected)
+    {
+        var first = Transform(source, ("dotnet_separate_import_directive_groups", value));
+
+        Assert.Equal(expected, first);
+        Assert.Equal(first, Transform(first, ("dotnet_separate_import_directive_groups", value)));
+    }
+
+    [Theory]
     [InlineData("csharp_space_after_cast")]
+    [InlineData("csharp_space_between_empty_square_brackets")]
+    [InlineData("csharp_preserve_single_line_blocks")]
+    [InlineData("csharp_preserve_single_line_statements")]
     [InlineData("dotnet_sort_system_directives_first")]
+    [InlineData("dotnet_separate_import_directive_groups")]
     public void Missing_and_unset_preferences_preserve_source(string key)
     {
-        const string source = "using Zoo;\nusing System;\nclass C { int M(object x) => (int) x; }";
+        const string source = "using System;\n\nusing Zoo;\nclass C { void M() { int[ ] x; int y = (int) 1; } }";
         Assert.Equal(source, Transform(source));
         Assert.Equal(source, Transform(source, (key, "unset")));
+    }
+
+    [Fact]
+    public void Compatibility_rules_compose_with_spacing_newlines_indentation_and_using_order()
+    {
+        const string source = "using Zoo;\nusing System.Text;\nusing Alpha;\nclass C { void M() { int[] x; int y = 1; } }";
+        (string, string)[] preferences =
+        [
+            ("dotnet_sort_system_directives_first", "true"),
+            ("dotnet_separate_import_directive_groups", "true"),
+            ("csharp_space_between_empty_square_brackets", "true"),
+            ("csharp_space_between_square_brackets", "true"),
+            ("csharp_preserve_single_line_blocks", "false"),
+            ("csharp_preserve_single_line_statements", "false"),
+            ("csharp_new_line_before_open_brace", "all"),
+            ("csharp_indent_block_contents", "true")
+        ];
+
+        var first = Transform(source, preferences).Replace("\r\n", "\n");
+        Assert.StartsWith("using System.Text;\n\nusing Zoo;\nusing Alpha;", first);
+        Assert.Contains("int[ ] x;\n        int y = 1;", first);
+        Assert.Equal(first, Transform(first, preferences).Replace("\r\n", "\n"));
+    }
+
+    [Fact]
+    public void Single_line_rules_skip_comments_directives_and_malformed_blocks_but_format_safe_blocks()
+    {
+        const string source = "class C { void Commented() { int a = 1; /* keep */ int b = 2; }\nvoid Directed() {\n#if X\nint a = 1; int b = 2;\n#endif\n}\nvoid Broken() { int a = ; int b = 2; }\nvoid Safe() { int a = 1; int b = 2; } }";
+        var result = Transform(
+            source,
+            ("csharp_preserve_single_line_blocks", "false"),
+            ("csharp_preserve_single_line_statements", "false")).Replace("\r\n", "\n");
+
+        Assert.Contains("Commented() { int a = 1; /* keep */ int b = 2; }", result);
+        Assert.Contains("int a = 1; int b = 2;\n#endif", result);
+        Assert.Contains("Broken() { int a = ; int b = 2; }", result);
+        Assert.Contains("Safe() {\nint a = 1;\nint b = 2;\n}", result);
+    }
+
+    [Fact]
+    public void Empty_bracket_spacing_preserves_unsafe_boundary_and_formats_safe_occurrence()
+    {
+        const string source = "class C { int[/* keep */] Commented; int[ Broken; int[] Safe; }";
+        var result = Transform(source, ("csharp_space_between_empty_square_brackets", "true"));
+        Assert.Contains("int[/* keep */] Commented", result);
+        Assert.Contains("int[ Broken", result);
+        Assert.Contains("int[ ] Safe", result);
+    }
+
+    [Fact]
+    public void Import_group_separation_preserves_comment_and_directive_boundaries()
+    {
+        const string comments = "using System;\n// keep\nusing Zoo;\n";
+        const string directives = "using System;\n#if X\nusing Zoo;\n#endif\n";
+        Assert.Equal(comments, Transform(comments, ("dotnet_separate_import_directive_groups", "true")));
+        Assert.Equal(directives, Transform(directives, ("dotnet_separate_import_directive_groups", "true")));
+    }
+
+    [Fact]
+    public void Import_group_separation_skips_a_list_containing_malformed_using()
+    {
+        const string source = "using System;\nusing ;\nusing Zoo;\n";
+        Assert.Equal(source, Transform(source, ("dotnet_separate_import_directive_groups", "true")));
     }
 
     [Fact]

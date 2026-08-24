@@ -24,7 +24,7 @@ static class FileScopedStructuralRules
                 if (configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                     && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
+                    if (!rule.Metadata.Accepts(preference))
                         throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.RuleKey.ToName()}'.");
 
                     var input = current;
@@ -44,7 +44,7 @@ static class FileScopedStructuralRules
                 if (configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                     && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!rule.Metadata.AcceptedValues.Contains(preference, StringComparer.OrdinalIgnoreCase))
+                    if (!rule.Metadata.Accepts(preference))
                         throw new InvalidOperationException($"Invalid value '{preference}' for '{rule.Metadata.RuleKey.ToName()}'.");
                     usingRules.Add((rule, preference));
                 }

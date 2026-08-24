@@ -35,7 +35,6 @@ sealed class RuleContext
 {
     readonly SyntaxNode _root;
     readonly bool _knownWellFormed;
-    ImmutableArray<TextSpan>? _regions;
     int _skippedOccurrences;
 
     internal RuleContext(SyntaxNode root, RuleSettings settings, bool knownWellFormed = false)
@@ -56,8 +55,10 @@ sealed class RuleContext
     /// never asked, because most rules never reach a construct whose safety is in doubt, so paying
     /// for the scan up front is paying for nothing.
     /// </remarks>
-    ImmutableArray<TextSpan> MalformedRegions =>
-        _regions ??= _knownWellFormed ? [] : ScanMalformedRegions(_root);
+    MalformedRegionIndex MalformedRegions =>
+        field ??= _knownWellFormed
+            ? MalformedRegionIndex.Empty
+            : new(ScanMalformedRegions(_root));
 
     internal int MaximumLineLength { get; }
     internal int TabWidth { get; }
@@ -83,7 +84,7 @@ sealed class RuleContext
         if (regions.IsEmpty)
             return false;
 
-        if (regions.Any(region => Intersects(region, occurrence)))
+        if (regions.Intersects(occurrence))
         {
             _skippedOccurrences++;
             return true;
@@ -121,8 +122,52 @@ sealed class RuleContext
         return diagnosticRegions.Distinct().OrderBy(span => span.Start).ToImmutableArray();
     }
 
-    static bool Intersects(TextSpan left, TextSpan right) =>
-        left.IntersectsWith(right)
-        || (left.IsEmpty && right.Start <= left.Start && left.Start <= right.End)
-        || (right.IsEmpty && left.Start <= right.Start && right.Start <= left.End);
+}
+
+sealed class MalformedRegionIndex
+{
+    internal static MalformedRegionIndex Empty { get; } = new([]);
+
+    readonly ImmutableArray<TextSpan> _regions;
+    readonly int[] _prefixMaximumEnds;
+
+    internal MalformedRegionIndex(ImmutableArray<TextSpan> sortedRegions)
+    {
+        _regions = sortedRegions;
+        _prefixMaximumEnds = new int[sortedRegions.Length];
+        var maximumEnd = -1;
+        for (var index = 0; index < sortedRegions.Length; index++)
+        {
+            var region = sortedRegions[index];
+            maximumEnd = Math.Max(maximumEnd, region.End);
+            _prefixMaximumEnds[index] = maximumEnd;
+        }
+    }
+
+    internal bool IsEmpty => _regions.IsEmpty;
+
+    internal bool Intersects(TextSpan occurrence)
+    {
+        if (_regions.IsEmpty)
+            return false;
+
+        var candidate = UpperBound(_regions, occurrence.End) - 1;
+        return candidate >= 0 && _prefixMaximumEnds[candidate] >= occurrence.Start;
+    }
+
+    static int UpperBound(ImmutableArray<TextSpan> regions, int position)
+    {
+        var low = 0;
+        var high = regions.Length;
+        while (low < high)
+        {
+            var middle = low + ((high - low) >> 1);
+            if (regions[middle].Start <= position)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
 }

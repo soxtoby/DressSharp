@@ -14,10 +14,12 @@ Every rule is independently selected. Missing values and `unset` make no change.
 | `dress_line_comment_spacing`, `dress_block_comment_spacing` | `none`, `single` | Comment interior spacing |
 | `dress_attached_comment_placement` | `same_line`, `own_line`, `auto` | Attached comments |
 | `dress_xml_comment_placement` | `attached`, `separated` | XML documentation comments |
-| `dress_xml_element_layout` | `single_line`, `multi_line` | XML elements |
+| `dress_xml_element_layout` | `single_line`, `multi_line` | Plain-text `///` XML elements with simple names |
 | `dress_global_using_order` | `first`, `last`, `mixed` | Global using placement |
 | `dress_using_kind_order` | Permutation of `ordinary,static,alias` | Using directives |
 | `dress_object_initializer_indentation`, `dress_collection_initializer_indentation`, `dress_array_initializer_indentation`, `dress_with_initializer_indentation`, `dress_collection_expression_indentation` | `indented`, `not_indented` | Named initializer |
+
+`dress_xml_element_layout` preserves nested XML elements and `/** */` documentation comments unchanged.
 
 ## Standard EditorConfig rules
 

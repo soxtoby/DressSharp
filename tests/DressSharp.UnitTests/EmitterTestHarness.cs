@@ -15,14 +15,31 @@ static class EmitterTestHarness
         if (!structural.Succeeded)
             throw structural.Failure!;
 
+        var settings = RuleSettings.From(configuration);
+        var emitterPlan = EmitterPlan.From(RuleCatalog.BuiltIn, configuration);
         var shaped = structural.Root;
         var text = ReferenceEquals(root, shaped) ? source : shaped.ToFullString();
-        var settings = RuleSettings.From(configuration);
         var context = new RuleContext(shaped, settings);
         var rewrites = SyntaxRewritePlan.For(
             shaped,
             MemberRuleSet.From(RuleCatalog.BuiltIn, configuration),
             context);
-        return SinglePassEmitter.Emit(shaped, EmitterPlan.From(RuleCatalog.BuiltIn, configuration), context, text, rewrites);
+        var constructPreparation = ConstructLayoutPlan.Prepare(
+            shaped,
+            text,
+            rewrites,
+            RuleCatalog.BuiltIn.ConstructLayoutRules,
+            configuration,
+            settings,
+            emitterPlan,
+            context);
+        var stream = constructPreparation.Stream;
+        var trivia = TriviaLayoutPlan.For(
+            shaped,
+            stream,
+            TriviaLayoutPlan.Prepare(RuleCatalog.BuiltIn, configuration),
+            context);
+        var constructs = constructPreparation.Finish(trivia);
+        return SinglePassEmitter.Emit(shaped, emitterPlan, context, text, stream, trivia, constructs);
     }
 }

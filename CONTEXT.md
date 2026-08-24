@@ -32,7 +32,7 @@ A rule-catalog classification stating whether a rule changes only layout or inte
 The versioned reference of every built-in formatting rule, including its preference key, accepted values, owned syntax, safety class, and validation invariant.
 
 **Transformation pipeline**:
-The single ordered pass that applies enabled formatting rules to a file. Each rule receives the latest syntax tree produced by earlier rules, and the completed pipeline must be idempotent.
+The ordered application of enabled formatting rules to a file. Compatible layout rules may share preparation, a syntax walk, or emission, but conflicting claims resolve in catalog order. The completed pipeline must be idempotent.
 
 **Catalog order**:
 The fixed order in which formatting rules run within a file. Files may be processed concurrently, but rules within one file run sequentially.

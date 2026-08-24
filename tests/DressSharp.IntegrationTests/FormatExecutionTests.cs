@@ -64,12 +64,26 @@ public sealed class FormatExecutionTests : IDisposable
         Assert.DoesNotContain("a, int", await File.ReadAllTextAsync(first, Token));
     }
 
-    async Task<(int ExitCode, string Output, string Error)> Run(CommandKind kind, string path)
+    [Fact]
+    public async Task Verbose_check_reports_emitter_skipped_occurrences_exactly()
+    {
+        var path = Source("class C\n{\nvoid M()\n{\n      retry:\nreturn +;\n}\n}");
+        await File.AppendAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            "csharp_indent_labels = flush_left\n",
+            Token);
+
+        var (_, _, error) = await Run(CommandKind.Check, path, verbose: true);
+
+        ExactAssert.Text("Program.cs: skipped 1 malformed occurrence(s)." + Environment.NewLine, error);
+    }
+
+    async Task<(int ExitCode, string Output, string Error)> Run(CommandKind kind, string path, bool verbose = false)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         var exitCode = await new FormatExecutor(_directory, output, error).Run(
-            new(kind, [], false, null), [new SelectedFile(path, Path.GetFileName(path))], Token);
+            new(kind, [], verbose, null), [new SelectedFile(path, Path.GetFileName(path))], Token);
         return (exitCode, output.ToString(), error.ToString());
     }
 

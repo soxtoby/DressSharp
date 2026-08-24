@@ -25,10 +25,13 @@ sealed class ConditionalBracesRule : ISyntaxFormattingRule
             // Only the outer node owns a chain; nested else-if nodes are rewritten with it.
             if (node.Parent is ElseClauseSyntax)
                 return node;
+            
             if (!CouldChange(node))
                 return node;
+            
             if (!SyntaxRuleSafety.CanRewrite(node, context))
                 return node;
+            
             var branches = Branches(node).ToArray();
             var canCompact = branches.All(CanUnbrace) && !HasDanglingElseRisk(node);
             var add = preference == "always"

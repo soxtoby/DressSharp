@@ -1,4 +1,5 @@
 using DressSharp.Architecture;
+using Microsoft.CodeAnalysis;
 
 namespace DressSharp.Rules;
 
@@ -11,6 +12,7 @@ sealed class EmitterPlan
     readonly Dictionary<int, ulong> _triggers;
     readonly Dictionary<int, ulong> _newLineTriggers;
     readonly ulong _newLineWildcards;
+    readonly bool?[] _initializerIndentations;
 
     EmitterPlan(
         (TokenSpacingRule Rule, string Preference)[] spacing,
@@ -20,8 +22,15 @@ sealed class EmitterPlan
         ulong newLineWildcards,
         ulong laterElementRules,
         RuleSettings settings,
-        bool indentBraces,
-        bool indentBlockContents)
+        bool? indentBraces,
+        bool? indentBlockContents,
+        bool? indentSwitchLabels,
+        bool? indentCaseContents,
+        LabelIndentationStyle? labelIndentation,
+        bool? indentCaseContentsWhenBlock,
+        bool expandSingleLineBlocks,
+        bool separateSingleLineStatements,
+        bool?[] initializerIndentations)
     {
         Spacing = spacing;
         NewLines = newLines;
@@ -33,14 +42,27 @@ sealed class EmitterPlan
         IndentUnit = settings.IndentUnit;
         IndentBraces = indentBraces;
         IndentBlockContents = indentBlockContents;
+        IndentSwitchLabels = indentSwitchLabels;
+        IndentCaseContents = indentCaseContents;
+        LabelIndentation = labelIndentation;
+        IndentCaseContentsWhenBlock = indentCaseContentsWhenBlock;
+        ExpandSingleLineBlocks = expandSingleLineBlocks;
+        SeparateSingleLineStatements = separateSingleLineStatements;
+        _initializerIndentations = initializerIndentations;
     }
 
     internal (TokenSpacingRule Rule, string Preference)[] Spacing { get; }
     internal (NewLineRule Rule, NewLineRule.BraceCategories Categories)[] NewLines { get; }
     internal int MaximumLineLength { get; }
     internal string IndentUnit { get; }
-    internal bool IndentBraces { get; }
-    internal bool IndentBlockContents { get; }
+    internal bool? IndentBraces { get; }
+    internal bool? IndentBlockContents { get; }
+    internal bool? IndentSwitchLabels { get; }
+    internal bool? IndentCaseContents { get; }
+    internal LabelIndentationStyle? LabelIndentation { get; }
+    internal bool? IndentCaseContentsWhenBlock { get; }
+    internal bool ExpandSingleLineBlocks { get; }
+    internal bool SeparateSingleLineStatements { get; }
     internal ulong LaterElementRules { get; }
     internal string LineEnding { get; init; } = "\n";
 
@@ -49,6 +71,31 @@ sealed class EmitterPlan
     /// </summary>
     internal ulong Trigger(int rawKind) => _triggers.GetValueOrDefault(rawKind);
     internal ulong NewLineTrigger(int rawKind) => _newLineWildcards | _newLineTriggers.GetValueOrDefault(rawKind);
+    internal bool? InitializerIndentation(InitializerKind kind) => _initializerIndentations[(int)kind];
+
+    internal bool? DesiredSpace(SyntaxToken left, SyntaxToken right)
+    {
+        var candidates = Trigger(left.RawKind) | Trigger(right.RawKind);
+        return candidates == 0 
+            ? null 
+            : DesiredSpace(left, right, candidates);
+    }
+
+    internal bool? DesiredSpace(SyntaxToken left, SyntaxToken right, ulong candidates)
+    {
+
+        var desired = default(bool?);
+        for (var index = 0; index < Spacing.Length; index++)
+        {
+            if ((candidates & (1UL << index)) == 0)
+                continue;
+            var candidate = Spacing[index].Rule.DesiredSpace(left, right, Spacing[index].Preference);
+            if (candidate is not null)
+                desired = candidate;
+        }
+
+        return desired;
+    }
 
     internal static EmitterPlan From(RuleCatalog catalog, FormattingConfiguration configuration)
     {
@@ -95,6 +142,12 @@ sealed class EmitterPlan
                 newLineTriggers[(int)kind] = newLineTriggers.GetValueOrDefault((int)kind) | bit;
         }
 
+        var initializerIndentations = new bool?[Enum.GetValues<InitializerKind>().Length];
+        foreach (var rule in catalog.InitializerIndentationRules)
+        {
+            initializerIndentations[(int)rule.Kind] = InitializerIndentation(configuration.Preferences.GetValueOrDefault(rule.Metadata.RuleKey));
+        }
+
         return new(
             [.. spacing],
             [.. newLines],
@@ -103,10 +156,44 @@ sealed class EmitterPlan
             newLineWildcards,
             laterElementRules,
             RuleSettings.From(configuration),
-            IsTrue(configuration, RuleKey.CSharpIndentBraces),
-            IsTrue(configuration, RuleKey.CSharpIndentBlockContents));
+            OptionalBoolean(configuration, RuleKey.CSharpIndentBraces),
+            OptionalBoolean(configuration, RuleKey.CSharpIndentBlockContents),
+            OptionalBoolean(configuration, RuleKey.CSharpIndentSwitchLabels),
+            OptionalBoolean(configuration, RuleKey.CSharpIndentCaseContents),
+            OptionalLabelIndentation(configuration),
+            OptionalBoolean(configuration, RuleKey.CSharpIndentCaseContentsWhenBlock),
+            OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == false,
+            OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineStatements) == false,
+            initializerIndentations);
     }
 
-    static bool IsTrue(FormattingConfiguration configuration, RuleKey key) =>
-        configuration.Preferences.GetValueOrDefault(key, "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+    static bool? OptionalBoolean(FormattingConfiguration configuration, RuleKey key) =>
+        configuration.Preferences.TryGetValue(key, out var value)
+        && bool.TryParse(value, out var parsed)
+            ? parsed
+            : null;
+
+    static bool? InitializerIndentation(string? value) =>
+        value?.Equals("indented", StringComparison.OrdinalIgnoreCase) == true
+            ? true
+            : value?.Equals("not_indented", StringComparison.OrdinalIgnoreCase) == true
+                ? false
+                : null;
+
+    static LabelIndentationStyle? OptionalLabelIndentation(FormattingConfiguration configuration) =>
+        configuration.Preferences.GetValueOrDefault(RuleKey.CSharpIndentLabels) switch
+        {
+            "flush_left" => LabelIndentationStyle.FlushLeft,
+            "no_change" => LabelIndentationStyle.NoChange,
+            "one_less_than_current" => LabelIndentationStyle.OneLessThanCurrent,
+            _ => null
+        };
+
+}
+
+enum LabelIndentationStyle
+{
+    FlushLeft,
+    NoChange,
+    OneLessThanCurrent
 }
