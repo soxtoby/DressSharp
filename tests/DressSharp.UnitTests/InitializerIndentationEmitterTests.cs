@@ -104,7 +104,7 @@ public sealed class InitializerIndentationEmitterTests
     }
 
     [Fact]
-    public void Composes_with_construct_layout_and_new_line_rules()
+    public void Composes_with_syntax_wrapping_and_new_line_rules()
     {
         const string source = "class C { C M() => new C { X = 1, Y = 2 }; int X; int Y; }";
 
@@ -124,7 +124,7 @@ public sealed class InitializerIndentationEmitterTests
     }
 
     [Fact]
-    public void Construct_layout_preserves_comment_before_indented_closing_delimiter()
+    public void Syntax_wrapping_preserves_comment_before_indented_closing_delimiter()
     {
         const string source = "class C\n{\nC M() => new C\n{\nX = 1\n/* keep */ };\nint X;\n}";
         (string, string)[] preferences =

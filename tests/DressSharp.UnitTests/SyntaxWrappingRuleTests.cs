@@ -4,9 +4,9 @@ using Xunit;
 
 namespace DressSharp.UnitTests;
 
-public class ConstructLayoutRuleTests
+public class SyntaxWrappingRuleTests
 {
-    public static TheoryData<string, string, string, string> Constructs => new()
+    public static TheoryData<string, string, string, string> SyntaxShapes => new()
     {
         {
             "dress_arguments_layout",
@@ -77,8 +77,8 @@ public class ConstructLayoutRuleTests
     };
 
     [Theory]
-    [MemberData(nameof(Constructs))]
-    public void Each_construct_supports_all_layout_modes_and_is_idempotent(
+    [MemberData(nameof(SyntaxShapes))]
+    public void Each_syntax_shape_supports_all_layout_modes_and_is_idempotent(
         string key,
         string source,
         string singleMarker,
@@ -204,7 +204,7 @@ public class ConstructLayoutRuleTests
     }
 
     [Fact]
-    public void Auto_measures_spacing_rules_that_run_before_construct_layout()
+    public void Auto_measures_spacing_rules_that_run_before_syntax_wrapping()
     {
         const string source = "class C { bool M() => alpha&&beta; bool alpha; bool beta; }";
 
@@ -224,7 +224,7 @@ public class ConstructLayoutRuleTests
     }
 
     [Fact]
-    public void Absent_and_unset_preferences_leave_constructs_alone()
+    public void Absent_and_unset_preferences_leave_syntax_shapes_alone()
     {
         const string source = "class C { void M(int alpha, int beta) {} }";
 
@@ -345,7 +345,7 @@ public class ConstructLayoutRuleTests
     }
 
     [Fact]
-    public void Auto_in_rewritten_member_uses_the_original_insertion_column_for_nested_constructs()
+    public void Auto_in_rewritten_member_uses_the_original_insertion_column_for_nested_syntax_shapes()
     {
         const string source =
             "class AClassNameLongEnoughToMatter { object M() { return N(first, second); } }";
@@ -504,7 +504,7 @@ public class ConstructLayoutRuleTests
     }
 
     [Fact]
-    public void Construct_layout_overrides_earlier_spacing_rules_on_owned_gaps()
+    public void Syntax_wrapping_overrides_earlier_spacing_rules_on_owned_gaps()
     {
         const string source = "class C { void M() { N(alpha,beta); } void N(int a, int b) {} int alpha; int beta; }";
 
@@ -523,7 +523,7 @@ public class ConstructLayoutRuleTests
     }
 
     [Fact]
-    public void Later_query_new_line_rule_overrides_construct_layout()
+    public void Later_query_new_line_rule_overrides_syntax_wrapping()
     {
         const string source = "class C { object M(int[] xs) => from x in xs where x > 0 select x; }";
 
@@ -550,7 +550,7 @@ public class ConstructLayoutRuleTests
     }
 
     [Fact]
-    public void Later_initializer_member_new_line_rule_overrides_construct_layout()
+    public void Later_initializer_member_new_line_rule_overrides_syntax_wrapping()
     {
         const string source = "class C { C M() => new C { X = 1, Y = 2 }; int X; int Y; }";
 
@@ -569,7 +569,7 @@ public class ConstructLayoutRuleTests
     [Theory]
     [InlineData("indented", "\n        {", "\n        };")]
     [InlineData("not_indented", "\n    {", "\n    };")]
-    public void Earlier_initializer_indentation_sets_the_base_used_by_construct_layout(
+    public void Earlier_initializer_indentation_sets_the_base_used_by_syntax_wrapping(
         string indentation,
         string opening,
         string closing)
@@ -638,7 +638,7 @@ public class ConstructLayoutRuleTests
     }
 
     [Fact]
-    public void Familiar_defaults_enable_every_construct_preference()
+    public void Familiar_defaults_enable_every_syntax_wrapping_preference()
     {
         string[] keys =
         [

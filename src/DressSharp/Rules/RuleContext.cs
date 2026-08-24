@@ -52,7 +52,7 @@ sealed class RuleContext
     /// </summary>
     /// <remarks>
     /// Finding them means reading every diagnostic, token and trivia in the file. Most files are
-    /// never asked, because most rules never reach a construct whose safety is in doubt, so paying
+    /// never asked. Most rules never reach a syntax occurrence whose safety is in doubt, so paying
     /// for the scan up front is paying for nothing.
     /// </remarks>
     MalformedRegionIndex MalformedRegions =>

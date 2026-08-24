@@ -12,9 +12,9 @@ sealed class DocumentFormatter
     readonly FormattingConfiguration _configuration;
     readonly BenchmarkTiming _timing;
     readonly EmitterPlan _emitterPlan;
+    readonly EmissionLayoutPlanner _layoutPlanner;
     readonly MemberRuleSet _memberRules;
     readonly RuleSettings _settings;
-    readonly TriviaLayoutPlan.PreparedSettings _triviaSettings;
     readonly RepresentationPreferences _representation;
 
     internal DocumentFormatter(FormattingConfiguration configuration, BenchmarkTiming timing)
@@ -24,7 +24,11 @@ sealed class DocumentFormatter
         _emitterPlan = EmitterPlan.From(RuleCatalog.BuiltIn, configuration);
         _memberRules = MemberRuleSet.From(RuleCatalog.BuiltIn, configuration);
         _settings = RuleSettings.From(configuration);
-        _triviaSettings = TriviaLayoutPlan.Prepare(RuleCatalog.BuiltIn, configuration);
+        _layoutPlanner = new(
+            RuleCatalog.BuiltIn,
+            configuration,
+            _settings,
+            _emitterPlan);
         _representation = Representation(configuration);
     }
 
@@ -75,35 +79,20 @@ sealed class DocumentFormatter
         // is never copied, and the file's tree is never rebuilt around one that is.
         var ruleContext = new RuleContext(root, _settings);
         var rewrites = SyntaxRewritePlan.For(root, _memberRules, ruleContext);
-        var constructPreparation = ConstructLayoutPlan.Prepare(
+        var layout = _layoutPlanner.Plan(
             root,
             text,
             rewrites,
-            RuleCatalog.BuiltIn.ConstructLayoutRules,
-            _configuration,
-            _settings,
-            _emitterPlan,
             ruleContext);
-        var stream = constructPreparation.Stream;
-        var trivia = TriviaLayoutPlan.For(
-            root,
-            stream,
-            _triviaSettings,
-            ruleContext);
-        var constructs = constructPreparation.Finish(trivia);
         var formatted = SinglePassEmitter.Emit(
             root,
             _emitterPlan,
             ruleContext,
             text,
-            stream,
-            trivia,
-            constructs);
+            layout);
         return new(
             formatted,
-            trivia.SkippedOccurrences
-            + constructs.SkippedOccurrences
-            + ruleContext.TakeSkippedOccurrences());
+            layout.SkippedOccurrences + ruleContext.TakeSkippedOccurrences());
     }
 
     ReadOnlyMemory<byte> Encode(SourceDocument document, string formatted)

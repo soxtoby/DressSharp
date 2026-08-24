@@ -14,13 +14,13 @@ namespace DressSharp.Rules;
 /// Members a syntax rule wanted are handed over already rewritten, and are written from their own
 /// text; everything else is written from the original source. So a file where no syntax rule applies
 /// is never copied at all, and one where a rule applies pays only for the members it touched.
-/// The emitter carries line-break, indentation, spacing, blank-line, comment, wrapping, and
-/// construct-layout decisions.
+/// The emitter carries line-break, indentation, spacing, blank-line, comment, and syntax-wrapping
+/// decisions.
 /// </remarks>
 sealed class SinglePassEmitter
 {
     readonly EmitterPlan _plan;
-    readonly ConstructLayoutPlan _constructLayout;
+    readonly SyntaxWrappingPlan _syntaxWrapping;
     readonly TriviaLayoutPlan _triviaLayout;
     readonly RuleContext _context;
     readonly SyntaxNode _root;
@@ -38,7 +38,7 @@ sealed class SinglePassEmitter
 
     /// <summary>
     /// The indentation for content at each open brace, innermost last. Nesting alone decides it,
-    /// so no lookup of where an owning construct started is needed.
+    /// so no lookup of where an owning syntax node started is needed.
     /// </summary>
     readonly List<string> _contentIndents = [""];
     readonly Stack<string> _braceIndents = new();
@@ -48,21 +48,19 @@ sealed class SinglePassEmitter
 
     SinglePassEmitter(
         EmitterPlan plan,
-        ConstructLayoutPlan constructLayout,
-        TriviaLayoutPlan triviaLayout,
+        EmissionLayoutPlan layout,
         RuleContext context,
         SyntaxNode root,
         bool checkMalformedRegions,
-        EffectiveTokenStream stream,
         int capacity)
     {
         _plan = plan;
-        _constructLayout = constructLayout;
-        _triviaLayout = triviaLayout;
+        _syntaxWrapping = layout.Wrapping;
+        _triviaLayout = layout.Trivia;
         _context = context;
         _root = root;
         _checkMalformedRegions = checkMalformedRegions;
-        _pieces = stream.Pieces;
+        _pieces = layout.Stream.Pieces;
         _output = new StringBuilder(capacity);
     }
 
@@ -71,17 +69,13 @@ sealed class SinglePassEmitter
         EmitterPlan plan,
         RuleContext context,
         string source,
-        EffectiveTokenStream stream,
-        TriviaLayoutPlan triviaLayout,
-        ConstructLayoutPlan constructLayout) =>
+        EmissionLayoutPlan layout) =>
         new SinglePassEmitter(
             plan,
-            constructLayout,
-            triviaLayout,
+            layout,
             context,
             root,
             root.ContainsDiagnostics,
-            stream,
             source.Length).Run();
 
     string Run()
@@ -160,14 +154,14 @@ sealed class SinglePassEmitter
         if (_triviaLayout.HasMeaningfulGap(index))
         {
             _previousGapHadMeaningfulTrivia = true;
-            if (_constructLayout.TryGetGap(index, out var constructGap))
-                EmitConstructGap(constructGap, right);
+            if (_syntaxWrapping.GapBefore(index) is { } wrappingGap)
+                EmitWrappingGap(wrappingGap, right);
             else
                 CopyGap(index);
             return;
         }
 
-        // New-line rules follow construct layout in catalog order, so they get the last word on a
+        // New-line rules follow syntax wrapping in catalog order, so they get the last word on a
         // boundary both rules own.
         if (ClaimsBreak(right) is { } wantsBreak)
         {
@@ -178,9 +172,9 @@ sealed class SinglePassEmitter
             return;
         }
 
-        if (_constructLayout.TryGetGap(index, out var gap))
+        if (_syntaxWrapping.GapBefore(index) is { } gap)
         {
-            EmitConstructGap(gap, right);
+            EmitWrappingGap(gap, right);
             return;
         }
 
@@ -231,7 +225,7 @@ sealed class SinglePassEmitter
             Append(" ");
     }
 
-    void EmitConstructGap(string gap, SyntaxToken right)
+    void EmitWrappingGap(string gap, SyntaxToken right)
     {
         var lastBreak = gap.LastIndexOfAny(LineBreaks);
         if (lastBreak >= 0 && InitializerIndentFor(right) is not null)

@@ -67,11 +67,11 @@ sealed class EffectiveTokenStream
             []);
     }
 
-    internal static EffectiveTokenStream ForConstructs(
+    internal static EffectiveTokenStream ForSyntaxWrapping(
         SyntaxNode root,
         string source,
         SyntaxRewritePlan rewrites,
-        ConstructTriggerMask triggerMask)
+        SyntaxWrappingTriggerMask triggerMask)
     {
         var pieces = new List<Piece>();
         List<Segment>? segments = null;

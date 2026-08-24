@@ -24,22 +24,16 @@ static class EmitterTestHarness
             shaped,
             MemberRuleSet.From(RuleCatalog.BuiltIn, configuration),
             context);
-        var constructPreparation = ConstructLayoutPlan.Prepare(
+        var layoutPlanner = new EmissionLayoutPlanner(
+            RuleCatalog.BuiltIn,
+            configuration,
+            settings,
+            emitterPlan);
+        var layout = layoutPlanner.Plan(
             shaped,
             text,
             rewrites,
-            RuleCatalog.BuiltIn.ConstructLayoutRules,
-            configuration,
-            settings,
-            emitterPlan,
             context);
-        var stream = constructPreparation.Stream;
-        var trivia = TriviaLayoutPlan.For(
-            shaped,
-            stream,
-            TriviaLayoutPlan.Prepare(RuleCatalog.BuiltIn, configuration),
-            context);
-        var constructs = constructPreparation.Finish(trivia);
-        return SinglePassEmitter.Emit(shaped, emitterPlan, context, text, stream, trivia, constructs);
+        return SinglePassEmitter.Emit(shaped, emitterPlan, context, text, layout);
     }
 }

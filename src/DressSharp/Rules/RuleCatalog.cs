@@ -92,19 +92,19 @@ sealed class RuleCatalog
                 new InitializerIndentationRule(RuleKey.DressWithInitializerIndentation, InitializerKind.With),
                 new InitializerIndentationRule(RuleKey.DressCollectionExpressionIndentation, InitializerKind.CollectionExpression)
             ];
-        ConstructLayoutRules =
+        SyntaxWrappingRules =
             [
-                new ConstructLayoutRule(RuleKey.DressArgumentsLayout, ConstructLayoutKind.Arguments),
-                new ConstructLayoutRule(RuleKey.DressParametersLayout, ConstructLayoutKind.Parameters),
-                new ConstructLayoutRule(RuleKey.DressInitializersLayout, ConstructLayoutKind.Initializers),
-                new ConstructLayoutRule(RuleKey.DressCollectionExpressionsLayout, ConstructLayoutKind.CollectionExpressions),
-                new ConstructLayoutRule(RuleKey.DressBaseTypeListsLayout, ConstructLayoutKind.BaseTypeLists),
-                new ConstructLayoutRule(RuleKey.DressConstraintClausesLayout, ConstructLayoutKind.ConstraintClauses),
-                new ConstructLayoutRule(RuleKey.DressMemberAccessChainsLayout, ConstructLayoutKind.MemberAccessChains),
-                new ConstructLayoutRule(RuleKey.DressBinaryExpressionsLayout, ConstructLayoutKind.BinaryExpressions),
-                new ConstructLayoutRule(RuleKey.DressConditionalExpressionsLayout, ConstructLayoutKind.ConditionalExpressions),
-                new ConstructLayoutRule(RuleKey.DressQueryClausesLayout, ConstructLayoutKind.QueryClauses),
-                new ConstructLayoutRule(RuleKey.DressAttributesLayout, ConstructLayoutKind.Attributes)
+                new SyntaxWrappingRule(RuleKey.DressArgumentsLayout, SyntaxWrappingKind.Arguments),
+                new SyntaxWrappingRule(RuleKey.DressParametersLayout, SyntaxWrappingKind.Parameters),
+                new SyntaxWrappingRule(RuleKey.DressInitializersLayout, SyntaxWrappingKind.Initializers),
+                new SyntaxWrappingRule(RuleKey.DressCollectionExpressionsLayout, SyntaxWrappingKind.CollectionExpressions),
+                new SyntaxWrappingRule(RuleKey.DressBaseTypeListsLayout, SyntaxWrappingKind.BaseTypeLists),
+                new SyntaxWrappingRule(RuleKey.DressConstraintClausesLayout, SyntaxWrappingKind.ConstraintClauses),
+                new SyntaxWrappingRule(RuleKey.DressMemberAccessChainsLayout, SyntaxWrappingKind.MemberAccessChains),
+                new SyntaxWrappingRule(RuleKey.DressBinaryExpressionsLayout, SyntaxWrappingKind.BinaryExpressions),
+                new SyntaxWrappingRule(RuleKey.DressConditionalExpressionsLayout, SyntaxWrappingKind.ConditionalExpressions),
+                new SyntaxWrappingRule(RuleKey.DressQueryClausesLayout, SyntaxWrappingKind.QueryClauses),
+                new SyntaxWrappingRule(RuleKey.DressAttributesLayout, SyntaxWrappingKind.Attributes)
             ];
         BlankLineRules =
             [
@@ -132,7 +132,7 @@ sealed class RuleCatalog
             .Concat(InitializerIndentationRules)
             .Concat(SpacingRules)
             .Concat(PreservationRules)
-            .Concat(ConstructLayoutRules)
+            .Concat(SyntaxWrappingRules)
             .Concat(NewLineRules)
             .Concat(IndentationRules)
             .ToImmutableArray();
@@ -149,7 +149,7 @@ sealed class RuleCatalog
     internal ImmutableArray<IndentationRule> IndentationRules { get; }
     internal ImmutableArray<SingleLinePreservationRule> PreservationRules { get; }
     internal ImmutableArray<InitializerIndentationRule> InitializerIndentationRules { get; }
-    internal ImmutableArray<ConstructLayoutRule> ConstructLayoutRules { get; }
+    internal ImmutableArray<SyntaxWrappingRule> SyntaxWrappingRules { get; }
     internal ImmutableArray<BlankLineRule> BlankLineRules { get; }
     internal ImmutableArray<CommentRule> CommentRules { get; }
 

@@ -38,7 +38,7 @@ The ordered application of enabled formatting rules to a file. Compatible layout
 The fixed order in which formatting rules run within a file. Files may be processed concurrently, but rules within one file run sequentially.
 
 **Layout mode**:
-An explicit wrapping outcome for one construct: `always_single`, `auto`, or `always_multi`. `auto` uses the shared maximum line length; an unspecified layout preference makes no change.
+An explicit wrapping outcome for one supported syntax shape: `always_single`, `auto`, or `always_multi`. `auto` uses the shared maximum line length; an unspecified layout preference makes no change.
 
 **Parse context**:
 The effective language version, preprocessor symbols, source kind, and documentation mode used to parse one file. It comes from the file's selected MSBuild project context or, for an unowned file, its implicit file-app project.
