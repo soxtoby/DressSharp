@@ -31,7 +31,7 @@ public sealed class FormatExecutionTests : IDisposable
     }
 
     [Fact]
-    public async Task Format_writes_silently_and_second_run_is_a_no_op()
+    public async Task Format_reports_changed_file_count_and_second_run_as_a_no_op()
     {
         var path = Source("class C { void M(int a,int b) { } }");
 
@@ -42,7 +42,9 @@ public sealed class FormatExecutionTests : IDisposable
 
         Assert.Equal(0, first.ExitCode);
         Assert.Equal(0, second.ExitCode);
-        ExactAssert.Text(string.Empty, first.Output + first.Error + second.Output + second.Error);
+        Assert.Matches($"^Formatted 1 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$", first.Output);
+        Assert.Matches($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$", second.Output);
+        ExactAssert.Text(string.Empty, first.Error + second.Error);
         Assert.Contains("int a, int b", formatted);
         Assert.EndsWith("\n", formatted);
         Assert.Equal(timestamp, File.GetLastWriteTimeUtc(path));

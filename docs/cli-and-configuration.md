@@ -15,7 +15,7 @@ The root command aliases `format`. An omitted include selects `**/*.cs` beneath 
 
 Inside a Git worktree, DressSharp selects tracked files plus nonignored untracked files using Git's standard excludes, including nested `.gitignore`, `.git/info/exclude`, and the user's global excludes. Outside a Git worktree it searches the filesystem directly. Both modes include only ordinary `.cs` files and exclude generated files, `.csx`, VCS directories, and linked paths. Overlapping includes are deduplicated.
 
-`format` writes changed files. `check` writes nothing and lists files requiring changes. `--verbose` lists changed files and reports an empty selection. `--configuration` (alias `--config`) selects the MSBuild configuration; the default is `Debug`.
+`format` writes changed files and reports the changed count and elapsed time. `check` writes nothing and lists files requiring changes. `--verbose` lists changed files and reports an empty selection. `--configuration` (alias `--config`) selects the MSBuild configuration; the default is `Debug`.
 
 `init` writes the complete Familiar preset into one EOF block delimited by `# DressSharp Begin` and `# DressSharp End`. `--target` defaults to `.editorconfig` in the invocation directory. Existing conflicting keys require `--force`; malformed or duplicate managed markers always fail.
 

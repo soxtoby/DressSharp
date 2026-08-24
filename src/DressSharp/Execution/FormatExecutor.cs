@@ -18,7 +18,10 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         var timing = new BenchmarkTiming();
         var commandStart = Stopwatch.GetTimestamp();
         if (selected.Count == 0)
+        {
+            await ReportFormatSummary(request, 0, 0, Stopwatch.GetElapsedTime(commandStart));
             return 0;
+        }
 
         var preparation = await PrepareRun(request, selected, timing, cancellationToken);
         var prepared = await FormatFiles(selected, preparation, timing, cancellationToken);
@@ -26,7 +29,19 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
 
         timing.Wall = Stopwatch.GetElapsedTime(commandStart);
         await BenchmarkDiagnostics.WriteAsync(timing, cancellationToken);
+        if (!failed)
+            await ReportFormatSummary(request, prepared.Count(result => result?.Changed == true), selected.Count, timing.Wall);
         return ExitCode(request, prepared, failed);
+    }
+
+    async ValueTask ReportFormatSummary(CommandRequest request, int formatted, int selected, TimeSpan elapsed)
+    {
+        if (request.Kind != CommandKind.Format)
+            return;
+
+        var files = selected == 1 ? "file" : "files";
+        var summary = FormattableString.Invariant($"Formatted {formatted} of {selected} {files} in {elapsed.TotalSeconds:F2} s.");
+        await _output.WriteLineAsync(summary);
     }
 
     async ValueTask<RunPreparation> PrepareRun(
