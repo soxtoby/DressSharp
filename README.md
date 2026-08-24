@@ -18,14 +18,19 @@ dotnet tool install DressSharp
 
 ## Development
 
-Build and install DressSharp locally:
+Build, test, and format DressSharp from the current checkout:
 
 ```powershell
-dotnet build DressSharp.slnx
-dotnet test DressSharp.slnx --no-build
+./do test
+./do format-self
+```
+
+To test the packed local tool:
+
+```powershell
 dotnet tool restore
-dotnet do install-local
-dotnet tool run dotnet-dress
+./do install-local
+dotnet tool run dotnet-dress -- --version
 ```
 
 The package installs one command: `dotnet dress`.

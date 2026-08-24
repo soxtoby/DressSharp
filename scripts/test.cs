@@ -1,5 +1,5 @@
 #!/usr/bin/env dotnet
-#:package DotNetDo.Core@0.6.0
+#:package DotNetDo.Core@0.7.0
 using DotNetDo;
 using static DotNetDo.Tools;
 
