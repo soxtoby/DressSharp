@@ -1,4 +1,3 @@
-# DressSharp Begin
 [*.cs]
 charset = utf-8
 end_of_line = lf
@@ -88,4 +87,3 @@ dress_namespace_style = file_scoped
 dress_embedded_statement_placement = next_line
 dress_embedded_statement_braces = balanced
 dress_braces_for_multiline_statement_header = true
-# DressSharp End

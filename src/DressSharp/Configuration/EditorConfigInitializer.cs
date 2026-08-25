@@ -3,50 +3,83 @@ using DressSharp.Architecture;
 
 namespace DressSharp.Configuration;
 
-sealed record InitializationResult(string Path, bool Changed, IReadOnlyList<string> Warnings);
+sealed record InitializationResult(string Path, bool Changed);
 
 static class EditorConfigInitializer
 {
-    internal const string BeginMarker = "# DressSharp Begin";
-    internal const string EndMarker = "# DressSharp End";
-
     internal static async Task<InitializationResult> InitializeAsync(
-        string? target, bool force, string invocationDirectory, CancellationToken cancellationToken)
+        string? target, string invocationDirectory, CancellationToken cancellationToken)
     {
         var path = ResolveTarget(target, invocationDirectory);
-        var original = File.Exists(path) ? await File.ReadAllTextAsync(path, cancellationToken) : string.Empty;
+        var original = File.Exists(path) 
+            ? await File.ReadAllTextAsync(path, cancellationToken) 
+            : string.Empty;
         if (original.Length > 0)
             EditorConfigSyntaxValidator.Validate(path, original);
 
         var newline = DetectNewline(original);
         var lines = SplitLines(original);
-        var begin = FindMarkers(lines, BeginMarker);
-        var end = FindMarkers(lines, EndMarker);
-        ValidateMarkers(path, begin, end);
+        var existing = ExistingPreferences(lines);
+        var missing = PreferenceCatalog.Defaults
+            .Where(preference => !existing.Contains(preference.Key))
+            .ToList();
+        if (missing.Count == 0)
+            return new InitializationResult(path, false);
 
-        var outside = RemoveManagedBlock(lines, begin, end);
-        var conflicts = FindConflicts(path, outside);
-        if (conflicts.Count != 0 && !force)
-            throw new ConfigurationException("DressSharp preference conflicts:" + Environment.NewLine + string.Join(Environment.NewLine, conflicts));
+        var sectionIndex = lines.FindLastIndex(IsCSharpSection);
+        if (sectionIndex < 0)
+        {
+            if (lines.Count != 0 && !string.IsNullOrWhiteSpace(lines[^1]))
+                lines.Add(string.Empty);
+            lines.Add("[*.cs]");
+            sectionIndex = lines.Count - 1;
+        }
 
-        var prefix = string.Join(newline, outside.Select(line => line.Text)).TrimEnd('\r', '\n');
-        var block = BuildManagedBlock(newline);
-        var output = prefix.Length == 0 ? block : prefix + newline + newline + block;
-        if (original == output)
-            return new InitializationResult(path, false, []);
+        var insertionIndex = lines.FindIndex(sectionIndex + 1, IsSection);
+        if (insertionIndex < 0)
+            insertionIndex = lines.Count;
+        while (insertionIndex > sectionIndex + 1 && string.IsNullOrWhiteSpace(lines[insertionIndex - 1]))
+            insertionIndex--;
+
+        lines.InsertRange(insertionIndex, missing.Select(Assignment));
+        var output = string.Join(newline, lines) + newline;
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, output, new UTF8Encoding(false), cancellationToken);
-        return new InitializationResult(path, true, force ? conflicts : []);
+        return new InitializationResult(path, true);
     }
 
-    internal static string BuildManagedBlock(string newline = "\n")
+    internal static string BuildDefaultSection(string newline = "\n") =>
+        "[*.cs]" + newline + string.Join(newline, PreferenceCatalog.Defaults.Select(Assignment)) + newline;
+
+    static string Assignment((RuleKey Key, string Default) preference) =>
+        $"{preference.Key.ToName()} = {preference.Default}";
+
+    static HashSet<RuleKey> ExistingPreferences(IEnumerable<string> lines)
     {
-        var lines = new List<string> { BeginMarker, "[*.cs]" };
-        lines.AddRange(PreferenceCatalog.Defaults.Select(item => $"{item.Key.ToName()} = {item.Default}"));
-        lines.Add(EndMarker);
-        return string.Join(newline, lines) + newline;
+        var existing = new HashSet<RuleKey>();
+        foreach (var sourceLine in lines)
+        {
+            var line = sourceLine.Trim();
+            if (line.Length == 0 || line[0] is '#' or ';' or '[')
+                continue;
+
+            var separator = line.IndexOfAny(['=', ':']);
+            if (separator > 0 && RuleKeys.TryParse(line[..separator].Trim(), out var key))
+                existing.Add(key);
+        }
+
+        return existing;
     }
+
+    static bool IsCSharpSection(string line)
+    {
+        var trimmed = line.TrimStart();
+        var close = trimmed.IndexOf(']');
+        return close >= 0 && trimmed[0] == '[' && trimmed[1..close].Equals("*.cs", StringComparison.Ordinal);
+    }
+
+    static bool IsSection(string line) => line.TrimStart().StartsWith('[');
 
     static string ResolveTarget(string? target, string invocationDirectory)
     {
@@ -66,53 +99,4 @@ static class EditorConfigInitializer
         : text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd('\n').Split('\n').ToList();
 
     static string DetectNewline(string text) => text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-    static List<int> FindMarkers(List<string> lines, string marker) => lines.Select((line, index) => (line, index)).Where(x => x.line == marker).Select(x => x.index).ToList();
-
-    static void ValidateMarkers(string path, List<int> begin, List<int> end)
-    {
-        if (begin.Count > 1
-            || end.Count > 1
-            || begin.Count != end.Count
-            || (begin.Count == 1 && begin[0] >= end[0]))
-        {
-            throw new ConfigurationException($"{path}: malformed or duplicate DressSharp managed markers.");
-        }
-    }
-
-    static List<SourceLine> RemoveManagedBlock(List<string> lines, List<int> begin, List<int> end)
-    {
-        var numberedLines = lines.Select((text, index) => new SourceLine(text, index + 1)).ToList();
-        if (begin.Count == 0)
-            return numberedLines;
-        var result = numberedLines.Take(begin[0]).Concat(numberedLines.Skip(end[0] + 1)).ToList();
-        while (result.Count != 0 && string.IsNullOrWhiteSpace(result[^1].Text))
-        {
-            result.RemoveAt(result.Count - 1);
-        }
-
-        return result;
-    }
-
-    static List<string> FindConflicts(string path, List<SourceLine> lines)
-    {
-        var conflicts = new List<string>();
-        foreach (var sourceLine in lines)
-        {
-            var line = sourceLine.Text.Trim();
-            if (line.Length != 0 && line[0] is not ('#' or ';' or '['))
-            {
-                var separator = line.IndexOfAny(['=', ':']);
-                if (separator > 0)
-                {
-                    var key = line[..separator].Trim();
-                    if (RuleKeys.TryParse(key, out _))
-                        conflicts.Add($"{path}({sourceLine.Number}): {key}");
-                }
-            }
-        }
-
-        return conflicts;
-    }
-
-    sealed record SourceLine(string Text, int Number);
 }

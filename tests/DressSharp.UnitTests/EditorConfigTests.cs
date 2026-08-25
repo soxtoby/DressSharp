@@ -164,11 +164,11 @@ public sealed class EditorConfigTests : IDisposable
     [Fact]
     public async Task Init_creates_default_file_without_root()
     {
-        var result = await EditorConfigInitializer.InitializeAsync(null, false, _directory, TestContext.Current.CancellationToken);
+        var result = await EditorConfigInitializer.InitializeAsync(null, _directory, TestContext.Current.CancellationToken);
         var text = await File.ReadAllTextAsync(result.Path, TestContext.Current.CancellationToken);
 
         Assert.True(result.Changed);
-        Assert.Equal(EditorConfigInitializer.BuildManagedBlock(), text);
+        Assert.Equal(EditorConfigInitializer.BuildDefaultSection(), text);
         Assert.DoesNotContain("root = true", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dress_embedded_statement_placement = next_line\n", text);
         Assert.Contains("dress_embedded_statement_braces = balanced\n", text);
@@ -187,75 +187,55 @@ public sealed class EditorConfigTests : IDisposable
             Path.Combine(AppContext.BaseDirectory, "Fixtures", "Default.editorconfig"),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(expected, EditorConfigInitializer.BuildManagedBlock());
+        Assert.Equal(expected, EditorConfigInitializer.BuildDefaultSection());
     }
 
     [Fact]
-    public async Task Init_replaces_one_block_at_eof_and_avoids_identical_rewrite()
+    public async Task Init_appends_missing_preferences_to_an_existing_csharp_section()
     {
         var path = Path.Combine(_directory, ".editorconfig");
-        await File.WriteAllTextAsync(path, "root = true\n\n# DressSharp Begin\n[*.cs]\nindent_size = 2\n# DressSharp End\n\n", TestContext.Current.CancellationToken);
-        var first = await EditorConfigInitializer.InitializeAsync(path, false, _directory, TestContext.Current.CancellationToken);
-        var timestamp = File.GetLastWriteTimeUtc(path);
-        var second = await EditorConfigInitializer.InitializeAsync(path, false, _directory, TestContext.Current.CancellationToken);
+        const string original = "root = true\n\n[*.cs]\nindent_size = 2\n\n[generated.cs]\ngenerated_code = true\n";
+        await File.WriteAllTextAsync(path, original, TestContext.Current.CancellationToken);
+
+        var first = await EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken);
+        var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+        var second = await EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken);
 
         Assert.True(first.Changed);
         Assert.False(second.Changed);
-        Assert.Equal(timestamp, File.GetLastWriteTimeUtc(path));
-        Assert.Equal(1, (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).Split(EditorConfigInitializer.BeginMarker).Length - 1);
+        Assert.StartsWith("root = true\n\n[*.cs]\nindent_size = 2\ncharset = utf-8\n", text);
+        Assert.Contains("dress_braces_for_multiline_statement_header = true\n\n[generated.cs]", text);
+        Assert.Equal(1, text.Split("indent_size =", StringSplitOptions.None).Length - 1);
     }
 
     [Fact]
-    public async Task Init_conflicts_fail_unless_forced_and_force_preserves_text()
+    public async Task Init_does_not_repeat_preferences_assigned_in_other_sections()
     {
         var path = Path.Combine(_directory, ".editorconfig");
-        const string userText = "# mine\n[generated/*.cs]\nindent_size = 2\n";
-        await File.WriteAllTextAsync(path, userText, TestContext.Current.CancellationToken);
+        const string original = "[generated/*.cs]\nindent_size = 2\n\n[*.cs]\ncharset = latin1\n";
+        await File.WriteAllTextAsync(path, original, TestContext.Current.CancellationToken);
 
-        await Assert.ThrowsAsync<ConfigurationException>(() => EditorConfigInitializer.InitializeAsync(path, false, _directory, TestContext.Current.CancellationToken));
-        Assert.Equal(userText, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+        await EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken);
 
-        var result = await EditorConfigInitializer.InitializeAsync(path, true, _directory, TestContext.Current.CancellationToken);
-        Assert.Single(result.Warnings);
-        Assert.StartsWith(userText.TrimEnd(), await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+        var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+        Assert.Equal(1, text.Split("indent_size =", StringSplitOptions.None).Length - 1);
+        Assert.Equal(1, text.Split("charset =", StringSplitOptions.None).Length - 1);
+        Assert.EndsWith("dress_braces_for_multiline_statement_header = true\n", text);
     }
 
     [Fact]
-    public async Task Init_reports_original_conflict_lines_after_managed_block()
+    public async Task Init_adds_a_csharp_section_at_the_bottom_when_missing()
     {
         var path = Path.Combine(_directory, ".editorconfig");
-        var text = $"root = true\n{EditorConfigInitializer.BeginMarker}\n[*.cs]\nindent_size = 4\n{EditorConfigInitializer.EndMarker}\n[generated.cs]\nindent_size = 2\n";
-        await File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
+        const string original = "root = true\n\n[generated.cs]\nindent_size = 2\n";
+        await File.WriteAllTextAsync(path, original, TestContext.Current.CancellationToken);
 
-        var exception = await Assert.ThrowsAsync<ConfigurationException>(() =>
-            EditorConfigInitializer.InitializeAsync(path, false, _directory, TestContext.Current.CancellationToken));
+        await EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken);
 
-        Assert.Contains($"{path}(7): indent_size", exception.Message);
-        Assert.Equal(text, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public async Task Force_never_bypasses_bad_markers()
-    {
-        var path = Path.Combine(_directory, ".editorconfig");
-        await File.WriteAllTextAsync(path, $"{EditorConfigInitializer.BeginMarker}\n{EditorConfigInitializer.BeginMarker}\n{EditorConfigInitializer.EndMarker}\n", TestContext.Current.CancellationToken);
-        await Assert.ThrowsAsync<ConfigurationException>(() => EditorConfigInitializer.InitializeAsync(path, true, _directory, TestContext.Current.CancellationToken));
-    }
-
-    [Theory]
-    [InlineData("# DressSharp Begin\n")]
-    [InlineData("# DressSharp End\n")]
-    [InlineData("# DressSharp End\n# DressSharp Begin\n")]
-    [InlineData("# DressSharp Begin\n# DressSharp End\n# DressSharp End\n")]
-    public async Task Init_rejects_every_malformed_marker_shape(string text)
-    {
-        var path = Path.Combine(_directory, ".editorconfig");
-        await File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
-
-        await Assert.ThrowsAsync<ConfigurationException>(() =>
-            EditorConfigInitializer.InitializeAsync(path, true, _directory, TestContext.Current.CancellationToken));
-
-        Assert.Equal(text, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+        var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+        Assert.StartsWith(original, text);
+        Assert.Contains("\n[*.cs]\ncharset = utf-8\n", text);
+        Assert.Equal(1, text.Split("indent_size =", StringSplitOptions.None).Length - 1);
     }
 
     [Theory]
@@ -269,7 +249,7 @@ public sealed class EditorConfigTests : IDisposable
         await File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<ConfigurationException>(() =>
-            EditorConfigInitializer.InitializeAsync(path, true, _directory, TestContext.Current.CancellationToken));
+            EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken));
 
         Assert.Equal(text, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
     }
@@ -278,7 +258,7 @@ public sealed class EditorConfigTests : IDisposable
     public async Task Nonexistent_trailing_separator_target_is_a_directory()
     {
         var target = Path.Combine(_directory, "nested") + Path.DirectorySeparatorChar;
-        var result = await EditorConfigInitializer.InitializeAsync(target, false, _directory, TestContext.Current.CancellationToken);
+        var result = await EditorConfigInitializer.InitializeAsync(target, _directory, TestContext.Current.CancellationToken);
         Assert.Equal(Path.Combine(_directory, "nested", ".editorconfig"), result.Path);
         Assert.True(File.Exists(result.Path));
     }
@@ -287,7 +267,7 @@ public sealed class EditorConfigTests : IDisposable
     public async Task Existing_directory_target_gets_editorconfig()
     {
         var target = Directory.CreateDirectory(Path.Combine(_directory, "existing")).FullName;
-        var result = await EditorConfigInitializer.InitializeAsync(target, false, _directory, TestContext.Current.CancellationToken);
+        var result = await EditorConfigInitializer.InitializeAsync(target, _directory, TestContext.Current.CancellationToken);
 
         Assert.Equal(Path.Combine(target, ".editorconfig"), result.Path);
     }
@@ -296,7 +276,7 @@ public sealed class EditorConfigTests : IDisposable
     public async Task Nonexistent_file_target_creates_parents()
     {
         var target = Path.Combine(_directory, "nested", "custom.editorconfig");
-        var result = await EditorConfigInitializer.InitializeAsync(target, false, _directory, TestContext.Current.CancellationToken);
+        var result = await EditorConfigInitializer.InitializeAsync(target, _directory, TestContext.Current.CancellationToken);
 
         Assert.Equal(target, result.Path);
         Assert.True(File.Exists(target));

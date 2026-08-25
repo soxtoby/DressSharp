@@ -8,7 +8,7 @@ This document describes DressSharp 0.x. The executable is distributed by the `Dr
 dotnet dress [--include <pattern>]... [--verbose] [--configuration <name>]
 dotnet dress format [--include <pattern>]... [--verbose] [--configuration <name>]
 dotnet dress check [--include <pattern>]... [--verbose] [--configuration <name>]
-dotnet dress init [--target <path>] [--force]
+dotnet dress init [--target <path>]
 ```
 
 The root command aliases `format`. An omitted include selects `**/*.cs` beneath the invocation directory. `--include` accepts an invocation-directory-relative glob and may be repeated; an exact file name is also a valid pattern. With an explicit command, place `--include` after the command name. Patterns use `/`, `*`, and `**`; quote them to prevent shell expansion. They cannot leave the invocation directory.
@@ -17,7 +17,7 @@ Inside a Git worktree, DressSharp selects tracked files plus nonignored untracke
 
 `format` writes changed files and reports the changed count and elapsed time. `check` writes nothing and lists files requiring changes. `--verbose` lists changed files and reports an empty selection. `--configuration` (alias `--config`) selects the MSBuild configuration; the default is `Debug`.
 
-`init` writes the complete Default preferences into one EOF block delimited by `# DressSharp Begin` and `# DressSharp End`. `--target` defaults to `.editorconfig` in the invocation directory. Existing conflicting keys require `--force`; malformed or duplicate managed markers always fail.
+`init` adds each missing supported preference to an EditorConfig file. An assignment in any section counts as present and remains unchanged. Missing preferences are appended to the last `[*.cs]` section, or to a new `[*.cs]` section at the end when none exists. `--target` defaults to `.editorconfig` in the invocation directory.
 
 ## Exit codes
 

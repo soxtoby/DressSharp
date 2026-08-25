@@ -54,22 +54,15 @@ static class Program
     static Command CreateInitCommand()
     {
         var target = new Option<string?>("--target") { Description = "EditorConfig file to initialize." };
-        var force = new Option<bool>("--force");
-        var init = new Command("init", "Write the Default preferences to a managed EditorConfig block.") { target, force };
+        var init = new Command("init", "Add missing Default preferences to an EditorConfig file.") { target };
         init.SetAction(async (parseResult, cancellationToken) =>
             {
                 try
                 {
-                    var result = await EditorConfigInitializer.InitializeAsync(
+                    await EditorConfigInitializer.InitializeAsync(
                         parseResult.GetValue(target),
-                        parseResult.GetValue(force),
                         Environment.CurrentDirectory,
                         cancellationToken);
-                    foreach (var warning in result.Warnings)
-                    {
-                        await Console.Error.WriteLineAsync($"warning: {warning}");
-                    }
-
                     return 0;
                 }
                 catch (ConfigurationException exception)

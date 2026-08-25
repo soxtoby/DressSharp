@@ -51,7 +51,7 @@ public sealed class SmokeTests
     }
 
     [Fact]
-    public async Task Init_command_fails_without_changing_conflicting_configuration()
+    public async Task Init_command_preserves_existing_preferences_and_adds_missing_ones()
     {
         var directory = Directory.CreateDirectory(
             Path.Combine(Path.GetTempPath(), "DressSharp.IntegrationTests", Guid.NewGuid().ToString("N"))).FullName;
@@ -64,8 +64,11 @@ public sealed class SmokeTests
             var exitCode = await Program.CreateCommand().Parse(["init", "--target", target]).InvokeAsync(
                 cancellationToken: TestContext.Current.CancellationToken);
 
-            Assert.Equal(2, exitCode);
-            Assert.Equal(original, await File.ReadAllTextAsync(target, TestContext.Current.CancellationToken));
+            Assert.Equal(0, exitCode);
+            var text = await File.ReadAllTextAsync(target, TestContext.Current.CancellationToken);
+            Assert.Contains("indent_size = 2", text);
+            Assert.Equal(1, text.Split("indent_size =", StringSplitOptions.None).Length - 1);
+            Assert.Contains("dress_embedded_statement_placement = next_line", text);
         }
         finally
         {

@@ -49,6 +49,7 @@ public sealed class CommandTests
     [InlineData("source.cs")]
     [InlineData("--unknown")]
     [InlineData("format --force")]
+    [InlineData("init --force")]
     [InlineData("format --include one.cs two.cs")]
     [InlineData("init --include *.cs")]
     [InlineData("--include *.cs init")]
@@ -66,7 +67,7 @@ public sealed class CommandTests
         var root = Program.CreateCommand();
         var command = Assert.Single(root.Subcommands, command => command.Name == "init");
         var target = Assert.Single(command.Options.OfType<System.CommandLine.Option<string?>>(), option => option.Name == "--target");
-        var result = root.Parse("init --target nested/.editorconfig --force");
+        var result = root.Parse("init --target nested/.editorconfig");
 
         Assert.Empty(result.Errors);
         Assert.Equal("nested/.editorconfig", result.GetValue(target));

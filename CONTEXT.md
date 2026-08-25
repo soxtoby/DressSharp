@@ -23,8 +23,9 @@ An EditorConfig key and value that selects a formatting rule's outcome. Missing 
 The complete, explicit set of formatting preferences written by `dresssharp init`. It is not an implicit formatter fallback.
 _Avoid_: Familiar preferences, Familiar preset
 
-**Managed configuration block**:
-The marked EditorConfig section owned by `dresssharp init`. A configuration file may contain at most one valid managed configuration block.
+**Default preference initialization**:
+Adding each missing supported preference to an EditorConfig file. Existing assignments in any section remain authoritative; missing preferences go into an existing `[*.cs]` section or a new one at the end.
+_Avoid_: Managed configuration block
 
 **Safety class**:
 A rule-catalog classification stating whether a rule changes only layout or intentionally transforms syntax, together with the test invariant used to validate its output.
