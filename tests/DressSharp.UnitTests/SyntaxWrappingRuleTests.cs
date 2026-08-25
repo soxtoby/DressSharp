@@ -638,7 +638,7 @@ public class SyntaxWrappingRuleTests
     }
 
     [Fact]
-    public void Familiar_defaults_enable_every_syntax_wrapping_preference()
+    public void Default_preferences_enable_every_syntax_wrapping_rule()
     {
         string[] keys =
         [

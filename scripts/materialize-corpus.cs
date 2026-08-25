@@ -14,7 +14,7 @@ try
 {
     corpus.RecreateDirectory();
     (benchmarkRoot / "corpus/Corpus.csproj").CopyTo(corpus / "Corpus.csproj");
-    (Do.RootDirectory / "tests/DressSharp.UnitTests/Fixtures/Familiar.editorconfig").CopyTo(corpus / ".editorconfig");
+    (Do.RootDirectory / "tests/DressSharp.UnitTests/Fixtures/Default.editorconfig").CopyTo(corpus / ".editorconfig");
 
     foreach (var sourceNode in definition)
     {

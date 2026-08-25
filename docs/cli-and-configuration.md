@@ -17,7 +17,7 @@ Inside a Git worktree, DressSharp selects tracked files plus nonignored untracke
 
 `format` writes changed files and reports the changed count and elapsed time. `check` writes nothing and lists files requiring changes. `--verbose` lists changed files and reports an empty selection. `--configuration` (alias `--config`) selects the MSBuild configuration; the default is `Debug`.
 
-`init` writes the complete Familiar preset into one EOF block delimited by `# DressSharp Begin` and `# DressSharp End`. `--target` defaults to `.editorconfig` in the invocation directory. Existing conflicting keys require `--force`; malformed or duplicate managed markers always fail.
+`init` writes the complete Default preferences into one EOF block delimited by `# DressSharp Begin` and `# DressSharp End`. `--target` defaults to `.editorconfig` in the invocation directory. Existing conflicting keys require `--force`; malformed or duplicate managed markers always fail.
 
 ## Exit codes
 
@@ -29,7 +29,7 @@ Inside a Git worktree, DressSharp selects tracked files plus nonignored untracke
 
 ## Configuration
 
-DressSharp resolves EditorConfig independently for each file using ordinary traversal, `root = true`, section matching, precedence, and `unset`. Missing or `unset` preferences do nothing: DressSharp has no implicit formatting defaults. `init` provides an explicit Familiar preset.
+DressSharp resolves EditorConfig independently for each file using ordinary traversal, `root = true`, section matching, precedence, and `unset`. Missing or `unset` preferences do nothing: DressSharp has no implicit formatting defaults. `init` provides the explicit Default preferences.
 
 Known invalid effective values and malformed EditorConfig fail preflight before source writes. Unknown well-formed keys are ignored for forward compatibility. Standard C# values may include a diagnostic severity suffix such as `:warning`; DressSharp ignores that suffix.
 

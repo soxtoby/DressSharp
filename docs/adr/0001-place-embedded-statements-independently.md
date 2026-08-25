@@ -10,4 +10,4 @@ This specific preference wins over `csharp_new_line_before_open_brace` for a blo
 
 `same_line` replaces boundary whitespace with one space. `next_line` replaces it with one configured line ending and the computed body indentation. Both remove excess spaces and blank lines. An occurrence with a comment or directive in that boundary remains unchanged.
 
-The Familiar default is `next_line`.
+The Default preference is `next_line`.

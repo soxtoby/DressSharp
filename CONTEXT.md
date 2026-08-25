@@ -19,8 +19,9 @@ The smallest independently selectable formatting decision. One formatting rule i
 **Formatting preference**:
 An EditorConfig key and value that selects a formatting rule's outcome. Missing or `unset` preferences select no outcome, so the rule makes no change.
 
-**Default configuration**:
+**Default preferences**:
 The complete, explicit set of formatting preferences written by `dresssharp init`. It is not an implicit formatter fallback.
+_Avoid_: Familiar preferences, Familiar preset
 
 **Managed configuration block**:
 The marked EditorConfig section owned by `dresssharp init`. A configuration file may contain at most one valid managed configuration block.

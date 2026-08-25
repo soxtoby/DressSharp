@@ -54,6 +54,8 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         var stageStart = Stopwatch.GetTimestamp();
         var configurations = new EditorConfigResolver().ResolveAll(paths, cancellationToken);
         timing.EditorConfig = Stopwatch.GetElapsedTime(stageStart);
+        if (configurations.Values.All(configuration => configuration.Preferences.Count == 0))
+            await _error.WriteLineAsync("warning: no EditorConfig preferences to apply; run 'dotnet dress init' to initialize .editorconfig.");
 
         stageStart = Stopwatch.GetTimestamp();
         var contexts = await new ParseContextResolver(_invocationDirectory).Resolve(paths, request.BuildConfiguration, cancellationToken);

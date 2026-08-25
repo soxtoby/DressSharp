@@ -53,7 +53,14 @@ static class EmbeddedStatements
 {
     internal static bool StartsBody(SyntaxToken token, out StatementSyntax statement)
     {
-        statement = StartingAt(token)!;
+        var candidate = StartingAt(token);
+        if (candidate is null)
+        {
+            statement = null!;
+            return false;
+        }
+
+        statement = candidate;
         return OwnerOf(statement) is not null
             && statement is not IfStatementSyntax { Parent: ElseClauseSyntax };
     }
@@ -61,7 +68,7 @@ static class EmbeddedStatements
     internal static int UnbracedDepth(StatementSyntax statement)
     {
         var depth = 0;
-        var current = statement;
+        StatementSyntax? current = statement;
         if (current is BlockSyntax)
             current = OwnerOf(current) as StatementSyntax;
 

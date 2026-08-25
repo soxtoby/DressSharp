@@ -26,7 +26,7 @@ public sealed class SmokeTests
     }
 
     [Fact]
-    public async Task Init_command_creates_the_familiar_configuration()
+    public async Task Init_command_creates_the_default_preferences()
     {
         var directory = Path.Combine(Path.GetTempPath(), "DressSharp.IntegrationTests", Guid.NewGuid().ToString("N"));
         try

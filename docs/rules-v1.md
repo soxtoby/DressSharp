@@ -1,6 +1,6 @@
 # Rule reference: catalog version 1
 
-Every rule is independently selected. Missing values and `unset` make no change. Keys ending in `_layout` accept `always_single`, `auto`, or `always_multi`; `auto` uses `max_line_length` (Familiar: `180`).
+Every rule is independently selected. Missing values and `unset` make no change. Keys ending in `_layout` accept `always_single`, `auto`, or `always_multi`; `auto` uses `max_line_length` (Default: `180`).
 
 ## DressSharp rules
 
@@ -39,6 +39,6 @@ DressSharp supports `charset`, `end_of_line`, `insert_final_newline`, `trim_trai
 - `csharp_space_after_comma`, `csharp_space_before_comma`, `csharp_space_after_dot`, `csharp_space_before_dot`, `csharp_space_after_semicolon_in_for_statement`, `csharp_space_before_semicolon_in_for_statement`, `csharp_space_around_declaration_statements`, `csharp_space_before_open_square_brackets`, `csharp_space_between_empty_square_brackets`, `csharp_space_between_square_brackets`
 - `csharp_preserve_single_line_blocks`, `csharp_preserve_single_line_statements`, `csharp_preferred_modifier_order`, `dotnet_sort_system_directives_first`, `dotnet_separate_import_directive_groups`
 
-Boolean keys accept `true` or `false`. `csharp_indent_labels` accepts `flush_left`, `no_change`, or `one_less_than_current`. `csharp_space_around_binary_operators` accepts `before_and_after`, `ignore`, or `none`. List-valued keys use the values documented by the .NET EditorConfig convention. The authoritative complete Familiar values are emitted by `dotnet dress init`.
+Boolean keys accept `true` or `false`. `csharp_indent_labels` accepts `flush_left`, `no_change`, or `one_less_than_current`. `csharp_space_around_binary_operators` accepts `before_and_after`, `ignore`, or `none`. List-valued keys use the values documented by the .NET EditorConfig convention. The authoritative complete Default values are emitted by `dotnet dress init`.
 
 Layout-only rules preserve token structure and significant trivia. Syntax-transforming rules preserve the selected parse meaning by construction and skip unsafe occurrences. The full pipeline is required to be idempotent.

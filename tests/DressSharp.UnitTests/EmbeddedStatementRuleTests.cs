@@ -1,3 +1,5 @@
+using DressSharp.Architecture;
+using DressSharp.Configuration;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
@@ -241,25 +243,17 @@ public class EmbeddedStatementRuleTests
     }
 
     [Fact]
-    public void Familiar_contract_formats_the_regression_and_is_idempotent()
+    public void Default_preferences_format_the_regression_and_are_idempotent()
     {
-        const string source = "class C\n{\n    bool Equal(C right)\n    {\n        if (!right.Try(key, out var other) || !value.Equals(other))             return false;\n        return true;\n    }\n}";
-        var preferences = new[]
-        {
-            ("dress_embedded_statement_placement", "next_line"),
-            ("dress_embedded_statement_braces", "balanced"),
-            ("dress_braces_for_multiline_statement_header", "true"),
-            ("dress_binary_expressions_layout", "always_multi"),
-            ("csharp_new_line_before_open_brace", "all"),
-            ("csharp_preserve_single_line_blocks", "false"),
-            ("csharp_preserve_single_line_statements", "false"),
-            ("csharp_indent_block_contents", "true")
-        };
+        const string source = "class C\n{\n    bool Equal(C right)\n    {\n        if (!right.Try(key, out var other)\n            || !value.Equals(other))             return false;\n        return true;\n    }\n}";
+        var preferences = PreferenceCatalog.Defaults
+            .Select(preference => (preference.Key.ToName(), preference.Default))
+            .ToArray();
 
         var first = Format(source, preferences);
         var normalized = Lines(first);
 
-        Assert.Contains("if (!right.Try(key, out var other)\n            || !value.Equals(other))\n        {\n            return false;\n        }", normalized);
+        Assert.Contains("if (!right.Try(key, out var other) || !value.Equals(other))\n            return false;", normalized);
         Assert.Equal(first, Format(first, preferences));
     }
 

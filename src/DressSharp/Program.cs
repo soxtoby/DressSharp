@@ -55,7 +55,7 @@ static class Program
     {
         var target = new Option<string?>("--target") { Description = "EditorConfig file to initialize." };
         var force = new Option<bool>("--force");
-        var init = new Command("init", "Write the complete Familiar preset to a managed EditorConfig block.") { target, force };
+        var init = new Command("init", "Write the Default preferences to a managed EditorConfig block.") { target, force };
         init.SetAction(async (parseResult, cancellationToken) =>
             {
                 try

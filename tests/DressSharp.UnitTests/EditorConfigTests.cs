@@ -181,10 +181,10 @@ public sealed class EditorConfigTests : IDisposable
     }
 
     [Fact]
-    public async Task Familiar_block_matches_the_canonical_snapshot()
+    public async Task Default_preferences_match_the_canonical_snapshot()
     {
         var expected = await File.ReadAllTextAsync(
-            Path.Combine(AppContext.BaseDirectory, "Fixtures", "Familiar.editorconfig"),
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", "Default.editorconfig"),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(expected, EditorConfigInitializer.BuildManagedBlock());

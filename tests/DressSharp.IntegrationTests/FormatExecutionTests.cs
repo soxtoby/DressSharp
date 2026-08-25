@@ -67,6 +67,22 @@ public sealed class FormatExecutionTests : IDisposable
     }
 
     [Fact]
+    public async Task No_preferences_explain_how_to_initialize_editorconfig()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "root = true\n", Token);
+        var path = Source("class C { }");
+
+        var result = await Run(CommandKind.Format, path);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Matches($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$", result.Output);
+        ExactAssert.Text(
+            "warning: no EditorConfig preferences to apply; run 'dotnet dress init' to initialize .editorconfig."
+                + Environment.NewLine,
+            result.Error);
+    }
+
+    [Fact]
     public async Task Verbose_check_reports_emitter_skipped_occurrences_exactly()
     {
         var path = Source("class C\n{\nvoid M()\n{\n      retry:\nreturn +;\n}\n}");
