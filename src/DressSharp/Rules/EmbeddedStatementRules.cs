@@ -277,7 +277,7 @@ static class EmbeddedStatementBraces
             first.GetLocation().GetLineSpan().StartLinePosition.Line
             != last.GetLocation().GetLineSpan().EndLinePosition.Line;
 
-        static StatementSyntax Brace(StatementSyntax statement)
+        StatementSyntax Brace(StatementSyntax statement)
         {
             if (statement is BlockSyntax)
                 return statement;
@@ -286,10 +286,25 @@ static class EmbeddedStatementBraces
             if (statement is EmptyStatementSyntax)
                 return SyntaxFactory.Block().WithLeadingTrivia(leading).WithTrailingTrivia(trailing);
             var inner = statement.WithoutLeadingTrivia().WithoutTrailingTrivia();
-            return SyntaxFactory.Block(inner).WithLeadingTrivia(leading).WithTrailingTrivia(trailing);
+            var block = SyntaxFactory.Block(inner);
+            if (IsMultiline(statement))
+            {
+                var lineEnding = SyntaxFactory.EndOfLine(context.LineEnding);
+                block = block
+                    .WithOpenBraceToken(block.OpenBraceToken.WithTrailingTrivia(lineEnding))
+                    .WithStatements(SyntaxFactory.SingletonList(inner.WithTrailingTrivia(lineEnding)));
+            }
+            else
+            {
+                block = block
+                    .WithOpenBraceToken(block.OpenBraceToken.WithTrailingTrivia(SyntaxFactory.Space))
+                    .WithStatements(SyntaxFactory.SingletonList(inner.WithTrailingTrivia(SyntaxFactory.Space)));
+            }
+
+            return block.WithLeadingTrivia(leading).WithTrailingTrivia(trailing);
         }
 
-        static IfStatementSyntax BraceChain(IfStatementSyntax node)
+        IfStatementSyntax BraceChain(IfStatementSyntax node)
         {
             var statement = Brace(node.Statement);
             var alternative = node.Else switch

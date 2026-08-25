@@ -303,18 +303,23 @@ sealed class ForSemicolonSpacingRule(SpacingSide side) : PunctuationSpacingRule(
 
 sealed class DeclarationSpacingRule() : TokenSpacingRule(
     RuleKey.CSharpSpaceAroundDeclarationStatements,
-        ["true", "false"],
+    ["false", "ignore"],
     "declaration equals tokens")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.EqualsToken];
 
-    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference) =>
-        (left.IsKind(SyntaxKind.EqualsToken)
+    internal override bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference)
+    {
+        if (preference == "ignore")
+            return null;
+
+        return (left.IsKind(SyntaxKind.EqualsToken)
             || right.IsKind(SyntaxKind.EqualsToken))
-        && (left.Parent is EqualsValueClauseSyntax
-            || right.Parent is EqualsValueClauseSyntax)
-            ? preference == "true"
+            && (left.Parent is EqualsValueClauseSyntax
+                || right.Parent is EqualsValueClauseSyntax)
+            ? true
             : null;
+    }
 }
 
 enum BracketSpacingKind

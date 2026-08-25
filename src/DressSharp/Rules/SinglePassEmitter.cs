@@ -198,7 +198,9 @@ sealed class SinglePassEmitter
             return;
         }
 
-        if (PreservesSourceIndent(right) && _triviaLayout.HasLineBreak(index))
+        if (rightPiece.IsOriginal
+            && PreservesSourceIndent(right)
+            && _triviaLayout.HasLineBreak(index))
         {
             CopyGap(index);
             return;

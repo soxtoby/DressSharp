@@ -112,7 +112,7 @@ public class MicrosoftCompatibilityRuleTests
     [InlineData("csharp_space_before_dot", "true", "class C { string M() => this.ToString(); }", "this .ToString")]
     [InlineData("csharp_space_after_semicolon_in_for_statement", "false", "class C { void M() { for (int i = 0; i < 1; i++) { } } }", "0;i")]
     [InlineData("csharp_space_before_semicolon_in_for_statement", "true", "class C { void M() { for (int i = 0; i < 1; i++) { } } }", "0 ; i")]
-    [InlineData("csharp_space_around_declaration_statements", "false", "class C { void M() { int x = 1; } }", "x=1")]
+    [InlineData("csharp_space_around_declaration_statements", "false", "class C { void M() { int x  =  1; } }", "x = 1")]
     [InlineData("csharp_space_before_open_square_brackets", "true", "class C { int M(int[] x) => x[0]; }", "x [0]")]
     [InlineData("csharp_space_between_square_brackets", "true", "class C { int M(int[] x) => x[0]; }", "x[ 0 ]")]
     public void Applies_spacing_value(string key, string value, string source, string expected)
@@ -120,6 +120,14 @@ public class MicrosoftCompatibilityRuleTests
         var first = Transform(source, (key, value));
         Assert.Contains(expected, first);
         Assert.Equal(first, Transform(first, (key, value)));
+    }
+
+    [Fact]
+    public void Declaration_spacing_ignore_preserves_existing_spaces()
+    {
+        const string source = "class C { void M() { int x  =  1; } }";
+
+        Assert.Equal(source, Transform(source, ("csharp_space_around_declaration_statements", "ignore")));
     }
 
     [Theory]

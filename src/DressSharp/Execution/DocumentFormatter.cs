@@ -17,6 +17,7 @@ sealed class DocumentFormatter
     readonly RuleSettings _settings;
     readonly RepresentationPreferences _representation;
     readonly EmbeddedStatementSettings _embeddedStatements;
+    readonly bool _stabilizeAutoWrapping;
 
     internal DocumentFormatter(FormattingConfiguration configuration, BenchmarkTiming timing)
     {
@@ -32,6 +33,9 @@ sealed class DocumentFormatter
             _settings,
             _emitterPlan);
         _representation = Representation(configuration);
+        _stabilizeAutoWrapping = _settings.MaximumLineLength != int.MaxValue
+            && RuleCatalog.BuiltIn.SyntaxWrappingRules.Any(rule =>
+                configuration.Preferences.GetValueOrDefault(rule.Metadata.RuleKey) == "auto");
     }
 
     internal async ValueTask<FormattedDocument> Format(SourceDocument document, CSharpParseOptions options, CancellationToken cancellationToken)
@@ -67,10 +71,30 @@ sealed class DocumentFormatter
         CancellationToken cancellationToken)
     {
         var transformStart = Stopwatch.GetTimestamp();
+        var transformed = TransformOnce(root, source, options, cancellationToken);
+        if (_stabilizeAutoWrapping && transformed.Text != source)
+        {
+            var stabilizedRoot = ParseCandidate(transformed.Text, options, cancellationToken);
+            transformed = TransformOnce(
+                stabilizedRoot,
+                transformed.Text,
+                options,
+                cancellationToken);
+        }
+
+        _timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
+        return transformed;
+    }
+
+    TransformedDocument TransformOnce(
+        SyntaxNode root,
+        string source,
+        CSharpParseOptions options,
+        CancellationToken cancellationToken)
+    {
         var structural = ApplyFileScopedRules(root);
         var text = ReferenceEquals(structural.Root, root) ? source : structural.Root.ToFullString();
         var emitted = Emit(structural.Root, text, options, cancellationToken);
-        _timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
         return new(
             emitted.Text,
             structural.SkippedOccurrences + emitted.SkippedOccurrences);

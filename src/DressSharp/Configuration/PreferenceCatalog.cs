@@ -114,6 +114,9 @@ static class PreferenceCatalog
         if (name == "csharp_space_between_parentheses")
             return value.Equals("false", StringComparison.OrdinalIgnoreCase) ||
                 IsSubset(value, "control_flow_statements expressions type_casts");
+        if (name == "csharp_space_around_declaration_statements")
+            return value.Equals("false", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("ignore", StringComparison.OrdinalIgnoreCase);
         if (BooleanValues.Contains(sample))
             return BooleanValues.Contains(value);
         if (name == "indent_size" && value.Equals("tab", StringComparison.OrdinalIgnoreCase))

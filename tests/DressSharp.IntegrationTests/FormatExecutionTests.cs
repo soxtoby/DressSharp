@@ -1,4 +1,5 @@
 using DressSharp.CommandLine;
+using DressSharp.Configuration;
 using DressSharp.Execution;
 using DressSharp.TestSupport;
 using Xunit;
@@ -47,6 +48,52 @@ public sealed class FormatExecutionTests : IDisposable
         ExactAssert.Text(string.Empty, first.Error + second.Error);
         Assert.Contains("int a, int b", formatted);
         Assert.EndsWith("\n", formatted);
+        Assert.Equal(timestamp, File.GetLastWriteTimeUtc(path));
+    }
+
+    [Fact]
+    public async Task Initialized_defaults_keep_required_spacing_and_layout_generated_braces()
+    {
+        await EditorConfigInitializer.InitializeAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            _directory,
+            Token);
+        var path = Source("""
+            class C
+            {
+                static readonly Dictionary<string, string> Values = new();
+
+                bool Matches(string value)
+                {
+                    if (value == "first")
+                        return value.Equals("first", StringComparison.OrdinalIgnoreCase)
+                            || value.Equals("second", StringComparison.OrdinalIgnoreCase)
+                            || value.Equals("third", StringComparison.OrdinalIgnoreCase);
+                    return false;
+                }
+
+                object Resolve(object[] paths)
+                {
+                    var configurations = paths;
+                    return paths
+                        .Select((path, index) => (path, configuration: configurations[index]))
+                        .ToDictionary(pair => pair.path, pair => pair.configuration, StringComparer.OrdinalIgnoreCase);
+                }
+            }
+            """);
+
+        var result = await Run(CommandKind.Format, path);
+        var formatted = await File.ReadAllTextAsync(path, Token);
+        var timestamp = File.GetLastWriteTimeUtc(path);
+        var second = await Run(CommandKind.Format, path);
+        var formattedAgain = await File.ReadAllTextAsync(path, Token);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(formatted, formattedAgain);
+        Assert.Matches($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$", second.Output);
+        Assert.Contains("Values = new();", formatted);
+        Assert.Contains("\n        {\n            return value.Equals", formatted);
+        Assert.DoesNotContain("{return", formatted);
         Assert.Equal(timestamp, File.GetLastWriteTimeUtc(path));
     }
 
