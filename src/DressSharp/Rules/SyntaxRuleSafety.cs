@@ -7,7 +7,14 @@ static class SyntaxRuleSafety
 {
     internal static bool CanRewrite(SyntaxNode node, RuleContext context) =>
         !context.IsUnsafe(node)
-        && node.DescendantTrivia(descendIntoTrivia: true).None(trivia =>
+        && HasNoSignificantTrivia(node);
+
+    internal static bool CanRewriteWithoutCounting(SyntaxNode node, RuleContext context) =>
+        !context.IsUnsafeWithoutCounting(node)
+        && HasNoSignificantTrivia(node);
+
+    static bool HasNoSignificantTrivia(SyntaxNode node) =>
+        node.DescendantTrivia(descendIntoTrivia: true).None(trivia =>
             trivia.IsDirective
             || trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
             || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)

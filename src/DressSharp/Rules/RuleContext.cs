@@ -75,6 +75,7 @@ sealed class RuleContext
 
     internal bool IsUnsafe(SyntaxNode node) => IsUnsafe(node.FullSpan);
     internal bool IsUnsafe(SyntaxToken token) => IsUnsafe(token.FullSpan);
+    internal bool IsUnsafeWithoutCounting(SyntaxNode node) => MalformedRegions.Intersects(node.FullSpan);
 
     internal bool IsUnsafe(TextSpan occurrence)
     {

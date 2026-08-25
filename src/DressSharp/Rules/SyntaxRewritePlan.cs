@@ -27,16 +27,20 @@ sealed class SyntaxRewritePlan
 
     internal readonly record struct Replacement(TextSpan Original, SyntaxNode Rewritten, string Text);
 
-    internal static SyntaxRewritePlan For(SyntaxNode root, MemberRuleSet rules, RuleContext context)
+    internal static SyntaxRewritePlan For(
+        SyntaxNode root,
+        MemberRuleSet rules,
+        RuleContext context,
+        Func<SyntaxNode, SyntaxNode>? finishMember = null)
     {
-        if (rules.IsEmpty)
+        if (rules.IsEmpty && finishMember is null)
             return Empty;
 
         List<Replacement>? replacements = null;
         foreach (var member in Members(root))
         {
             var claims = rules.ClaimsFor(member);
-            if (claims == 0)
+            if (claims == 0 && finishMember is null)
                 continue;
 
             var current = member;
@@ -45,6 +49,9 @@ sealed class SyntaxRewritePlan
                 if ((claims & (1UL << index)) != 0)
                     current = rules.Transform(index, current, context);
             }
+
+            if (finishMember is not null)
+                current = finishMember(current);
 
             if (!ReferenceEquals(current, member))
                 (replacements ??= []).Add(new(member.FullSpan, current, current.ToFullString()));
@@ -168,4 +175,6 @@ sealed class MemberRuleSet
 
         return new(prepared, kindBits, allWanted);
     }
+
+    internal static MemberRuleSet Empty { get; } = new([], [], 0);
 }

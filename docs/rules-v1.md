@@ -8,7 +8,9 @@ Every rule is independently selected. Missing values and `unset` make no change.
 | --- | --- | --- |
 | `dress_method_body`, `dress_constructor_body`, `dress_operator_body`, `dress_property_body`, `dress_indexer_body`, `dress_accessor_body`, `dress_lambda_body` | `block`, `expression` | Corresponding declarations or lambdas |
 | `dress_namespace_style` | `file_scoped`, `block_scoped` | Namespace declarations |
-| `dress_conditional_braces` | `compact`, `always`, `balanced` | Complete `if`/`else` chains |
+| `dress_embedded_statement_placement` | `same_line`, `next_line` | Embedded statements of `if`/`else`, `while`, `do`, `for`, `foreach`, `using`, `lock`, and `fixed` |
+| `dress_embedded_statement_braces` | `compact`, `balanced`, `always` | Brace-optional embedded statements; `balanced` makes each `if`/`else` chain uniform |
+| `dress_braces_for_multiline_statement_header` | `true`, `false` | Adds braces when the owning statement header is multiline |
 | `dress_arguments_layout`, `dress_parameters_layout`, `dress_initializers_layout`, `dress_collection_expressions_layout`, `dress_base_type_lists_layout`, `dress_constraint_clauses_layout`, `dress_member_access_chains_layout`, `dress_binary_expressions_layout`, `dress_conditional_expressions_layout`, `dress_query_clauses_layout`, `dress_attributes_layout` | `always_single`, `auto`, `always_multi` | Named syntax shape |
 | `dress_blank_lines_around_namespaces`, `dress_blank_lines_around_types`, `dress_blank_lines_between_members`, `dress_blank_lines_between_using_groups`, `dress_blank_lines_between_member_categories`, `dress_max_consecutive_blank_lines` | Non-negative integer | Blank-line layout |
 | `dress_line_comment_spacing`, `dress_block_comment_spacing` | `none`, `single` | Comment interior spacing |
@@ -20,6 +22,10 @@ Every rule is independently selected. Missing values and `unset` make no change.
 | `dress_object_initializer_indentation`, `dress_collection_initializer_indentation`, `dress_array_initializer_indentation`, `dress_with_initializer_indentation`, `dress_collection_expression_indentation` | `indented`, `not_indented` | Named initializer |
 
 `dress_xml_element_layout` preserves nested XML elements and `/** */` documentation comments unchanged.
+
+Embedded-statement placement applies to braced and unbraced bodies. `same_line` uses one space; `next_line` uses one configured newline and computed indentation. Comments and directives prevent rewriting their boundary, and `else if` remains a chain continuation. Placement overrides `csharp_new_line_before_open_brace` for these bodies.
+
+`compact` uses braces only for planned multiline bodies or multiline headers when enabled. `balanced` applies the same test, then makes an entire `if`/`else if`/`else` chain uniform. `always` braces every supported body. Planned layout includes wrapping, but excludes the body's outer placement and braces. Empty bodies become `;` under `compact`/`balanced` and `{ }` under `always`, subject to syntax-safety constraints.
 
 ## Standard EditorConfig rules
 

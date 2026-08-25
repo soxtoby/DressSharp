@@ -16,6 +16,7 @@ sealed class DocumentFormatter
     readonly MemberRuleSet _memberRules;
     readonly RuleSettings _settings;
     readonly RepresentationPreferences _representation;
+    readonly EmbeddedStatementSettings _embeddedStatements;
 
     internal DocumentFormatter(FormattingConfiguration configuration, BenchmarkTiming timing)
     {
@@ -24,6 +25,7 @@ sealed class DocumentFormatter
         _emitterPlan = EmitterPlan.From(RuleCatalog.BuiltIn, configuration);
         _memberRules = MemberRuleSet.From(RuleCatalog.BuiltIn, configuration);
         _settings = RuleSettings.From(configuration);
+        _embeddedStatements = EmbeddedStatementSettings.From(configuration);
         _layoutPlanner = new(
             RuleCatalog.BuiltIn,
             configuration,
@@ -35,9 +37,16 @@ sealed class DocumentFormatter
     internal async ValueTask<FormattedDocument> Format(SourceDocument document, CSharpParseOptions options, CancellationToken cancellationToken)
     {
         var root = await Parse(document, options, cancellationToken);
-        var transformed = Transform(root, document.Text);
+        var transformed = Transform(root, document.Text, options, cancellationToken);
         return new(Encode(document, transformed.Text), transformed.SkippedOccurrences);
     }
+
+    internal string FormatSyntax(
+        SyntaxNode root,
+        string source,
+        CSharpParseOptions options,
+        CancellationToken cancellationToken = default) =>
+        Transform(root, source, options, cancellationToken).Text;
 
     async ValueTask<SyntaxNode> Parse(
         SourceDocument document,
@@ -51,12 +60,16 @@ sealed class DocumentFormatter
         return root;
     }
 
-    TransformedDocument Transform(SyntaxNode root, string source)
+    TransformedDocument Transform(
+        SyntaxNode root,
+        string source,
+        CSharpParseOptions options,
+        CancellationToken cancellationToken)
     {
         var transformStart = Stopwatch.GetTimestamp();
         var structural = ApplyFileScopedRules(root);
         var text = ReferenceEquals(structural.Root, root) ? source : structural.Root.ToFullString();
-        var emitted = Emit(structural.Root, text);
+        var emitted = Emit(structural.Root, text, options, cancellationToken);
         _timing.AddTransform(Stopwatch.GetElapsedTime(transformStart));
         return new(
             emitted.Text,
@@ -73,12 +86,68 @@ sealed class DocumentFormatter
             : throw structural.Failure;
     }
 
-    EmittedDocument Emit(SyntaxNode root, string text)
+    EmittedDocument Emit(
+        SyntaxNode root,
+        string text,
+        CSharpParseOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (!_embeddedStatements.NeedsBracePlanning)
+        {
+            var only = EmitStage(root, text, _memberRules);
+            return new(only.Text, only.RewriteSkippedOccurrences + only.LayoutSkippedOccurrences);
+        }
+
+        var candidate = EmitStage(
+            root,
+            text,
+            _memberRules,
+            _embeddedStatements.NeedsBraceFreeCandidate
+                ? EmbeddedStatementBraces.MinimizeMember
+                : null);
+        var candidateRoot = ParseCandidate(candidate.Text, options, cancellationToken);
+        var final = EmitStage(
+            candidateRoot,
+            candidate.Text,
+            MemberRuleSet.Empty,
+            (member, context) => EmbeddedStatementBraces.ApplyMember(
+                member,
+                _embeddedStatements,
+                context));
+        return new(
+            final.Text,
+            candidate.RewriteSkippedOccurrences
+                + final.RewriteSkippedOccurrences
+                + final.LayoutSkippedOccurrences);
+    }
+
+    SyntaxNode ParseCandidate(string text, CSharpParseOptions options, CancellationToken cancellationToken)
+    {
+        var parseStart = Stopwatch.GetTimestamp();
+        var root = CSharpSyntaxTree.ParseText(
+                text,
+                options,
+                cancellationToken: cancellationToken)
+            .GetRoot(cancellationToken);
+        _timing.AddParse(Stopwatch.GetElapsedTime(parseStart));
+        return root;
+    }
+
+    EmissionStage EmitStage(
+        SyntaxNode root,
+        string text,
+        MemberRuleSet memberRules,
+        Func<SyntaxNode, RuleContext, SyntaxNode>? finishMember = null)
     {
         // The rest are scoped to the member they change, so a member no rule wants
         // is never copied, and the file's tree is never rebuilt around one that is.
         var ruleContext = new RuleContext(root, _settings);
-        var rewrites = SyntaxRewritePlan.For(root, _memberRules, ruleContext);
+        var rewrites = SyntaxRewritePlan.For(
+            root,
+            memberRules,
+            ruleContext,
+            finishMember is null ? null : member => finishMember(member, ruleContext));
+        var rewriteSkipped = ruleContext.TakeSkippedOccurrences();
         var layout = _layoutPlanner.Plan(
             root,
             text,
@@ -92,6 +161,7 @@ sealed class DocumentFormatter
             layout);
         return new(
             formatted,
+            rewriteSkipped,
             layout.SkippedOccurrences + ruleContext.TakeSkippedOccurrences());
     }
 
@@ -132,4 +202,5 @@ sealed class DocumentFormatter
 
 sealed record TransformedDocument(string Text, int SkippedOccurrences);
 sealed record EmittedDocument(string Text, int SkippedOccurrences);
+sealed record EmissionStage(string Text, int RewriteSkippedOccurrences, int LayoutSkippedOccurrences);
 sealed record FormattedDocument(ReadOnlyMemory<byte> Content, int SkippedOccurrences);

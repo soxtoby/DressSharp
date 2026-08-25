@@ -32,8 +32,25 @@ sealed class RuleCatalog
                 new MemberBodyRule(RuleKey.DressIndexerBody, MemberBodyKind.Indexer),
                 new MemberBodyRule(RuleKey.DressAccessorBody, MemberBodyKind.Accessor),
                 new LambdaBodyRule(),
-                new ConditionalBracesRule(),
                 new ModifierOrderRule()
+            ];
+        EmbeddedStatementRules =
+            [
+                new EmbeddedStatementPreferenceRule(
+                    RuleKey.DressEmbeddedStatementPlacement,
+                    ["same_line", "next_line"],
+                    "the boundary before brace-optional embedded statements",
+                    "Only boundary whitespace changes"),
+                new EmbeddedStatementPreferenceRule(
+                    RuleKey.DressEmbeddedStatementBraces,
+                    ["compact", "balanced", "always"],
+                    "brace-optional embedded statements",
+                    "Brace changes preserve control flow and use planned body layout"),
+                new EmbeddedStatementPreferenceRule(
+                    RuleKey.DressBracesForMultilineStatementHeader,
+                    ["true", "false"],
+                    "multiline statement headers owning brace-optional embedded statements",
+                    "A multiline statement header contributes only a brace constraint")
             ];
         SpacingRules =
             [
@@ -129,6 +146,7 @@ sealed class RuleCatalog
             .Concat(BlankLineRules)
             .Concat(CommentRules)
             .Concat(MemberRules)
+            .Concat(EmbeddedStatementRules)
             .Concat(InitializerIndentationRules)
             .Concat(SpacingRules)
             .Concat(PreservationRules)
@@ -144,6 +162,7 @@ sealed class RuleCatalog
     internal ImmutableArray<ISyntaxFormattingRule> FileRules { get; }
     internal ImmutableArray<IUsingFormattingRule> UsingRules { get; }
     internal ImmutableArray<ISyntaxFormattingRule> MemberRules { get; }
+    internal ImmutableArray<IFormattingRule> EmbeddedStatementRules { get; }
     internal ImmutableArray<TokenSpacingRule> SpacingRules { get; }
     internal ImmutableArray<NewLineRule> NewLineRules { get; }
     internal ImmutableArray<IndentationRule> IndentationRules { get; }

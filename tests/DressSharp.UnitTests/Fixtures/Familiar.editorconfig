@@ -85,5 +85,7 @@ dress_indexer_body = expression
 dress_accessor_body = expression
 dress_lambda_body = expression
 dress_namespace_style = file_scoped
-dress_conditional_braces = balanced
+dress_embedded_statement_placement = next_line
+dress_embedded_statement_braces = balanced
+dress_braces_for_multiline_statement_header = true
 # DressSharp End

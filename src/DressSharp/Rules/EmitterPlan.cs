@@ -30,7 +30,8 @@ sealed class EmitterPlan
         bool? indentCaseContentsWhenBlock,
         bool expandSingleLineBlocks,
         bool separateSingleLineStatements,
-        bool?[] initializerIndentations)
+        bool?[] initializerIndentations,
+        EmbeddedStatementSettings embeddedStatements)
     {
         Spacing = spacing;
         NewLines = newLines;
@@ -49,6 +50,7 @@ sealed class EmitterPlan
         ExpandSingleLineBlocks = expandSingleLineBlocks;
         SeparateSingleLineStatements = separateSingleLineStatements;
         _initializerIndentations = initializerIndentations;
+        EmbeddedStatements = embeddedStatements;
     }
 
     internal (TokenSpacingRule Rule, string Preference)[] Spacing { get; }
@@ -63,9 +65,8 @@ sealed class EmitterPlan
     internal bool? IndentCaseContentsWhenBlock { get; }
     internal bool ExpandSingleLineBlocks { get; }
     internal bool SeparateSingleLineStatements { get; }
+    internal EmbeddedStatementSettings EmbeddedStatements { get; }
     internal ulong LaterElementRules { get; }
-    internal string LineEnding { get; init; } = "\n";
-
     /// <summary>
     /// The bit set of spacing rules that could claim a pair containing a token of this kind.
     /// </summary>
@@ -164,7 +165,8 @@ sealed class EmitterPlan
             OptionalBoolean(configuration, RuleKey.CSharpIndentCaseContentsWhenBlock),
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == false,
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineStatements) == false,
-            initializerIndentations);
+            initializerIndentations,
+            EmbeddedStatementSettings.From(configuration));
     }
 
     static bool? OptionalBoolean(FormattingConfiguration configuration, RuleKey key) =>

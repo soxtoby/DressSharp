@@ -38,7 +38,10 @@ public sealed class SmokeTests
 
             Assert.Equal(0, exitCode);
             Assert.True(File.Exists(target));
-            Assert.Contains("dress_conditional_braces = balanced", await File.ReadAllTextAsync(target, TestContext.Current.CancellationToken));
+            var text = await File.ReadAllTextAsync(target, TestContext.Current.CancellationToken);
+            Assert.Contains("dress_embedded_statement_placement = next_line", text);
+            Assert.Contains("dress_embedded_statement_braces = balanced", text);
+            Assert.Contains("dress_braces_for_multiline_statement_header = true", text);
         }
         finally
         {

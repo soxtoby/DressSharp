@@ -14,7 +14,7 @@ The `dotnet dress` command that invokes DressSharp. The product name remains **D
 The process working directory from which `dotnet dress` is invoked. It is the default discovery root and the preferred base for displayed relative paths.
 
 **Formatting rule**:
-The smallest independently selectable transformation. One formatting rule owns one syntax surface and is controlled by exactly one formatting preference.
+The smallest independently selectable formatting decision. One formatting rule is controlled by exactly one formatting preference; compatible rules may contribute constraints to the same planned transformation.
 
 **Formatting preference**:
 An EditorConfig key and value that selects a formatting rule's outcome. Missing or `unset` preferences select no outcome, so the rule makes no change.
@@ -39,6 +39,10 @@ The fixed order in which formatting rules run within a file. Files may be proces
 
 **Layout mode**:
 An explicit wrapping outcome for one supported syntax shape: `always_single`, `auto`, or `always_multi`. `auto` uses the shared maximum line length; an unspecified layout preference makes no change.
+
+**Statement header**:
+The controlling syntax of a statement that owns an embedded statement, excluding the embedded statement itself. For a `do` statement, it includes the trailing `while` clause.
+_Avoid_: Header, control header
 
 **Parse context**:
 The effective language version, preprocessor symbols, source kind, and documentation mode used to parse one file. It comes from the file's selected MSBuild project context or, for an unowned file, its implicit file-app project.

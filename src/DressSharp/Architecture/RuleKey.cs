@@ -94,7 +94,9 @@ enum RuleKey
     DressAccessorBody,
     DressLambdaBody,
     DressNamespaceStyle,
-    DressConditionalBraces
+    DressEmbeddedStatementPlacement,
+    DressEmbeddedStatementBraces,
+    DressBracesForMultilineStatementHeader
 }
 
 static class RuleKeys

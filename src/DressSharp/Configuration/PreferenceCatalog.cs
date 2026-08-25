@@ -93,7 +93,9 @@ static class PreferenceCatalog
             (RuleKey.DressAccessorBody, "expression"),
             (RuleKey.DressLambdaBody, "expression"),
             (RuleKey.DressNamespaceStyle, "file_scoped"),
-            (RuleKey.DressConditionalBraces, "balanced")
+            (RuleKey.DressEmbeddedStatementPlacement, "next_line"),
+            (RuleKey.DressEmbeddedStatementBraces, "balanced"),
+            (RuleKey.DressBracesForMultilineStatementHeader, "true")
         ];
 
     static readonly Dictionary<RuleKey, string> DefaultsByKey = Defaults.ToDictionary(item => item.Key, item => item.Default);
@@ -145,7 +147,8 @@ static class PreferenceCatalog
                 "dress_attached_comment_placement" => "same_line own_line auto",
                 "dress_xml_comment_placement" => "attached separated",
                 "dress_namespace_style" => "file_scoped block_scoped",
-                "dress_conditional_braces" => "compact always balanced",
+                "dress_embedded_statement_placement" => "same_line next_line",
+                "dress_embedded_statement_braces" => "compact always balanced",
                 "dress_global_using_order" => "first last mixed",
                 var n when n.EndsWith("_body", StringComparison.Ordinal) => "block expression",
                 _ => sample

@@ -43,7 +43,7 @@ public class SyntaxConversionRuleTests
     [InlineData("balanced", "if (a) { A(); } else if (b) { B(); C(); } else { D(); }", "if (a) { A(); } else if (b) { B(); C(); } else { D(); }")]
     [InlineData("balanced", "if (a) { A(); } else { B(); }", "if (a) A(); else B();")]
     public void Converts_complete_conditional_chains(string preference, string source, string expected) =>
-        AssertEquivalent(expected, Transform($"class C {{ void M() {{ {source} }} }}", ("dress_conditional_braces", preference)), wrap: true);
+        AssertEquivalent(expected, Transform($"class C {{ void M() {{ {source} }} }}", ("dress_embedded_statement_braces", preference)), wrap: true);
 
     [Fact]
     public void Unsafe_occurrences_are_skipped_while_safe_occurrences_continue()
@@ -60,7 +60,7 @@ public class SyntaxConversionRuleTests
     public void Directives_and_dangling_else_prevent_only_unsafe_brace_removal()
     {
         const string source = "class C { void M() { if (a) { if (b) A(); } else { B(); } if (c) {\n#if X\n C();\n#endif\n} if (d) { D(); } } }";
-        var result = Normalize(Transform(source, ("dress_conditional_braces", "compact")));
+        var result = Normalize(Transform(source, ("dress_embedded_statement_braces", "compact")));
         Assert.Contains("if (a) { if (b) A(); } else B();", result);
         Assert.Contains("#if X", result);
         Assert.Contains("if (d) D();", result);
@@ -70,7 +70,7 @@ public class SyntaxConversionRuleTests
     public void Built_in_rules_are_independently_selectable_deterministic_and_idempotent()
     {
         const string source = "namespace N { class C { int P { get { return 1; } } int M() { return P; } void V() { if (P > 0) { M(); } else { V(); } } } }";
-        var preferences = new[] { ("dress_method_body", "expression"), ("dress_property_body", "expression"), ("dress_namespace_style", "file_scoped"), ("dress_conditional_braces", "balanced") };
+        var preferences = new[] { ("dress_method_body", "expression"), ("dress_property_body", "expression"), ("dress_namespace_style", "file_scoped"), ("dress_embedded_statement_braces", "balanced") };
         var first = Transform(source, preferences);
         var second = Transform(first, preferences);
         Assert.Equal(first, second);

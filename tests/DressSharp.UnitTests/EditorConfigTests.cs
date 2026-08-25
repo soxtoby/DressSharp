@@ -104,6 +104,9 @@ public sealed class EditorConfigTests : IDisposable
     [InlineData("csharp_new_line_before_open_brace", "methods,unknown")]
     [InlineData("csharp_space_between_parentheses", "expressions,expressions")]
     [InlineData("csharp_preferred_modifier_order", "public,private")]
+    [InlineData("dress_embedded_statement_placement", "separate_line")]
+    [InlineData("dress_embedded_statement_braces", "never")]
+    [InlineData("dress_braces_for_multiline_statement_header", "sometimes")]
     public async Task Resolver_rejects_invalid_catalog_values(string key, string value)
     {
         await File.WriteAllTextAsync(
@@ -121,6 +124,9 @@ public sealed class EditorConfigTests : IDisposable
     [InlineData("dress_using_kind_order", "alias,ordinary,static")]
     [InlineData("csharp_new_line_before_open_brace", "methods, properties")]
     [InlineData("csharp_space_between_parentheses", "expressions, type_casts")]
+    [InlineData("dress_embedded_statement_placement", "same_line")]
+    [InlineData("dress_embedded_statement_braces", "compact")]
+    [InlineData("dress_braces_for_multiline_statement_header", "false")]
     public async Task Resolver_accepts_catalog_alternatives(string key, string value)
     {
         await File.WriteAllTextAsync(
@@ -164,7 +170,9 @@ public sealed class EditorConfigTests : IDisposable
         Assert.True(result.Changed);
         Assert.Equal(EditorConfigInitializer.BuildManagedBlock(), text);
         Assert.DoesNotContain("root = true", text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("dress_conditional_braces = balanced\n", text);
+        Assert.Contains("dress_embedded_statement_placement = next_line\n", text);
+        Assert.Contains("dress_embedded_statement_braces = balanced\n", text);
+        Assert.Contains("dress_braces_for_multiline_statement_header = true\n", text);
         Assert.DoesNotContain("dress_control_flow_braces", text);
         foreach (var (key, value) in PreferenceCatalog.Defaults)
         {

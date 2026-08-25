@@ -161,6 +161,15 @@ sealed class SinglePassEmitter
             return;
         }
 
+        if (EmbeddedStatementBreak(right) is { } embeddedStatementBreak)
+        {
+            if (embeddedStatementBreak)
+                StartLine(right);
+            else
+                Append(" ");
+            return;
+        }
+
         // New-line rules follow syntax wrapping in catalog order, so they get the last word on a
         // boundary both rules own.
         if (ClaimsBreak(right) is { } wantsBreak)
@@ -331,9 +340,19 @@ sealed class SinglePassEmitter
         return null;
     }
 
+    bool? EmbeddedStatementBreak(SyntaxToken token)
+    {
+        var placement = _plan.EmbeddedStatements.Placement;
+        return placement is null
+            || _checkMalformedRegions && IsUnsafeOriginal(token)
+            || !EmbeddedStatements.StartsBody(token, out _)
+                ? null
+                : placement == "next_line";
+    }
+
     void StartLine(SyntaxToken token)
     {
-        _output.Append(_plan.LineEnding);
+        _output.Append(_context.LineEnding);
         WriteIndent(token);
     }
 
@@ -372,6 +391,15 @@ sealed class SinglePassEmitter
 
         if (CaseBlockIndent(token) is { } caseBlockIndent)
             return caseBlockIndent;
+
+        if (EmbeddedStatements.StartsBody(token, out var embeddedStatement)
+            && (!_checkMalformedRegions || !IsUnsafeOriginal(embeddedStatement)))
+        {
+            return _contentIndents[^1]
+                + string.Concat(Enumerable.Repeat(
+                    _plan.IndentUnit,
+                    EmbeddedStatements.UnbracedDepth(embeddedStatement)));
+        }
 
         if (_plan.IndentCaseContents is { } indentCaseContents
             && DirectSwitchSectionStatement(token) is { } section
