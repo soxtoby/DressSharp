@@ -30,6 +30,7 @@ sealed class SinglePassEmitter
 
     int _column;
     string _lineIndent = "";
+    string _previousLineIndent = "";
     bool _previousGapHadMeaningfulTrivia;
     SwitchSectionSyntax? _lastCaseBlockSection;
     bool _lastCaseBlockSectionIsSafe;
@@ -43,6 +44,9 @@ sealed class SinglePassEmitter
     readonly List<string> _contentIndents = [""];
     readonly Stack<string> _braceIndents = new();
     readonly Stack<InitializerFrame> _initializerFrames = new();
+    readonly Dictionary<SyntaxNode, string> _emittedContentIndents = [];
+    readonly Dictionary<SyntaxToken, string> _sourceIndents = [];
+    readonly HashSet<SyntaxToken> _originalTokens = [];
 
     readonly record struct InitializerFrame(SyntaxNode Initializer, string Indent);
 
@@ -61,6 +65,21 @@ sealed class SinglePassEmitter
         _root = root;
         _checkMalformedRegions = checkMalformedRegions;
         _pieces = layout.Stream.Pieces;
+        var segmentStarts = new Dictionary<int, int>();
+        foreach (var piece in _pieces)
+        {
+            if (!piece.IsOriginal)
+                segmentStarts.TryAdd(piece.SegmentIndex, piece.Token.FullSpan.Start);
+        }
+        foreach (var piece in _pieces)
+        {
+            if (piece.IsOriginal)
+                _originalTokens.Add(piece.Token);
+            var position = piece.IsOriginal
+                ? piece.Token.SpanStart
+                : piece.Token.SpanStart - segmentStarts[piece.SegmentIndex];
+            _sourceIndents.TryAdd(piece.Token, SourceIndent(piece.Source, position));
+        }
         _output = new StringBuilder(capacity);
     }
 
@@ -97,6 +116,7 @@ sealed class SinglePassEmitter
                 EmitGap(pair, index);
             }
 
+            RememberDirectContentIndent(piece.Token);
             EnterOrLeave(piece.Token);
             Append(piece.Token.Text);
         }
@@ -161,6 +181,33 @@ sealed class SinglePassEmitter
             return;
         }
 
+        if (_syntaxWrapping.GapBefore(index - 1) is not null
+            && IsWrappedExpressionOperator(left))
+        {
+            pair.Reset(left, right);
+            if (DesiredSpace(
+                    pair,
+                    boundaryBeforeLeft,
+                    leftPiece.IsOriginal && rightPiece.IsOriginal) != false)
+            {
+                Append(" ");
+            }
+            return;
+        }
+
+        if ((!leftPiece.IsOriginal
+                && left.IsKind(SyntaxKind.OpenBraceToken)
+                && left.Parent is BlockSyntax leftBlock
+                && leftBlock.HasAnnotation(GeneratedSyntax.Block))
+            || (!rightPiece.IsOriginal
+                && right.IsKind(SyntaxKind.CloseBraceToken)
+                && right.Parent is BlockSyntax rightBlock
+                && rightBlock.HasAnnotation(GeneratedSyntax.Block)))
+        {
+            StartLine(right);
+            return;
+        }
+
         if (EmbeddedStatementBreak(right) is { } embeddedStatementBreak)
         {
             if (embeddedStatementBreak)
@@ -172,7 +219,7 @@ sealed class SinglePassEmitter
 
         // New-line rules follow syntax wrapping in catalog order, so they get the last word on a
         // boundary both rules own.
-        if (ClaimsBreak(right) is { } wantsBreak)
+        if (ClaimsBreak(right, rightPiece.IsOriginal) is { } wantsBreak)
         {
             if (wantsBreak)
                 StartLine(right);
@@ -193,13 +240,12 @@ sealed class SinglePassEmitter
         if (preservationBreaks != 0)
         {
             for (var count = 0; count < preservationBreaks; count++)
-                _output.Append(_context.LineEnding);
+                Append(_context.LineEnding);
             WriteIndent(right);
             return;
         }
 
-        if (rightPiece.IsOriginal
-            && PreservesSourceIndent(right)
+        if (PreservesSourceIndent(right)
             && _triviaLayout.HasLineBreak(index))
         {
             CopyGap(index);
@@ -323,8 +369,17 @@ sealed class SinglePassEmitter
         Copy(right.Source, right.Token.FullSpan.Start, right.Token.SpanStart);
     }
 
-    bool? ClaimsBreak(SyntaxToken token)
+    bool? ClaimsBreak(SyntaxToken token, bool original)
     {
+        if (_plan.PreserveSingleLineBlocks
+            && original
+            && token.IsKind(SyntaxKind.OpenBraceToken)
+            && SingleLineBraceOwner(token, true) is { } owner
+            && IsSafeSingleLine(owner))
+        {
+            return false;
+        }
+
         var candidates = _plan.NewLineTrigger(token.RawKind);
         if (candidates == 0 || _checkMalformedRegions && IsUnsafeOriginal(token))
             return null;
@@ -354,7 +409,7 @@ sealed class SinglePassEmitter
 
     void StartLine(SyntaxToken token)
     {
-        _output.Append(_context.LineEnding);
+        Append(_context.LineEnding);
         WriteIndent(token);
     }
 
@@ -394,6 +449,19 @@ sealed class SinglePassEmitter
         if (CaseBlockIndent(token) is { } caseBlockIndent)
             return caseBlockIndent;
 
+        if (token.IsKind(SyntaxKind.OpenBraceToken)
+            && token.Parent is SwitchExpressionSyntax
+            && _plan.IndentBraces is { } indentSwitchExpressionBrace)
+        {
+            return _previousLineIndent + (indentSwitchExpressionBrace ? _plan.IndentUnit : "");
+        }
+
+        if (token.IsKind(SyntaxKind.OpenBraceToken)
+            && _plan.IndentBraces is { } indentBrace)
+        {
+            return _contentIndents[^1] + (indentBrace ? _plan.IndentUnit : "");
+        }
+
         if (EmbeddedStatements.StartsBody(token, out var embeddedStatement)
             && (!_checkMalformedRegions || !IsUnsafeOriginal(embeddedStatement)))
         {
@@ -409,6 +477,14 @@ sealed class SinglePassEmitter
         {
             var labelIndent = SwitchLabelIndent();
             return labelIndent + (indentCaseContents ? _plan.IndentUnit : "");
+        }
+
+        if (_plan.IndentBlockContents is not null
+            && !token.IsKind(SyntaxKind.OpenBraceToken)
+            && !token.IsKind(SyntaxKind.CloseBraceToken)
+            && ContinuationIndentFor(token) is { } continuationIndent)
+        {
+            return continuationIndent;
         }
 
         return token.IsKind(SyntaxKind.CloseBraceToken) && _braceIndents.Count != 0
@@ -514,6 +590,9 @@ sealed class SinglePassEmitter
     {
         BlockSyntax block when token == (opening ? block.OpenBraceToken : block.CloseBraceToken) => block,
         AccessorListSyntax accessors when token == (opening ? accessors.OpenBraceToken : accessors.CloseBraceToken) => accessors,
+        BaseTypeDeclarationSyntax type when token == (opening ? type.OpenBraceToken : type.CloseBraceToken) => type,
+        NamespaceDeclarationSyntax @namespace when token == (opening ? @namespace.OpenBraceToken : @namespace.CloseBraceToken) => @namespace,
+        SwitchStatementSyntax @switch when token == (opening ? @switch.OpenBraceToken : @switch.CloseBraceToken) => @switch,
         _ => null
     };
 
@@ -634,9 +713,115 @@ sealed class SinglePassEmitter
             return false;
         }
 
+        if (_plan.IndentBlockContents is not null
+            && ContinuationIndentFor(token) is not null)
+        {
+            return false;
+        }
+
         return _plan.IndentBlockContents is null
             || token.IsKind(SyntaxKind.CloseBraceToken)
-            || _contentIndents.Count == 1;
+            || _contentIndents.Count == 1
+            || !StartsBlockContent(token);
+    }
+
+    string? ContinuationIndentFor(SyntaxToken token)
+    {
+        if (token.Parent is ElseClauseSyntax or CatchClauseSyntax or FinallyClauseSyntax or SwitchLabelSyntax
+            || token.IsKind(SyntaxKind.WhileKeyword) && token.Parent is DoStatementSyntax
+            || DirectContentFor(token) is not { } content
+            || content.GetFirstToken() == token
+            || token.Parent?.FirstAncestorOrSelf<StatementSyntax>() is { } nestedStatement
+            && nestedStatement != content
+            && nestedStatement.GetFirstToken() == token
+            || !ReferenceEquals(content.SyntaxTree, token.Parent?.SyntaxTree))
+        {
+            return null;
+        }
+
+        if (!_sourceIndents.TryGetValue(content.GetFirstToken(), out var contentIndent)
+            || !_sourceIndents.TryGetValue(token, out var tokenIndent))
+        {
+            return null;
+        }
+        if (!_emittedContentIndents.TryGetValue(content, out var emittedContentIndent))
+            return null;
+        if (!_originalTokens.Contains(token)
+            && contentIndent.Length == 0
+            && tokenIndent.StartsWith(emittedContentIndent, StringComparison.Ordinal))
+        {
+            return tokenIndent;
+        }
+        return tokenIndent.StartsWith(contentIndent, StringComparison.Ordinal)
+            ? emittedContentIndent + tokenIndent[contentIndent.Length..]
+            : null;
+    }
+
+    void RememberDirectContentIndent(SyntaxToken token)
+    {
+        if (DirectContentFor(token) is { } content && content.GetFirstToken() == token)
+            _emittedContentIndents[content] = _lineIndent;
+    }
+
+    static SyntaxNode? DirectContentFor(SyntaxToken token)
+    {
+        for (var node = token.Parent; node is not null; node = node.Parent)
+        {
+            if (node is StatementSyntax && node.Parent is BlockSyntax or SwitchSectionSyntax
+                || node is MemberDeclarationSyntax && node.Parent is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax
+                || node is AccessorDeclarationSyntax && node.Parent is AccessorListSyntax
+                || node is EnumMemberDeclarationSyntax && node.Parent is EnumDeclarationSyntax
+                || node is SwitchExpressionArmSyntax && node.Parent is SwitchExpressionSyntax
+                || node is AnonymousObjectMemberDeclaratorSyntax && node.Parent is AnonymousObjectCreationExpressionSyntax
+                || node is SubpatternSyntax && node.Parent is PropertyPatternClauseSyntax)
+            {
+                return node;
+            }
+        }
+
+        return null;
+    }
+
+    static string SourceIndent(string source, int position)
+    {
+        var start = position == 0 ? 0 : source.LastIndexOfAny(LineBreaks, position - 1) + 1;
+        var end = start;
+        while (end < source.Length && source[end] is ' ' or '\t')
+            end++;
+        return source[start..end];
+    }
+
+    static bool StartsBlockContent(SyntaxToken token)
+    {
+        if (token.IsKind(SyntaxKind.OpenBraceToken)
+            && token.Parent is BlockSyntax or AccessorListSyntax or BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax or SwitchStatementSyntax)
+        {
+            return true;
+        }
+
+        if (token.Parent?.FirstAncestorOrSelf<StatementSyntax>() is { } statement
+            && statement.GetFirstToken() == token)
+        {
+            return true;
+        }
+
+        for (var node = token.Parent; node is not null && node.GetFirstToken() == token; node = node.Parent)
+        {
+            if (node is MemberDeclarationSyntax && node.Parent is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax
+                || node is AccessorDeclarationSyntax && node.Parent is AccessorListSyntax
+                || node is EnumMemberDeclarationSyntax && node.Parent is EnumDeclarationSyntax
+                || node is SwitchExpressionArmSyntax
+                || node is SwitchLabelSyntax
+                || node is AnonymousObjectMemberDeclaratorSyntax && node.Parent is AnonymousObjectCreationExpressionSyntax
+                || node is SubpatternSyntax && node.Parent is PropertyPatternClauseSyntax
+                || node is UsingDirectiveSyntax && node.Parent is BaseNamespaceDeclarationSyntax
+                || node is ExternAliasDirectiveSyntax && node.Parent is BaseNamespaceDeclarationSyntax)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     static LabeledStatementSyntax? LabelFor(SyntaxToken token) =>
@@ -667,7 +852,9 @@ sealed class SinglePassEmitter
 
         if (token.IsKind(SyntaxKind.OpenBraceToken))
         {
-            var braceIndent = CaseBlockIndent(token)
+            var braceIndent = token.Parent is SwitchExpressionSyntax
+                ? _lineIndent
+                : CaseBlockIndent(token)
                 ?? (_plan.IndentBraces is { } indentBraces
                     ? _contentIndents[^1] + (indentBraces ? _plan.IndentUnit : "")
                     : _lineIndent);
@@ -685,15 +872,30 @@ sealed class SinglePassEmitter
 
     string? InitializerIndentFor(SyntaxToken token)
     {
-        if (_initializerFrames.TryPeek(out var frame)
-            && InitializerIndentationRule.FindDelimiter(token) is { } delimiter
+        if (!_initializerFrames.TryPeek(out var frame))
+            return null;
+
+        if (InitializerIndentationRule.FindDelimiter(token) is { } delimiter
             && ReferenceEquals(frame.Initializer, delimiter.Initializer))
-        {
             return frame.Indent;
+
+        if (_plan.IndentBlockContents is { } indentBlockContents
+            && StartsDirectInitializerItem(frame.Initializer, token))
+        {
+            return frame.Indent + (indentBlockContents ? _plan.IndentUnit : "");
         }
 
         return null;
     }
+
+    static bool StartsDirectInitializerItem(SyntaxNode initializer, SyntaxToken token) => initializer switch
+    {
+        InitializerExpressionSyntax expression =>
+            expression.Expressions.Any(item => item.GetFirstToken() == token),
+        CollectionExpressionSyntax collection =>
+            collection.Elements.Any(item => item.GetFirstToken() == token),
+        _ => false
+    };
 
     bool? DesiredSpace(TokenPair pair, bool boundaryBeforeLeft, bool originalOccurrence)
     {
@@ -747,6 +949,11 @@ sealed class SinglePassEmitter
         return false;
     }
 
+    static bool IsWrappedExpressionOperator(SyntaxToken token) =>
+        token.Parent is BinaryExpressionSyntax binary && token == binary.OperatorToken
+        || token.Parent is ConditionalExpressionSyntax conditional
+        && (token == conditional.QuestionToken || token == conditional.ColonToken);
+
     void Copy(string source, int start, int end)
     {
         if (end <= start)
@@ -767,6 +974,7 @@ sealed class SinglePassEmitter
         }
 
         var currentLine = text[(lastBreak + 1)..];
+        _previousLineIndent = _lineIndent;
         _column = currentLine.Length;
         _lineIndent = currentLine[..InitialIndentLength(currentLine)].ToString();
     }
@@ -782,8 +990,7 @@ sealed class SinglePassEmitter
     void Append(string text)
     {
         _output.Append(text);
-        var lastBreak = text.LastIndexOfAny(LineBreaks);
-        _column = lastBreak < 0 ? _column + text.Length : text.Length - lastBreak - 1;
+        TrackCopiedText(text);
     }
 
     void AppendTrivia(SyntaxTriviaList trivia)

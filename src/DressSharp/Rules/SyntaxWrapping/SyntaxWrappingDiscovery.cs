@@ -196,7 +196,8 @@ sealed class SyntaxWrappingDiscovery
         if (Enabled(SyntaxWrappingKind.MemberAccessChains) is not null
             && token.Parent is MemberAccessExpressionSyntax access
             && token == access.OperatorToken
-            && access.Parent is not MemberAccessExpressionSyntax)
+            && access.Parent is not MemberAccessExpressionSyntax
+            && !IsInsideArgument(access))
         {
             AddOccurrence(access, SyntaxWrappingKind.MemberAccessChains);
         }
@@ -208,7 +209,8 @@ sealed class SyntaxWrappingDiscovery
             && token.Parent is ConditionalAccessExpressionSyntax access
             && token == access.OperatorToken
             && access.Parent is not MemberAccessExpressionSyntax
-            && access.Parent is not ConditionalAccessExpressionSyntax)
+            && access.Parent is not ConditionalAccessExpressionSyntax
+            && !IsInsideArgument(access))
         {
             AddOccurrence(access, SyntaxWrappingKind.MemberAccessChains);
         }
@@ -260,7 +262,7 @@ sealed class SyntaxWrappingDiscovery
                 Delimited(list.Parameters, list.CloseBracketToken);
                 break;
             case InitializerExpressionSyntax initializer:
-                Delimited(initializer.Expressions, initializer.CloseBraceToken);
+                Delimited(initializer.Expressions, initializer.CloseBraceToken, spacesInside: true);
                 break;
             case CollectionExpressionSyntax collection:
                 Delimited(collection.Elements, collection.CloseBracketToken);
@@ -292,11 +294,11 @@ sealed class SyntaxWrappingDiscovery
             case DelegateDeclarationSyntax declaration:
                 Constraints(declaration.ConstraintClauses);
                 break;
-            case MemberAccessExpressionSyntax:
-                MemberAccess(firstToken, lastToken);
+            case MemberAccessExpressionSyntax access:
+                MemberAccess(access, firstToken, lastToken);
                 break;
-            case ConditionalAccessExpressionSyntax:
-                MemberAccess(firstToken, lastToken);
+            case ConditionalAccessExpressionSyntax access:
+                MemberAccess(access, firstToken, lastToken);
                 break;
             case BinaryExpressionSyntax:
                 Binary(firstToken, lastToken);
@@ -333,22 +335,37 @@ sealed class SyntaxWrappingDiscovery
         }
     }
 
-    void MemberAccess(int firstToken, int lastToken)
+    void MemberAccess(SyntaxNode occurrence, int firstToken, int lastToken)
     {
         var pieces = _stream.Pieces;
         for (var index = firstToken; index <= lastToken; index++)
         {
             var token = pieces[index].Token;
-            if (token.IsKind(SyntaxKind.QuestionToken)
+            if (BelongsToOccurrence(token, occurrence)
+                && (token.IsKind(SyntaxKind.QuestionToken)
                 && token.Parent is ConditionalAccessExpressionSyntax
                 || (token.IsKind(SyntaxKind.DotToken)
                     && !token.GetPreviousToken().IsKind(SyntaxKind.QuestionToken))
-                || token.IsKind(SyntaxKind.MinusGreaterThanToken))
+                || token.IsKind(SyntaxKind.MinusGreaterThanToken)))
             {
                 AddBoundary(index, GapStyle.CompactItem);
             }
         }
     }
+
+    static bool BelongsToOccurrence(SyntaxToken token, SyntaxNode occurrence)
+    {
+        for (var node = token.Parent; node is not null && !ReferenceEquals(node, occurrence); node = node.Parent)
+        {
+            if (node is ArgumentSyntax or AttributeArgumentSyntax or LambdaExpressionSyntax or AnonymousMethodExpressionSyntax)
+                return false;
+        }
+
+        return true;
+    }
+
+    static bool IsInsideArgument(SyntaxNode node) =>
+        node.Ancestors().Any(parent => parent is ArgumentSyntax or AttributeArgumentSyntax);
 
     void Binary(int firstToken, int lastToken)
     {
@@ -391,11 +408,15 @@ sealed class SyntaxWrappingDiscovery
             _ => node.GetLastToken()
         };
 
-    void Delimited<T>(SeparatedSyntaxList<T> items, SyntaxToken close) where T : SyntaxNode
+    void Delimited<T>(SeparatedSyntaxList<T> items, SyntaxToken close, bool spacesInside = false) where T : SyntaxNode
     {
         for (var index = 0; index < items.Count; index++)
-            AddBoundary(items[index].GetFirstToken(), index == 0 ? GapStyle.DelimitedFirst : GapStyle.DelimitedLater);
-        AddBoundary(close, GapStyle.DelimitedClose);
+            AddBoundary(
+                items[index].GetFirstToken(),
+                index == 0
+                    ? spacesInside ? GapStyle.DelimitedSpacedFirst : GapStyle.DelimitedFirst
+                    : GapStyle.DelimitedLater);
+        AddBoundary(close, spacesInside ? GapStyle.DelimitedSpacedClose : GapStyle.DelimitedClose);
     }
 
     void Constraints<T>(SyntaxList<T> clauses) where T : SyntaxNode

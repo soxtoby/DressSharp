@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using DressSharp.Rules;
 using Microsoft.CodeAnalysis.Text;
 using Xunit;
+using EasyAssertions;
 
 namespace DressSharp.UnitTests;
 
@@ -15,14 +16,14 @@ public class RuleContextTests
             new TextSpan(20, 0),
             new TextSpan(30, 5)));
 
-        Assert.True(regions.Intersects(new TextSpan(0, 10)));
-        Assert.True(regions.Intersects(new TextSpan(0, 11)));
-        Assert.True(regions.Intersects(new TextSpan(15, 0)));
-        Assert.True(regions.Intersects(new TextSpan(15, 4)));
-        Assert.False(regions.Intersects(new TextSpan(16, 3)));
-        Assert.True(regions.Intersects(new TextSpan(15, 5)));
-        Assert.True(regions.Intersects(new TextSpan(20, 1)));
-        Assert.False(regions.Intersects(new TextSpan(21, 1)));
+        regions.Intersects(new TextSpan(0, 10)).ShouldBe(true);
+        regions.Intersects(new TextSpan(0, 11)).ShouldBe(true);
+        regions.Intersects(new TextSpan(15, 0)).ShouldBe(true);
+        regions.Intersects(new TextSpan(15, 4)).ShouldBe(true);
+        regions.Intersects(new TextSpan(16, 3)).ShouldBe(false);
+        regions.Intersects(new TextSpan(15, 5)).ShouldBe(true);
+        regions.Intersects(new TextSpan(20, 1)).ShouldBe(true);
+        regions.Intersects(new TextSpan(21, 1)).ShouldBe(false);
     }
 
     [Fact]
@@ -32,8 +33,8 @@ public class RuleContextTests
             new TextSpan(0, 100),
             new TextSpan(50, 1)));
 
-        Assert.True(regions.Intersects(new TextSpan(90, 1)));
-        Assert.True(regions.Intersects(new TextSpan(100, 1)));
-        Assert.True(regions.Intersects(new TextSpan(100, 0)));
+        regions.Intersects(new TextSpan(90, 1)).ShouldBe(true);
+        regions.Intersects(new TextSpan(100, 1)).ShouldBe(true);
+        regions.Intersects(new TextSpan(100, 0)).ShouldBe(true);
     }
 }

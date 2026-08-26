@@ -1,1 +1,3 @@
-class Smoke {}
+class Smoke
+{
+}

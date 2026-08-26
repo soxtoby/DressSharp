@@ -95,19 +95,20 @@ sealed class ParenthesisSpacingRule() : TokenSpacingRule(
             return null;
 
         var category = parent switch
-            {
-                CastExpressionSyntax => Category.TypeCasts,
-                IfStatementSyntax
-                    or WhileStatementSyntax
-                    or ForStatementSyntax
-                    or ForEachStatementSyntax
-                    or SwitchStatementSyntax
-                    or LockStatementSyntax
-                    or UsingStatementSyntax
-                    or CatchDeclarationSyntax
-                    => Category.ControlFlowStatements,
-                _ => Category.Expressions
-            };
+        {
+            CastExpressionSyntax => Category.TypeCasts,
+            IfStatementSyntax
+                or WhileStatementSyntax
+                or ForStatementSyntax
+                or ForEachStatementSyntax
+                or SwitchStatementSyntax
+                or LockStatementSyntax
+                or UsingStatementSyntax
+                or CatchDeclarationSyntax
+                => Category.ControlFlowStatements,
+            ParenthesizedExpressionSyntax => Category.Expressions,
+            _ => default
+        };
         return (Selected.GetValueOrDefault(preference) & category) != 0;
     }
 

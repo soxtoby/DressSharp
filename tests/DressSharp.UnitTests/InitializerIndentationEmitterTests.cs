@@ -1,47 +1,291 @@
+using EasyAssertions;
 using Xunit;
+using static DressSharp.UnitTests.EmitterTestHarness;
 
 namespace DressSharp.UnitTests;
 
 public sealed class InitializerIndentationEmitterTests
 {
     [Fact]
-    public void Initializer_setting_preserves_unrelated_source_indentation()
+    public void Nested_initializer_uses_the_indent_from_a_planned_parent_line()
     {
-        const string source = "class C\n  {\n      C M() => new C\n        {\n        X = 1\n        };\n          int X;\n  }";
-        const string expected = "class C\n  {\n      C M() => new C\n          {\n        X = 1\n          };\n          int X;\n  }";
-
-        Assert.Equal(expected, Format(source, ("dress_object_initializer_indentation", "indented")));
+        Format("""
+                class C
+                {
+                    object M() => N(first, [1, 2]);
+                }
+                """,
+                ("dress_arguments_layout", "always_multi"),
+                ("dress_collection_expression_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"))
+            .ShouldBe("""
+                class C
+                {
+                    object M() => N(
+                        first,
+                        [1, 2]
+                    );
+                }
+                """);
     }
 
-    [Theory]
-    [InlineData(
-        "dress_object_initializer_indentation",
-        "class C\n{\nC M() => new C\n{\nX = 1\n};\nint X;\n}")]
-    [InlineData(
-        "dress_collection_initializer_indentation",
-        "class C\n{\nList<int> M() => new List<int>\n{\n1\n};\n}")]
-    [InlineData(
-        "dress_array_initializer_indentation",
-        "class C\n{\nint[] M() => new[]\n{\n1\n};\n}")]
-    [InlineData(
-        "dress_with_initializer_indentation",
-        "record C(int X)\n{\nC M() => this with\n{\nX = 1\n};\n}")]
-    [InlineData(
-        "dress_collection_expression_indentation",
-        "class C\n{\nint[] M() =>\n[\n1\n];\n}")]
-    public void Configures_each_initializer_kind(string key, string source)
+    [Fact]
+    public void Auto_layout_keeps_nested_initializer_items_stable()
     {
-        var indented = Format(source, (key, "indented"));
-        var notIndented = Format(source, (key, "not_indented"));
-        var opening = key == "dress_collection_expression_indentation" ? '[' : '{';
-        var closing = key == "dress_collection_expression_indentation" ? ']' : '}';
+        (string, string)[] preferences =
+        [
+            ("max_line_length", "180"),
+            ("dress_initializers_layout", "auto"),
+            ("csharp_new_line_before_open_brace", "all"),
+            ("csharp_indent_block_contents", "true"),
+            ("dress_object_initializer_indentation", "indented"),
+            ("dress_collection_initializer_indentation", "indented")
+        ];
 
-        Assert.Contains($"\n    {opening}\n", indented);
-        Assert.Contains($"\n    {closing};", indented);
-        Assert.Contains($"\n{opening}\n", notIndented);
-        Assert.Contains($"\n{closing};", notIndented);
-        Assert.Equal(indented, Format(indented, (key, "indented")));
-        Assert.Equal(notIndented, Format(notIndented, (key, "not_indented")));
+        var result = Format("""
+            class C
+            {
+                void M()
+                {
+                    var value = new C("git") { ArgumentList = { "-C", "directory", "ls-files", "--cached", "--others", "--exclude-standard", "-z" }, StandardOutputEncoding = Encoding.UTF8, Environment = { ["LANG"] = "C", ["LC_ALL"] = "C" } };
+                }
+            }
+            """,
+            preferences);
+
+        result.ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                    var value = new C("git")
+                        {
+                            ArgumentList =
+                                { "-C", "directory", "ls-files", "--cached", "--others", "--exclude-standard", "-z" },
+                            StandardOutputEncoding = Encoding.UTF8,
+                            Environment =
+                                {
+                                    ["LANG"] = "C",
+                                    ["LC_ALL"] = "C"
+                                }
+                        };
+                }
+            }
+            """);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Initializer_setting_preserves_unrelated_source_indentation()
+    {
+        Format("""
+            class C
+              {
+                  C M() => new C
+                    {
+                    X = 1
+                    };
+                      int X;
+              }
+            """,
+            ("dress_object_initializer_indentation", "indented")).ShouldBe("""
+            class C
+              {
+                  C M() => new C
+                      {
+                    X = 1
+                      };
+                      int X;
+              }
+            """);
+    }
+
+    [Fact]
+    public void Configures_object_initializer_indentation()
+    {
+        const string key = "dress_object_initializer_indentation";
+        var indented = Format("""
+            class C
+            {
+            C M() => new C
+            {
+            X = 1
+            };
+            int X;
+            }
+            """,
+            (key, "indented"));
+        indented.ShouldBe("""
+            class C
+            {
+            C M() => new C
+                {
+            X = 1
+                };
+            int X;
+            }
+            """);
+        var notIndented = Format(indented, (key, "not_indented"));
+        notIndented.ShouldBe("""
+            class C
+            {
+            C M() => new C
+            {
+            X = 1
+            };
+            int X;
+            }
+            """);
+        Format(indented, (key, "indented")).ShouldBe(indented);
+        Format(notIndented, (key, "not_indented")).ShouldBe(notIndented);
+    }
+
+    [Fact]
+    public void Configures_collection_initializer_indentation()
+    {
+        const string key = "dress_collection_initializer_indentation";
+        var indented = Format("""
+            class C
+            {
+            List<int> M() => new List<int>
+            {
+            1
+            };
+            }
+            """,
+            (key, "indented"));
+        indented.ShouldBe("""
+            class C
+            {
+            List<int> M() => new List<int>
+                {
+            1
+                };
+            }
+            """);
+        var notIndented = Format(indented, (key, "not_indented"));
+        notIndented.ShouldBe("""
+            class C
+            {
+            List<int> M() => new List<int>
+            {
+            1
+            };
+            }
+            """);
+        Format(indented, (key, "indented")).ShouldBe(indented);
+        Format(notIndented, (key, "not_indented")).ShouldBe(notIndented);
+    }
+
+    [Fact]
+    public void Configures_array_initializer_indentation()
+    {
+        const string key = "dress_array_initializer_indentation";
+        var indented = Format("""
+            class C
+            {
+            int[] M() => new[]
+            {
+            1
+            };
+            }
+            """,
+            (key, "indented"));
+        indented.ShouldBe("""
+            class C
+            {
+            int[] M() => new[]
+                {
+            1
+                };
+            }
+            """);
+        var notIndented = Format(indented, (key, "not_indented"));
+        notIndented.ShouldBe("""
+            class C
+            {
+            int[] M() => new[]
+            {
+            1
+            };
+            }
+            """);
+        Format(indented, (key, "indented")).ShouldBe(indented);
+        Format(notIndented, (key, "not_indented")).ShouldBe(notIndented);
+    }
+
+    [Fact]
+    public void Configures_with_initializer_indentation()
+    {
+        const string key = "dress_with_initializer_indentation";
+        var indented = Format("""
+            record C(int X)
+            {
+            C M() => this with
+            {
+            X = 1
+            };
+            }
+            """,
+            (key, "indented"));
+        indented.ShouldBe("""
+            record C(int X)
+            {
+            C M() => this with
+                {
+            X = 1
+                };
+            }
+            """);
+        var notIndented = Format(indented, (key, "not_indented"));
+        notIndented.ShouldBe("""
+            record C(int X)
+            {
+            C M() => this with
+            {
+            X = 1
+            };
+            }
+            """);
+        Format(indented, (key, "indented")).ShouldBe(indented);
+        Format(notIndented, (key, "not_indented")).ShouldBe(notIndented);
+    }
+
+    [Fact]
+    public void Configures_collection_expression_indentation()
+    {
+        const string key = "dress_collection_expression_indentation";
+        var indented = Format("""
+            class C
+            {
+            int[] M() =>
+            [
+            1
+            ];
+            }
+            """,
+            (key, "indented"));
+        indented.ShouldBe("""
+            class C
+            {
+            int[] M() =>
+                [
+            1
+                ];
+            }
+            """);
+        var notIndented = Format(indented, (key, "not_indented"));
+        notIndented.ShouldBe("""
+            class C
+            {
+            int[] M() =>
+            [
+            1
+            ];
+            }
+            """);
+        Format(indented, (key, "indented")).ShouldBe(indented);
+        Format(notIndented, (key, "not_indented")).ShouldBe(notIndented);
     }
 
     [Theory]
@@ -52,7 +296,7 @@ public sealed class InitializerIndentationEmitterTests
     [InlineData("dress_collection_expression_indentation")]
     public void Missing_unset_empty_and_single_line_preferences_add_no_opinion(string key)
     {
-        const string source = """
+        var baseline = Format("""
             record C(int X)
             {
             C ObjectSingle = new C { X = 1 };
@@ -76,75 +320,209 @@ public sealed class InitializerIndentationEmitterTests
             [
             ];
             }
-            """;
-        var baseline = Format(source);
+            """);
 
-        Assert.Equal(baseline, Format(source, (key, "unset")));
-        Assert.Equal(baseline, Format(source, (key, "indented")));
-        Assert.Equal(baseline, Format(source, (key, "not_indented")));
+        Format("""
+            record C(int X)
+            {
+            C ObjectSingle = new C { X = 1 };
+            C ObjectEmpty = new C
+            {
+            };
+            List<int> CollectionSingle = new List<int> { 1 };
+            List<int> CollectionEmpty = new List<int>
+            {
+            };
+            int[] ArraySingle = new[] { 1 };
+            int[] ArrayEmpty = new[]
+            {
+            };
+            C WithSingle() => this with { X = 1 };
+            C WithEmpty() => this with
+            {
+            };
+            int[] ExpressionSingle = [1];
+            int[] ExpressionEmpty =
+            [
+            ];
+            }
+            """,
+            (key, "unset")).ShouldBe(baseline);
+        Format("""
+            record C(int X)
+            {
+            C ObjectSingle = new C { X = 1 };
+            C ObjectEmpty = new C
+            {
+            };
+            List<int> CollectionSingle = new List<int> { 1 };
+            List<int> CollectionEmpty = new List<int>
+            {
+            };
+            int[] ArraySingle = new[] { 1 };
+            int[] ArrayEmpty = new[]
+            {
+            };
+            C WithSingle() => this with { X = 1 };
+            C WithEmpty() => this with
+            {
+            };
+            int[] ExpressionSingle = [1];
+            int[] ExpressionEmpty =
+            [
+            ];
+            }
+            """,
+            (key, "indented")).ShouldBe(baseline);
+        Format("""
+            record C(int X)
+            {
+            C ObjectSingle = new C { X = 1 };
+            C ObjectEmpty = new C
+            {
+            };
+            List<int> CollectionSingle = new List<int> { 1 };
+            List<int> CollectionEmpty = new List<int>
+            {
+            };
+            int[] ArraySingle = new[] { 1 };
+            int[] ArrayEmpty = new[]
+            {
+            };
+            C WithSingle() => this with { X = 1 };
+            C WithEmpty() => this with
+            {
+            };
+            int[] ExpressionSingle = [1];
+            int[] ExpressionEmpty =
+            [
+            ];
+            }
+            """,
+            (key, "not_indented")).ShouldBe(baseline);
     }
 
     [Fact]
     public void Different_initializer_kinds_keep_independent_settings()
     {
-        const string source = "class C\n{\nC M() => new C\n{\nValues = new[]\n{\n1\n}\n};\nint[] Values = [];\n}";
-
         var result = Format(
-            source,
+            """
+            class C
+            {
+            C M() => new C
+            {
+            Values = new[]
+            {
+            1
+            }
+            };
+            int[] Values = [];
+            }
+            """,
             ("dress_object_initializer_indentation", "indented"),
             ("dress_array_initializer_indentation", "not_indented"));
 
-        Assert.Contains("new C\n    {", result);
-        Assert.Contains("new[]\n{", result);
-        Assert.Contains("\n}\n    };", result);
-        Assert.Equal(result, Format(
+        result.ShouldBe("""
+            class C
+            {
+            C M() => new C
+                {
+            Values = new[]
+            {
+            1
+            }
+                };
+            int[] Values = [];
+            }
+            """);
+        Format(
             result,
             ("dress_object_initializer_indentation", "indented"),
-            ("dress_array_initializer_indentation", "not_indented")));
+            ("dress_array_initializer_indentation", "not_indented")).ShouldBe(result);
     }
 
     [Fact]
     public void Composes_with_syntax_wrapping_and_new_line_rules()
     {
-        const string source = "class C { C M() => new C { X = 1, Y = 2 }; int X; int Y; }";
-
         var result = Format(
-            source,
+            "class C { C M() => new C { X = 1, Y = 2 }; int X; int Y; }",
             ("dress_initializers_layout", "always_multi"),
             ("csharp_new_line_before_open_brace", "object_collection_array_initializers"),
             ("dress_object_initializer_indentation", "indented"));
 
-        Assert.Contains("new C\n    {\n", result);
-        Assert.Contains("\n    };", result);
-        Assert.Equal(result, Format(
+        result.ShouldBe("""
+            class C { C M() => new C
+                {
+                X = 1,
+                Y = 2
+                }; int X; int Y; }
+            """);
+        Format(
             result,
             ("dress_initializers_layout", "always_multi"),
             ("csharp_new_line_before_open_brace", "object_collection_array_initializers"),
-            ("dress_object_initializer_indentation", "indented")));
+            ("dress_object_initializer_indentation", "indented")).ShouldBe(result);
     }
 
     [Fact]
     public void Syntax_wrapping_preserves_comment_before_indented_closing_delimiter()
     {
-        const string source = "class C\n{\nC M() => new C\n{\nX = 1\n/* keep */ };\nint X;\n}";
         (string, string)[] preferences =
         [
             ("dress_initializers_layout", "always_multi"),
             ("dress_object_initializer_indentation", "indented")
         ];
 
-        var result = Format(source, preferences);
+        var result = Format("""
+            class C
+            {
+            C M() => new C
+            {
+            X = 1
+            /* keep */ };
+            int X;
+            }
+            """,
+            preferences);
 
-        Assert.Contains("/* keep */", result);
-        Assert.Contains("/* keep */    };", result);
-        Assert.Equal(1, result.Split("/* keep */").Length - 1);
-        Assert.Equal(result, Format(result, preferences));
+        result.ShouldBe("""
+            class C
+            {
+            C M() => new C
+                {
+                X = 1
+            /* keep */    };
+            int X;
+            }
+            """);
+        Format(result, preferences).ShouldBe(result);
     }
 
     [Fact]
     public void Uses_tabs_and_preserves_crlf()
     {
-        const string source = "class C\r\n{\r\nC M() => new C\r\n{\r\nX = 1\r\n};\r\nint X;\r\n}";
+        const string sourceTemplate = """
+            class C
+            {
+            C M() => new C
+            {
+            X = 1
+            };
+            int X;
+            }
+            """;
+        const string expectedTemplate = """
+            class C
+            {
+            	C M() => new C
+            		{
+            			X = 1
+            		};
+            	int X;
+            }
+            """;
+        var source = sourceTemplate.Replace("\n", "\r\n");
+        var expected = expectedTemplate.Replace("\n", "\r\n");
 
         var result = Format(
             source,
@@ -152,26 +530,42 @@ public sealed class InitializerIndentationEmitterTests
             ("csharp_indent_block_contents", "true"),
             ("dress_object_initializer_indentation", "indented"));
 
-        Assert.Contains("new C\r\n\t\t{\r\n", result);
-        Assert.Contains("\r\n\t\t};", result);
-        Assert.DoesNotContain("\n", result.Replace("\r\n", ""));
+        result.ShouldBe(expected);
     }
 
     [Fact]
     public void Preserves_comments_and_skips_directive_or_malformed_initializers()
     {
-        const string commented = "class C\n{\nC M() => new C\n{\n// keep\nX = 1\n};\nint X;\n}";
+        const string commented = """
+            class C
+            {
+            C M() => new C
+            {
+            // keep
+            X = 1
+            };
+            int X;
+            }
+            """;
+
         const string directive = "class C\n{\nC M() => new C\n{\n#if true\nX = 1\n#endif\n};\nint X;\n}";
         const string malformed = "class C\n{\nC M() => new C\n{\nX =\n};\nint X;\n}";
 
         var commentedResult = Format(commented, ("dress_object_initializer_indentation", "indented"));
 
-        Assert.Contains("// keep", commentedResult);
-        Assert.Equal(Format(directive), Format(directive, ("dress_object_initializer_indentation", "indented")));
-        Assert.Equal(Format(malformed), Format(malformed, ("dress_object_initializer_indentation", "indented")));
-        Assert.Equal(commentedResult, Format(commentedResult, ("dress_object_initializer_indentation", "indented")));
+        commentedResult.ShouldBe("""
+            class C
+            {
+            C M() => new C
+                {
+            // keep
+            X = 1
+                };
+            int X;
+            }
+            """);
+        Format(directive, ("dress_object_initializer_indentation", "indented")).ShouldBe(Format(directive));
+        Format(malformed, ("dress_object_initializer_indentation", "indented")).ShouldBe(Format(malformed));
+        Format(commentedResult, ("dress_object_initializer_indentation", "indented")).ShouldBe(commentedResult);
     }
-
-    static string Format(string source, params (string Key, string Value)[] preferences) =>
-        EmitterTestHarness.Format(source, preferences);
 }

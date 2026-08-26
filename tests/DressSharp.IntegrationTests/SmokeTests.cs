@@ -1,5 +1,6 @@
 using DressSharp.TestSupport;
 using Xunit;
+using EasyAssertions;
 
 namespace DressSharp.IntegrationTests;
 
@@ -20,8 +21,8 @@ public sealed class SmokeTests
             configuration,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(0, exitCode);
-        Assert.Contains("Format C# using explicit syntax-only preferences.", output.ToString());
+        exitCode.ShouldBe(0);
+        output.ToString().ShouldContain("Format C# using explicit syntax-only preferences.");
         ExactAssert.Text(string.Empty, error.ToString());
     }
 
@@ -36,12 +37,12 @@ public sealed class SmokeTests
             var exitCode = await Program.CreateCommand().Parse(["init", "--target", target]).InvokeAsync(
                 cancellationToken: TestContext.Current.CancellationToken);
 
-            Assert.Equal(0, exitCode);
-            Assert.True(File.Exists(target));
+            exitCode.ShouldBe(0);
+            File.Exists(target).ShouldBe(true);
             var text = await File.ReadAllTextAsync(target, TestContext.Current.CancellationToken);
-            Assert.Contains("dress_embedded_statement_placement = next_line", text);
-            Assert.Contains("dress_embedded_statement_braces = balanced", text);
-            Assert.Contains("dress_braces_for_multiline_statement_header = true", text);
+            text.ShouldContain("dress_embedded_statement_placement = next_line");
+            text.ShouldContain("dress_embedded_statement_braces = balanced");
+            text.ShouldContain("dress_braces_for_multiline_statement_header = true");
         }
         finally
         {
@@ -64,11 +65,11 @@ public sealed class SmokeTests
             var exitCode = await Program.CreateCommand().Parse(["init", "--target", target]).InvokeAsync(
                 cancellationToken: TestContext.Current.CancellationToken);
 
-            Assert.Equal(0, exitCode);
+            exitCode.ShouldBe(0);
             var text = await File.ReadAllTextAsync(target, TestContext.Current.CancellationToken);
-            Assert.Contains("indent_size = 2", text);
-            Assert.Equal(1, text.Split("indent_size =", StringSplitOptions.None).Length - 1);
-            Assert.Contains("dress_embedded_statement_placement = next_line", text);
+            text.ShouldContain("indent_size = 2");
+            (text.Split("indent_size =", StringSplitOptions.None).Length - 1).ShouldBe(1);
+            text.ShouldContain("dress_embedded_statement_placement = next_line");
         }
         finally
         {

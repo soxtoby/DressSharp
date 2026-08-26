@@ -1,6 +1,7 @@
 using DressSharp.Architecture;
 using DressSharp.Configuration;
 using Xunit;
+using EasyAssertions;
 
 namespace DressSharp.UnitTests;
 
@@ -20,8 +21,8 @@ public sealed class EditorConfigTests : IDisposable
 
         var result = Resolve(source);
 
-        Assert.Equal("180", result.Preferences[RuleKey.MaxLineLength]);
-        Assert.False(result.Preferences.ContainsKey(RuleKey.IndentStyle));
+        result.Preferences[RuleKey.MaxLineLength].ShouldBe("180");
+        result.Preferences.ContainsKey(RuleKey.IndentStyle).ShouldBe(false);
     }
 
     [Fact]
@@ -39,7 +40,7 @@ public sealed class EditorConfigTests : IDisposable
 
         var result = Resolve(Path.Combine(root, "Example.cs"));
 
-        Assert.False(result.Preferences.ContainsKey(RuleKey.MaxLineLength));
+        result.Preferences.ContainsKey(RuleKey.MaxLineLength).ShouldBe(false);
     }
 
     [Fact]
@@ -49,8 +50,8 @@ public sealed class EditorConfigTests : IDisposable
 
         var result = Resolve(Path.Combine(_directory, "Example.cs"));
 
-        Assert.Equal("tab", result.Preferences[RuleKey.IndentStyle]);
-        Assert.Equal("tab", result.Preferences[RuleKey.IndentSize]);
+        result.Preferences[RuleKey.IndentStyle].ShouldBe("tab");
+        result.Preferences[RuleKey.IndentSize].ShouldBe("tab");
     }
 
     [Fact]
@@ -64,8 +65,8 @@ public sealed class EditorConfigTests : IDisposable
         var matching = Resolve(Path.Combine(_directory, "src", "File2.cs"));
         var excluded = Resolve(Path.Combine(_directory, "src", "File4.cs"));
 
-        Assert.Equal("180", matching.Preferences[RuleKey.MaxLineLength]);
-        Assert.False(excluded.Preferences.ContainsKey(RuleKey.MaxLineLength));
+        matching.Preferences[RuleKey.MaxLineLength].ShouldBe("180");
+        excluded.Preferences.ContainsKey(RuleKey.MaxLineLength).ShouldBe(false);
     }
 
     [Fact]
@@ -85,15 +86,15 @@ public sealed class EditorConfigTests : IDisposable
             ],
             TestContext.Current.CancellationToken);
 
-        Assert.Same(result[Path.Combine(_directory, "First.cs")], result[Path.Combine(_directory, "Second.cs")]);
-        Assert.NotSame(result[Path.Combine(_directory, "First.cs")], result[Path.Combine(_directory, "GeneratedFirst.cs")]);
+        result[Path.Combine(_directory, "Second.cs")].ShouldReferTo(result[Path.Combine(_directory, "First.cs")]);
+        result[Path.Combine(_directory, "GeneratedFirst.cs")].ShouldNotReferTo(result[Path.Combine(_directory, "First.cs")]);
     }
 
     [Fact]
     public async Task Resolver_rejects_invalid_effective_value()
     {
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[*.cs]\nindent_style = invalid\n", TestContext.Current.CancellationToken);
-        Assert.Throws<ConfigurationException>(() =>
+        Should.Throw<ConfigurationException>(() =>
             Resolve(Path.Combine(_directory, "Example.cs")));
     }
 
@@ -115,7 +116,7 @@ public sealed class EditorConfigTests : IDisposable
             $"[*.cs]\n{key} = {value}\n",
             TestContext.Current.CancellationToken);
 
-        Assert.Throws<ConfigurationException>(() =>
+        Should.Throw<ConfigurationException>(() =>
             Resolve(Path.Combine(_directory, "Example.cs")));
     }
 
@@ -138,7 +139,7 @@ public sealed class EditorConfigTests : IDisposable
 
         var result = Resolve(Path.Combine(_directory, "Example.cs"));
 
-        Assert.Equal(value, result.Preferences[RuleKeys.Parse(key)]);
+        result.Preferences[RuleKeys.Parse(key)].ShouldBe(value);
     }
 
     [Fact]
@@ -149,7 +150,7 @@ public sealed class EditorConfigTests : IDisposable
             "[*.cs]\nbad key = value\n",
             TestContext.Current.CancellationToken);
 
-        Assert.Throws<ConfigurationException>(() =>
+        Should.Throw<ConfigurationException>(() =>
             Resolve(Path.Combine(_directory, "Example.cs")));
     }
 
@@ -159,7 +160,7 @@ public sealed class EditorConfigTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[bad.cs]\nindent_style = invalid\n", TestContext.Current.CancellationToken);
         var paths = new[] { Path.Combine(_directory, "good.cs"), Path.Combine(_directory, "bad.cs") };
 
-        Assert.Throws<ConfigurationException>(() =>
+        Should.Throw<ConfigurationException>(() =>
             new EditorConfigResolver().ResolveAll(paths, TestContext.Current.CancellationToken));
     }
 
@@ -169,16 +170,16 @@ public sealed class EditorConfigTests : IDisposable
         var result = await EditorConfigInitializer.InitializeAsync(null, _directory, TestContext.Current.CancellationToken);
         var text = await File.ReadAllTextAsync(result.Path, TestContext.Current.CancellationToken);
 
-        Assert.True(result.Changed);
-        Assert.Equal(EditorConfigInitializer.BuildDefaultSection(), text);
-        Assert.DoesNotContain("root = true", text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("dress_embedded_statement_placement = next_line\n", text);
-        Assert.Contains("dress_embedded_statement_braces = balanced\n", text);
-        Assert.Contains("dress_braces_for_multiline_statement_header = true\n", text);
-        Assert.DoesNotContain("dress_control_flow_braces", text);
+        result.Changed.ShouldBe(true);
+        text.ShouldBe(EditorConfigInitializer.BuildDefaultSection());
+        text.Contains("root = true", StringComparison.OrdinalIgnoreCase).ShouldBe(false);
+        text.ShouldContain("dress_embedded_statement_placement = next_line\n");
+        text.ShouldContain("dress_embedded_statement_braces = balanced\n");
+        text.ShouldContain("dress_braces_for_multiline_statement_header = true\n");
+        text.ShouldNotContain("dress_control_flow_braces");
         foreach (var (key, value) in PreferenceCatalog.Defaults)
         {
-            Assert.Contains($"{key.ToName()} = {value}\n", text);
+            text.ShouldContain($"{key.ToName()} = {value}\n");
         }
     }
 
@@ -189,7 +190,7 @@ public sealed class EditorConfigTests : IDisposable
             Path.Combine(AppContext.BaseDirectory, "Fixtures", "Default.editorconfig"),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(expected, EditorConfigInitializer.BuildDefaultSection());
+        EditorConfigInitializer.BuildDefaultSection().ShouldBe(expected);
     }
 
     [Fact]
@@ -203,11 +204,11 @@ public sealed class EditorConfigTests : IDisposable
         var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
         var second = await EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken);
 
-        Assert.True(first.Changed);
-        Assert.False(second.Changed);
-        Assert.StartsWith("root = true\n\n[*.cs]\nindent_size = 2\ncharset = utf-8\n", text);
-        Assert.Contains("dress_braces_for_multiline_statement_header = true\n\n[generated.cs]", text);
-        Assert.Equal(1, text.Split("indent_size =", StringSplitOptions.None).Length - 1);
+        first.Changed.ShouldBe(true);
+        second.Changed.ShouldBe(false);
+        text.ShouldStartWith("root = true\n\n[*.cs]\nindent_size = 2\ncharset = utf-8\n");
+        text.ShouldContain("dress_braces_for_multiline_statement_header = true\n\n[generated.cs]");
+        (text.Split("indent_size =", StringSplitOptions.None).Length - 1).ShouldBe(1);
     }
 
     [Fact]
@@ -220,9 +221,9 @@ public sealed class EditorConfigTests : IDisposable
         await EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken);
 
         var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
-        Assert.Equal(1, text.Split("indent_size =", StringSplitOptions.None).Length - 1);
-        Assert.Equal(1, text.Split("charset =", StringSplitOptions.None).Length - 1);
-        Assert.EndsWith("dress_braces_for_multiline_statement_header = true\n", text);
+        (text.Split("indent_size =", StringSplitOptions.None).Length - 1).ShouldBe(1);
+        (text.Split("charset =", StringSplitOptions.None).Length - 1).ShouldBe(1);
+        text.ShouldEndWith("dress_braces_for_multiline_statement_header = true\n");
     }
 
     [Fact]
@@ -235,9 +236,9 @@ public sealed class EditorConfigTests : IDisposable
         await EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken);
 
         var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
-        Assert.StartsWith(original, text);
-        Assert.Contains("\n[*.cs]\ncharset = utf-8\n", text);
-        Assert.Equal(1, text.Split("indent_size =", StringSplitOptions.None).Length - 1);
+        text.ShouldStartWith(original);
+        text.ShouldContain("\n[*.cs]\ncharset = utf-8\n");
+        (text.Split("indent_size =", StringSplitOptions.None).Length - 1).ShouldBe(1);
     }
 
     [Theory]
@@ -250,10 +251,9 @@ public sealed class EditorConfigTests : IDisposable
         var path = Path.Combine(_directory, ".editorconfig");
         await File.WriteAllTextAsync(path, text, TestContext.Current.CancellationToken);
 
-        await Assert.ThrowsAsync<ConfigurationException>(() =>
-            EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken));
+        EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken).ShouldFailWith<ConfigurationException>();
 
-        Assert.Equal(text, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+        (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).ShouldBe(text);
     }
 
     [Fact]
@@ -261,8 +261,8 @@ public sealed class EditorConfigTests : IDisposable
     {
         var target = Path.Combine(_directory, "nested") + Path.DirectorySeparatorChar;
         var result = await EditorConfigInitializer.InitializeAsync(target, _directory, TestContext.Current.CancellationToken);
-        Assert.Equal(Path.Combine(_directory, "nested", ".editorconfig"), result.Path);
-        Assert.True(File.Exists(result.Path));
+        result.Path.ShouldBe(Path.Combine(_directory, "nested", ".editorconfig"));
+        File.Exists(result.Path).ShouldBe(true);
     }
 
     [Fact]
@@ -271,7 +271,7 @@ public sealed class EditorConfigTests : IDisposable
         var target = Directory.CreateDirectory(Path.Combine(_directory, "existing")).FullName;
         var result = await EditorConfigInitializer.InitializeAsync(target, _directory, TestContext.Current.CancellationToken);
 
-        Assert.Equal(Path.Combine(target, ".editorconfig"), result.Path);
+        result.Path.ShouldBe(Path.Combine(target, ".editorconfig"));
     }
 
     [Fact]
@@ -280,8 +280,8 @@ public sealed class EditorConfigTests : IDisposable
         var target = Path.Combine(_directory, "nested", "custom.editorconfig");
         var result = await EditorConfigInitializer.InitializeAsync(target, _directory, TestContext.Current.CancellationToken);
 
-        Assert.Equal(target, result.Path);
-        Assert.True(File.Exists(target));
+        result.Path.ShouldBe(target);
+        File.Exists(target).ShouldBe(true);
     }
 
     static FormattingConfiguration Resolve(string path) =>

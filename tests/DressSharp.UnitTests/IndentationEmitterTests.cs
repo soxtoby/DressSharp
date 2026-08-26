@@ -1,154 +1,470 @@
 using Xunit;
+using EasyAssertions;
+using static DressSharp.UnitTests.EmitterTestHarness;
 
 namespace DressSharp.UnitTests;
 
 public class IndentationEmitterTests
 {
     [Fact]
+    public void Block_indentation_preserves_continuation_indentation()
+    {
+        Format("""
+                class C
+                {
+                    int M(bool value) =>
+                        value
+                            ? 1
+                            : 2;
+                }
+                """,
+                ("csharp_indent_block_contents", "true"))
+            .ShouldBe("""
+                class C
+                {
+                    int M(bool value) =>
+                        value
+                            ? 1
+                            : 2;
+                }
+                """);
+    }
+
+    [Fact]
+    public void Switch_expression_arms_follow_the_reindented_brace()
+    {
+        Format("""
+                class C
+                {
+                int M(int value)
+                {
+                var result = value switch
+                    {
+                                0
+                                    or 1 => 1,
+                                _ => 2
+                    };
+                return result;
+                }
+                }
+                """,
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "false"))
+            .ShouldBe("""
+                class C
+                {
+                    int M(int value)
+                    {
+                        var result = value switch
+                        {
+                            0
+                                or 1 => 1,
+                            _ => 2
+                        };
+                        return result;
+                    }
+                }
+                """);
+    }
+
+    [Fact]
+    public void Switch_expression_inside_a_wrapped_argument_uses_that_argument_indent()
+    {
+        Format(
+                """
+                class C : B(kind switch
+                {
+                0 => 1,
+                _ => 2
+                }) { }
+                """,
+                ("dress_arguments_layout", "always_multi"),
+                ("csharp_new_line_before_open_brace", "all"),
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "false"))
+            .ShouldBe("""
+                class C : B(
+                    kind switch
+                    {
+                        0 => 1,
+                        _ => 2
+                    }
+                )
+                { }
+                """);
+    }
+
+    [Fact]
     public void Switch_label_setting_preserves_unrelated_source_indentation()
     {
-        const string source = "class C\n  {\n      void M(int x)\n        {\n          switch (x)\n            {\n case 0:\n                  break;\n            }\n        }\n  }";
-        const string expected = "class C\n  {\n      void M(int x)\n        {\n          switch (x)\n            {\n            case 0:\n                  break;\n            }\n        }\n  }";
-
-        Assert.Equal(expected, Emit(source, ("csharp_indent_switch_labels", "false")));
+        Format("""
+                class C
+                  {
+                      void M(int x)
+                        {
+                          switch (x)
+                            {
+                 case 0:
+                                  break;
+                            }
+                        }
+                  }
+                """,
+                ("csharp_indent_switch_labels", "false"))
+            .ShouldBe("""
+                class C
+                  {
+                      void M(int x)
+                        {
+                          switch (x)
+                            {
+                            case 0:
+                                  break;
+                            }
+                        }
+                  }
+                """);
     }
 
-    [Theory]
-    [InlineData("true", "            case 0:")]
-    [InlineData("false", "        case 0:")]
-    public void Indents_switch_labels_from_the_switch_brace(string preference, string expectedLabel)
+    [Fact]
+    public void Indents_switch_labels()
     {
-        const string source = "class C\n{\nvoid M(int x)\n{\nswitch (x)\n{\n                case 0:\n                break;\n}\n}\n}";
-
-        var result = Emit(source,
+        var result = Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+                            case 0:
+                            break;
+            }
+            }
+            }
+            """,
             ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_switch_labels", preference));
+            ("csharp_indent_switch_labels", "true"));
 
-        Assert.Contains($"\n{expectedLabel}\n", result);
-        Assert.Equal(result, Emit(result,
+        result.ShouldBe("""
+            class C
+            {
+                void M(int x)
+                {
+                    switch (x)
+                    {
+                        case 0:
+                        break;
+                    }
+                }
+            }
+            """);
+        Format(result,
             ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_switch_labels", preference)));
+            ("csharp_indent_switch_labels", "true")).ShouldBe(result);
     }
 
-    [Theory]
-    [InlineData("true", "            break;")]
-    [InlineData("false", "        break;")]
-    public void Indents_case_contents_from_the_effective_label(string preference, string expectedStatement)
+    [Fact]
+    public void Does_not_indent_switch_labels()
     {
-        const string source = "class C\n{\nvoid M(int x)\n{\nswitch (x)\n{\ncase 0:\n                break;\n}\n}\n}";
-
-        var result = Emit(source,
+        var result = Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+            case 0:
+                            break;
+            }
+            }
+            }
+            """,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_switch_labels", "false"),
-            ("csharp_indent_case_contents", preference));
+            ("csharp_indent_case_contents", "true"));
 
-        Assert.Contains("\n        case 0:\n", result);
-        Assert.Contains($"\n{expectedStatement}\n", result);
-        Assert.Equal(result, Emit(result,
+        result.ShouldBe("""
+            class C
+            {
+                void M(int x)
+                {
+                    switch (x)
+                    {
+                    case 0:
+                        break;
+                    }
+                }
+            }
+            """);
+        Format(result,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_switch_labels", "false"),
-            ("csharp_indent_case_contents", preference)));
+            ("csharp_indent_case_contents", "true")).ShouldBe(result);
     }
 
-    [Theory]
-    [InlineData("flush_left", "")]
-    [InlineData("one_less_than_current", "    ")]
-    [InlineData("no_change", "      ")]
-    public void Applies_label_indentation_after_block_indentation(string preference, string expectedIndent)
+    [Fact]
+    public void Flushes_labels_left()
     {
-        const string source = "class C\n{\nvoid M()\n{\n      retry:\nreturn;\n}\n}";
-
-        var result = Emit(source,
+        var result = Format("""
+            class C
+            {
+            void M()
+            {
+                  retry:
+            return;
+            }
+            }
+            """,
             ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_labels", preference));
+            ("csharp_indent_labels", "flush_left"));
 
-        Assert.Contains($"\n{expectedIndent}retry:\n        return;", result);
-        Assert.Equal(result, Emit(result,
+        result.ShouldBe("""
+            class C
+            {
+                void M()
+                {
+            retry:
+                    return;
+                }
+            }
+            """);
+        Format(result,
             ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_labels", preference)));
+            ("csharp_indent_labels", "flush_left")).ShouldBe(result);
     }
 
-    [Theory]
-    [InlineData("true", "                        ")]
-    [InlineData("false", "                    ")]
-    public void Case_block_indentation_overrides_case_contents_and_brace_indentation(
-        string preference,
-        string expectedBraceIndent)
+    [Fact]
+    public void Indents_labels_one_less_than_current()
     {
-        const string source = "class C\n{\nvoid M(int x)\n{\nswitch (x)\n{\ncase 0:\n{\nreturn;\n}\n}\n}\n}";
+        var result = Format("""
+            class C
+            {
+            void M()
+            {
+                  retry:
+            return;
+            }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_labels", "one_less_than_current"));
 
-        var result = Emit(source,
+        result.ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                retry:
+                    return;
+                }
+            }
+            """);
+        Format(result,
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_labels", "one_less_than_current")).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Leaves_labels_unchanged()
+    {
+        var result = Format("""
+            class C
+            {
+            void M()
+            {
+                  retry:
+            return;
+            }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_labels", "no_change"));
+
+        result.ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                  retry:
+                    return;
+                }
+            }
+            """);
+        Format(result,
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_labels", "no_change")).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Indents_case_blocks()
+    {
+        var result = Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+            case 0:
+            {
+            return;
+            }
+            }
+            }
+            }
+            """,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_braces", "true"),
             ("csharp_indent_switch_labels", "false"),
             ("csharp_indent_case_contents", "false"),
-            ("csharp_indent_case_contents_when_block", preference));
+            ("csharp_indent_case_contents_when_block", "true"));
 
-        Assert.Contains($"\n                    case 0:\n{expectedBraceIndent}{{\n{expectedBraceIndent}    return;\n{expectedBraceIndent}}}", result);
-        Assert.Equal(result, Emit(result,
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_braces", "true"),
-            ("csharp_indent_switch_labels", "false"),
-            ("csharp_indent_case_contents", "false"),
-            ("csharp_indent_case_contents_when_block", preference)));
+        result.ShouldBe("""
+            class C
+                {
+                    void M(int x)
+                        {
+                            switch (x)
+                                {
+                                case 0:
+                                    {
+                                        return;
+                                    }
+                                }
+                        }
+                }
+            """);
     }
 
-    [Theory]
-    [InlineData("true", "                ")]
-    [InlineData("false", "            ")]
-    public void Case_block_indentation_does_not_require_a_switch_label_preference(
-        string preference,
-        string expectedBraceIndent)
+    [Fact]
+    public void Does_not_indent_case_blocks()
     {
-        const string source = "class C\n{\nvoid M(int x)\n{\nswitch (x)\n{\ncase 0:\n{\nreturn;\n}\n}\n}\n}";
-
-        var result = Emit(source,
+        var result = Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+            case 0:
+            {
+            return;
+            }
+            }
+            }
+            }
+            """,
             ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_case_contents_when_block", preference));
+            ("csharp_indent_case_contents_when_block", "false"));
 
-        Assert.Contains($"\n            case 0:\n{expectedBraceIndent}{{\n{expectedBraceIndent}    return;\n{expectedBraceIndent}}}", result);
+        result.ShouldBe("""
+            class C
+            {
+                void M(int x)
+                {
+                    switch (x)
+                    {
+                        case 0:
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+            """);
     }
 
     [Fact]
     public void Preserves_comments_and_directives_attached_to_indentation_targets()
     {
-        const string source = "class C\n{\nvoid M(int x)\n{\nswitch (x)\n{\n          // label\n          case 0:\n          // block\n          {\nreturn;\n}\n#if true\n          case 1:\n          break;\n#endif\n}\n      // goto label\n      retry:\nreturn;\n}\n}";
-
-        var result = Emit(source,
+        var result = Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+                      // label
+                      case 0:
+                      // block
+                      {
+            return;
+            }
+            #if true
+                      case 1:
+                      break;
+            #endif
+            }
+                  // goto label
+                  retry:
+            return;
+            }
+            }
+            """,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_switch_labels", "false"),
             ("csharp_indent_case_contents", "false"),
             ("csharp_indent_labels", "flush_left"),
             ("csharp_indent_case_contents_when_block", "false"));
-
-        Assert.Contains("// label\n          case 0:", result);
-        Assert.Contains("// block\n          {", result);
-        Assert.Contains("#if true\n          case 1:", result);
-        Assert.Contains("// goto label\n      retry:", result);
-        Assert.Equal(result, Emit(result,
+        result.ShouldBe("""
+            class C
+            {
+                void M(int x)
+                {
+                    switch (x)
+                    {
+                      // label
+                      case 0:
+                      // block
+                      {
+                        return;
+                    }
+            #if true
+                      case 1:
+                    break;
+            #endif
+            }
+                  // goto label
+                  retry:
+                    return;
+                }
+            }
+            """);
+        Format(result,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_switch_labels", "false"),
             ("csharp_indent_case_contents", "false"),
             ("csharp_indent_labels", "flush_left"),
-            ("csharp_indent_case_contents_when_block", "false")));
+            ("csharp_indent_case_contents_when_block", "false")).ShouldBe(result);
     }
 
     [Fact]
     public void Leading_block_comment_does_not_become_same_line_brace_indentation()
     {
-        const string source = "class C\n{\n    /* keep */ void M() {\nreturn;\n}\n}";
-        const string expected = "class C\n{\n    /* keep */ void M() {\n        return;\n}\n}";
+        var result = Format("""
+            class C
+            {
+                /* keep */ void M() {
+            return;
+            }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"));
 
-        var result = Emit(source, ("csharp_indent_block_contents", "true"));
-
-        Assert.Equal(expected, result);
-        Assert.Equal(result, Emit(result, ("csharp_indent_block_contents", "true")));
+        result.ShouldBe("""
+            class C
+            {
+                /* keep */ void M() {
+                    return;
+            }
+            }
+            """);
+        Format(result, ("csharp_indent_block_contents", "true")).ShouldBe(result);
     }
 
     [Fact]
     public void Skips_malformed_switch_sections_and_labeled_statements()
     {
-        const string source = "class C\n{\nvoid M(int x)\n{\nswitch (x)\n{\n          case :\n          {\nreturn +;\n}\n}\n      retry:\nreturn +;\n}\n}";
         (string, string)[] firstPreferences =
         [
             ("csharp_indent_block_contents", "true"),
@@ -166,7 +482,41 @@ public class IndentationEmitterTests
             ("csharp_indent_case_contents_when_block", "false")
         ];
 
-        Assert.Equal(Emit(source, firstPreferences), Emit(source, oppositePreferences));
+        Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+                      case :
+                      {
+            return +;
+            }
+            }
+                  retry:
+            return +;
+            }
+            }
+            """,
+            oppositePreferences).ShouldBe(Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+                      case :
+                      {
+            return +;
+            }
+            }
+                  retry:
+            return +;
+            }
+            }
+            """,
+            firstPreferences));
     }
 
     [Theory]
@@ -176,12 +526,44 @@ public class IndentationEmitterTests
     [InlineData("csharp_indent_case_contents_when_block")]
     public void Unset_indentation_preferences_add_no_rule_opinion(string key)
     {
-        const string source = "class C\n{\nvoid M(int x)\n{\nswitch (x)\n{\n      case 0:\n      {\nreturn;\n}\n}\n   retry:\nreturn;\n}\n}";
         (string, string)[] baseline = [("csharp_indent_block_contents", "true")];
 
-        Assert.Equal(Emit(source, baseline), Emit(source,
+        Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+                  case 0:
+                  {
+            return;
+            }
+            }
+               retry:
+            return;
+            }
+            }
+            """,
             ("csharp_indent_block_contents", "true"),
-            (key, "unset")));
+            (key, "unset")).ShouldBe(Format("""
+            class C
+            {
+            void M(int x)
+            {
+            switch (x)
+            {
+                  case 0:
+                  {
+            return;
+            }
+            }
+               retry:
+            return;
+            }
+            }
+            """,
+            baseline));
     }
 
     [Theory]
@@ -193,11 +575,31 @@ public class IndentationEmitterTests
     [InlineData("csharp_indent_case_contents_when_block")]
     public void Unset_indentation_preference_is_inactive(string key)
     {
-        const string source = "class C\n  {\n      void M(int x)\n        {\n          switch (x)\n            {\n case 0:\n                  break;\n            }\n        }\n  }";
-
-        Assert.Equal(source, Emit(source, (key, "unset")));
+        Format("""
+            class C
+              {
+                  void M(int x)
+                    {
+                      switch (x)
+                        {
+             case 0:
+                              break;
+                        }
+                    }
+              }
+            """,
+            (key, "unset")).ShouldBe("""
+            class C
+              {
+                  void M(int x)
+                    {
+                      switch (x)
+                        {
+             case 0:
+                              break;
+                        }
+                    }
+              }
+            """);
     }
-
-    static string Emit(string source, params (string Key, string Value)[] preferences) =>
-        EmitterTestHarness.Format(source, preferences);
 }

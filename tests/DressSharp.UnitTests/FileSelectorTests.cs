@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DressSharp.CommandLine;
 using Xunit;
+using EasyAssertions;
 
 namespace DressSharp.UnitTests;
 
@@ -23,7 +24,7 @@ public sealed class FileSelectorTests : IDisposable
 
         var selected = await Select();
 
-        Assert.Equal(["a.cs", "z.cs"], selected.Select(file => file.DisplayPath));
+        selected.Select(file => file.DisplayPath).ShouldMatch(["a.cs", "z.cs"]);
     }
 
     [Fact]
@@ -32,9 +33,9 @@ public sealed class FileSelectorTests : IDisposable
         Write("code.designer.cs", "class Generated {}");
         Write("notes.txt", "no");
 
-        Assert.Empty(await Select("code.designer.cs"));
-        Assert.Empty(await Select("notes.txt"));
-        Assert.Empty(await Select("missing.cs"));
+        (await Select("code.designer.cs")).ShouldBeEmpty();
+        (await Select("notes.txt")).ShouldBeEmpty();
+        (await Select("missing.cs")).ShouldBeEmpty();
     }
 
     [Fact]
@@ -42,10 +43,9 @@ public sealed class FileSelectorTests : IDisposable
     {
         Write("src/code.cs", "class C {}");
 
-        var selected = await Select("src/**/*.cs", "src/code.cs", "**/*.cs");
-
-        Assert.Single(selected);
-        Assert.Equal("src/code.cs", selected[0].DisplayPath);
+        (await Select("src/**/*.cs", "src/code.cs", "**/*.cs"))
+            .ShouldBeASingular<SelectedFile>()
+            .And.DisplayPath.ShouldBe("src/code.cs");
     }
 
     [Fact]
@@ -58,7 +58,8 @@ public sealed class FileSelectorTests : IDisposable
 
         var selected = await Select("*.cs", "src/**/*.cs");
 
-        Assert.Equal(["root.cs", "src/direct.cs", "src/nested/deep.cs"], selected.Select(file => file.DisplayPath));
+        selected.Select(file => file.DisplayPath)
+            .ShouldMatch(["root.cs", "src/direct.cs", "src/nested/deep.cs"]);
     }
 
     [Fact]
@@ -72,7 +73,8 @@ public sealed class FileSelectorTests : IDisposable
 
         var selected = await Select("src/**/*.cs");
 
-        Assert.Equal(["src/included.cs"], selected.Select(file => file.DisplayPath));
+        selected.Select(file => file.DisplayPath)
+            .ShouldMatch(["src/included.cs"]);
     }
 
     [Fact]
@@ -80,7 +82,7 @@ public sealed class FileSelectorTests : IDisposable
     {
         Write("source.cs", "class Source {}");
 
-        Assert.Empty(await Select("tests/**/*.cs"));
+        (await Select("tests/**/*.cs")).ShouldBeEmpty();
     }
 
     [Fact]
@@ -94,10 +96,10 @@ public sealed class FileSelectorTests : IDisposable
             Write(root, "src/nested.cs", "class Nested {}");
             Write(root, "src/generated.g.cs", "class Generated {}");
 
-            var selected = await new FileSelector(root).Select(
-                ["src/**/*.cs"], TestContext.Current.CancellationToken);
+            var selected = await new FileSelector(root).Select(["src/**/*.cs"], TestContext.Current.CancellationToken);
 
-            Assert.Equal(["src/nested.cs"], selected.Select(file => file.DisplayPath));
+            selected.Select(file => file.DisplayPath)
+                .ShouldMatch(["src/nested.cs"]);
         }
         finally
         {
@@ -118,7 +120,7 @@ public sealed class FileSelectorTests : IDisposable
 
         var selected = await Select();
 
-        Assert.Equal(["keep.skip.cs", "nested/yes.cs"], selected.Select(file => file.DisplayPath));
+        selected.Select(file => file.DisplayPath).ShouldMatch(["keep.skip.cs", "nested/yes.cs"]);
     }
 
     [Fact]
@@ -131,7 +133,7 @@ public sealed class FileSelectorTests : IDisposable
 
         var selected = await Select();
 
-        Assert.Equal(["tracked.cs"], selected.Select(file => file.DisplayPath));
+        selected.Select(file => file.DisplayPath).ShouldMatch(["tracked.cs"]);
     }
 
     [Fact]
@@ -146,7 +148,7 @@ public sealed class FileSelectorTests : IDisposable
 
         var selected = await Select();
 
-        Assert.Equal(["logs/deep/traceX.cs"], selected.Select(file => file.DisplayPath));
+        selected.Select(file => file.DisplayPath).ShouldMatch(["logs/deep/traceX.cs"]);
     }
 
     [Fact]
@@ -155,7 +157,7 @@ public sealed class FileSelectorTests : IDisposable
         Write(".gitignore", "ignored/\n!ignored/keep.cs\n");
         Write("ignored/keep.cs", "class Ignored {}");
 
-        Assert.Empty(await Select());
+        (await Select()).ShouldBeEmpty();
     }
 
     [Theory]
@@ -164,7 +166,7 @@ public sealed class FileSelectorTests : IDisposable
     [InlineData("../**/*.cs")]
     public async Task Invalid_includes_fail_preflight(string include)
     {
-        await Assert.ThrowsAsync<FileSelectionException>(() => Select(include));
+        Select(include).ShouldFailWith<FileSelectionException>();
     }
 
     [Fact]
@@ -172,14 +174,14 @@ public sealed class FileSelectorTests : IDisposable
     {
         var include = Path.Combine(_directory, "**", "*.cs");
 
-        await Assert.ThrowsAsync<FileSelectionException>(() => Select(include));
+        Select(include).ShouldFailWith<FileSelectionException>();
     }
 
     Task<IReadOnlyList<SelectedFile>> Select(params string[] includes) =>
         new FileSelector(_directory).Select(includes, TestContext.Current.CancellationToken);
 
-    void Write(string relativePath, string text)
-        => Write(_directory, relativePath, text);
+    void Write(string relativePath, string text) =>
+        Write(_directory, relativePath, text);
 
     static void Write(string root, string relativePath, string text)
     {
@@ -203,7 +205,7 @@ public sealed class FileSelectorTests : IDisposable
         using var process = Process.Start(startInfo)!;
         var error = process.StandardError.ReadToEnd();
         process.WaitForExit();
-        Assert.True(process.ExitCode == 0, error);
+        (process.ExitCode == 0).ShouldBe(true, error);
     }
 
     public void Dispose()
@@ -211,6 +213,5 @@ public sealed class FileSelectorTests : IDisposable
         foreach (var file in Directory.EnumerateFiles(_directory, "*", SearchOption.AllDirectories))
             File.SetAttributes(file, FileAttributes.Normal);
         Directory.Delete(_directory, true);
-        GC.SuppressFinalize(this);
     }
 }

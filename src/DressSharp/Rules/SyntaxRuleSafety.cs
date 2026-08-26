@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
@@ -22,5 +23,12 @@ static class SyntaxRuleSafety
             || trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia));
 
     internal static SyntaxToken SemicolonFrom(SyntaxToken token) =>
-        SyntaxFactory.Token(token.LeadingTrivia, SyntaxKind.SemicolonToken, token.TrailingTrivia);
+        SyntaxFactory.Token(SyntaxKind.SemicolonToken).WithTrailingTrivia(token.TrailingTrivia);
+}
+
+static class GeneratedSyntax
+{
+    internal static SyntaxAnnotation Block { get; } = new("DressSharp.GeneratedBlock");
+
+    internal static BlockSyntax Mark(BlockSyntax block) => block.WithAdditionalAnnotations(Block);
 }

@@ -1,5 +1,6 @@
 using DressSharp.Architecture;
 using Xunit;
+using EasyAssertions;
 
 namespace DressSharp.UnitTests;
 
@@ -10,8 +11,8 @@ public sealed class RuleKeyTests
     {
         foreach (var key in Enum.GetValues<RuleKey>())
         {
-            Assert.True(RuleKeys.TryParse(key.ToName(), out var parsed));
-            Assert.Equal(key, parsed);
+            RuleKeys.TryParse(key.ToName(), out var parsed).ShouldBe(true);
+            parsed.ShouldBe(key);
         }
     }
 
@@ -22,14 +23,14 @@ public sealed class RuleKeyTests
     [InlineData(RuleKey.DressMaxConsecutiveBlankLines, "dress_max_consecutive_blank_lines")]
     [InlineData(RuleKey.InsertFinalNewline, "insert_final_newline")]
     internal void Names_convert_to_the_expected_editorconfig_spelling(RuleKey key, string expected) =>
-        Assert.Equal(expected, key.ToName());
+        key.ToName().ShouldBe(expected);
 
     [Fact]
     public void Parsing_is_case_insensitive_and_rejects_unknown_names()
     {
-        Assert.True(RuleKeys.TryParse("DRESS_NAMESPACE_STYLE", out var parsed));
-        Assert.Equal(RuleKey.DressNamespaceStyle, parsed);
-        Assert.False(RuleKeys.TryParse("dress_not_a_preference", out _));
-        Assert.Throws<ArgumentException>(() => RuleKeys.Parse("dress_not_a_preference"));
+        RuleKeys.TryParse("DRESS_NAMESPACE_STYLE", out var parsed).ShouldBe(true);
+        parsed.ShouldBe(RuleKey.DressNamespaceStyle);
+        RuleKeys.TryParse("dress_not_a_preference", out _).ShouldBe(false);
+        Should.Throw<ArgumentException>(() => RuleKeys.Parse("dress_not_a_preference"));
     }
 }

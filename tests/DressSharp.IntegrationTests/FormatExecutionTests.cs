@@ -2,6 +2,7 @@ using DressSharp.CommandLine;
 using DressSharp.Configuration;
 using DressSharp.Execution;
 using DressSharp.TestSupport;
+using EasyAssertions;
 using Xunit;
 
 namespace DressSharp.IntegrationTests;
@@ -24,7 +25,7 @@ public sealed class FormatExecutionTests : IDisposable
         var original = await File.ReadAllBytesAsync(path, Token);
         var (exitCode, output, error) = await Run(CommandKind.Check, path);
 
-        Assert.Equal(1, exitCode);
+        exitCode.ShouldBe(1);
         ExactAssert.Text("Program.cs" + Environment.NewLine, output);
         ExactAssert.Text(string.Empty, error);
         var persisted = await File.ReadAllBytesAsync(path, Token);
@@ -34,25 +35,29 @@ public sealed class FormatExecutionTests : IDisposable
     [Fact]
     public async Task Format_reports_changed_file_count_and_second_run_as_a_no_op()
     {
-        var path = Source("class C { void M(int a,int b) { } }");
+        const string source = """class C { void M(int a,int b) { } }""";
+        const string expected = """
+            class C { void M(int a, int b) { } }
+
+            """;
+        var path = Source(source);
 
         var first = await Run(CommandKind.Format, path);
         var formatted = await File.ReadAllTextAsync(path, Token);
         var timestamp = File.GetLastWriteTimeUtc(path);
         var second = await Run(CommandKind.Format, path);
 
-        Assert.Equal(0, first.ExitCode);
-        Assert.Equal(0, second.ExitCode);
-        Assert.Matches($"^Formatted 1 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$", first.Output);
-        Assert.Matches($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$", second.Output);
+        first.ExitCode.ShouldBe(0);
+        second.ExitCode.ShouldBe(0);
+        first.Output.ShouldMatch($"^Formatted 1 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$");
+        second.Output.ShouldMatch($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$");
         ExactAssert.Text(string.Empty, first.Error + second.Error);
-        Assert.Contains("int a, int b", formatted);
-        Assert.EndsWith("\n", formatted);
-        Assert.Equal(timestamp, File.GetLastWriteTimeUtc(path));
+        formatted.ShouldBe(expected);
+        File.GetLastWriteTimeUtc(path).ShouldBe(timestamp);
     }
 
     [Fact]
-    public async Task Initialized_defaults_keep_required_spacing_and_layout_generated_braces()
+    public async Task Initialized_defaults_produce_the_expected_layout()
     {
         await EditorConfigInitializer.InitializeAsync(
             Path.Combine(_directory, ".editorconfig"),
@@ -63,13 +68,24 @@ public sealed class FormatExecutionTests : IDisposable
             {
                 static readonly Dictionary<string, string> Values = new();
 
-                bool Matches(string value)
+                public RuleMetadata Metadata { get; } = new(
+                    ruleKey,
+                    acceptedValues,
+                    ownedSyntax,
+                    "Only same-line whitespace changes");
+
+                int Identity(int value)
                 {
-                    if (value == "first")
-                        return value.Equals("first", StringComparison.OrdinalIgnoreCase)
-                            || value.Equals("second", StringComparison.OrdinalIgnoreCase)
-                            || value.Equals("third", StringComparison.OrdinalIgnoreCase);
-                    return false;
+                    return value;
+                }
+
+                object? Discover(ProcessResult result)
+                {
+                    if (result.ExitCode != 0)
+                        return result.StandardError.Contains("not a git repository", StringComparison.OrdinalIgnoreCase)
+                            ? null
+                            : throw new FileSelectionException($"Git file discovery failed: {result.StandardError.Trim()}");
+                    return result;
                 }
 
                 object Resolve(object[] paths)
@@ -88,29 +104,63 @@ public sealed class FormatExecutionTests : IDisposable
         var second = await Run(CommandKind.Format, path);
         var formattedAgain = await File.ReadAllTextAsync(path, Token);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Equal(formatted, formattedAgain);
-        Assert.Matches($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$", second.Output);
-        Assert.Contains("Values = new();", formatted);
-        Assert.Contains("\n        {\n            return value.Equals", formatted);
-        Assert.DoesNotContain("{return", formatted);
-        Assert.Equal(timestamp, File.GetLastWriteTimeUtc(path));
+        const string expected = """
+            class C
+            {
+                static readonly Dictionary<string, string> Values = new();
+
+                public RuleMetadata Metadata { get; } = new(
+                    ruleKey,
+                    acceptedValues,
+                    ownedSyntax,
+                    "Only same-line whitespace changes");
+
+                int Identity(int value) => value;
+
+                object? Discover(ProcessResult result)
+                {
+                    if (result.ExitCode != 0)
+                    {
+                        return result.StandardError.Contains("not a git repository", StringComparison.OrdinalIgnoreCase)
+                            ? null
+                            : throw new FileSelectionException($"Git file discovery failed: {result.StandardError.Trim()}");
+                    }
+                    return result;
+                }
+
+                object Resolve(object[] paths)
+                {
+                    var configurations = paths;
+                    return paths
+                        .Select((path, index) => (path, configuration: configurations[index]))
+                        .ToDictionary(pair => pair.path, pair => pair.configuration, StringComparer.OrdinalIgnoreCase);
+                }
+            }
+            """;
+
+        result.ExitCode.ShouldBe(0);
+        formatted.ShouldBe(expected + "\n");
+        formattedAgain.ShouldBe(formatted);
+        second.Output.ShouldMatch($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$");
+        File.GetLastWriteTimeUtc(path).ShouldBe(timestamp);
     }
 
     [Fact]
     public async Task Invalid_configuration_fails_before_any_write()
     {
-        var first = Source("class A { void M(int a,int b) { } }", "A.cs");
-        var second = Source("class B { void M(int a,int b) { } }", "B.cs");
+        const string firstSource = """class A { void M(int a,int b) { } }""";
+        const string secondSource = """class B { void M(int a,int b) { } }""";
+        var first = Source(firstSource, "A.cs");
+        var second = Source(secondSource, "B.cs");
         await File.AppendAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[B.cs]\ncsharp_space_after_comma = invalid\n", Token);
 
         var output = new StringWriter();
         var error = new StringWriter();
         var selected = new[] { new SelectedFile(first, "A.cs"), new SelectedFile(second, "B.cs") };
-        await Assert.ThrowsAsync<DressSharp.Configuration.ConfigurationException>(() =>
-            new FormatExecutor(_directory, output, error).Run(new(CommandKind.Format, [], false, null), selected, Token));
+        new FormatExecutor(_directory, output, error).Run(new(CommandKind.Format, [], false, null), selected, Token).ShouldFailWith<DressSharp.Configuration.ConfigurationException>();
 
-        Assert.DoesNotContain("a, int", await File.ReadAllTextAsync(first, Token));
+        (await File.ReadAllTextAsync(first, Token)).ShouldBe(firstSource);
+        (await File.ReadAllTextAsync(second, Token)).ShouldBe(secondSource);
     }
 
     [Fact]
@@ -121,8 +171,8 @@ public sealed class FormatExecutionTests : IDisposable
 
         var result = await Run(CommandKind.Format, path);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Matches($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$", result.Output);
+        result.ExitCode.ShouldBe(0);
+        result.Output.ShouldMatch($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$");
         ExactAssert.Text(
             "warning: no EditorConfig preferences to apply; run 'dotnet dress init' to initialize .editorconfig."
                 + Environment.NewLine,

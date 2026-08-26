@@ -28,6 +28,7 @@ sealed class EmitterPlan
         bool? indentCaseContents,
         LabelIndentationStyle? labelIndentation,
         bool? indentCaseContentsWhenBlock,
+        bool preserveSingleLineBlocks,
         bool expandSingleLineBlocks,
         bool separateSingleLineStatements,
         bool?[] initializerIndentations,
@@ -47,6 +48,7 @@ sealed class EmitterPlan
         IndentCaseContents = indentCaseContents;
         LabelIndentation = labelIndentation;
         IndentCaseContentsWhenBlock = indentCaseContentsWhenBlock;
+        PreserveSingleLineBlocks = preserveSingleLineBlocks;
         ExpandSingleLineBlocks = expandSingleLineBlocks;
         SeparateSingleLineStatements = separateSingleLineStatements;
         _initializerIndentations = initializerIndentations;
@@ -63,6 +65,7 @@ sealed class EmitterPlan
     internal bool? IndentCaseContents { get; }
     internal LabelIndentationStyle? LabelIndentation { get; }
     internal bool? IndentCaseContentsWhenBlock { get; }
+    internal bool PreserveSingleLineBlocks { get; }
     internal bool ExpandSingleLineBlocks { get; }
     internal bool SeparateSingleLineStatements { get; }
     internal EmbeddedStatementSettings EmbeddedStatements { get; }
@@ -163,6 +166,7 @@ sealed class EmitterPlan
             OptionalBoolean(configuration, RuleKey.CSharpIndentCaseContents),
             OptionalLabelIndentation(configuration),
             OptionalBoolean(configuration, RuleKey.CSharpIndentCaseContentsWhenBlock),
+            OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == true,
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == false,
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineStatements) == false,
             initializerIndentations,

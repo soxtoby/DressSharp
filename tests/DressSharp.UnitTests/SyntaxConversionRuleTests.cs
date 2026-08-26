@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Text.RegularExpressions;
 using Xunit;
+using EasyAssertions;
 
 namespace DressSharp.UnitTests;
 
@@ -31,10 +32,8 @@ public class SyntaxConversionRuleTests
     [Fact]
     public void Converts_namespace_forms_both_directions()
     {
-        const string block = "namespace N { using X; class C {} }";
-        const string file = "namespace N; using X; class C {}";
-        AssertEquivalent(file, Transform(block, ("dress_namespace_style", "file_scoped")));
-        AssertEquivalent(block, Transform(file, ("dress_namespace_style", "block_scoped")));
+        AssertEquivalent("namespace N; using X; class C {}", Transform("namespace N { using X; class C {} }", ("dress_namespace_style", "file_scoped")));
+        AssertEquivalent("namespace N { using X; class C {} }", Transform("namespace N; using X; class C {}", ("dress_namespace_style", "block_scoped")));
     }
 
     [Theory]
@@ -48,33 +47,37 @@ public class SyntaxConversionRuleTests
     [Fact]
     public void Unsafe_occurrences_are_skipped_while_safe_occurrences_continue()
     {
-        const string source = "class C { int Safe() { return 1; } int Commented() { /* keep */ return 2; } int Broken() { return ; } int Later() { return 3; } }";
-        var result = Transform(source, ("dress_method_body", "expression"));
-        Assert.Contains("Safe() => 1;", Normalize(result));
-        Assert.Contains("Commented() { /* keep */ return 2; }", Normalize(result));
-        Assert.Contains("Broken() { return; }", Normalize(result));
-        Assert.Contains("Later() => 3;", Normalize(result));
+        var result = Transform("class C { int Safe() { return 1; } int Commented() { /* keep */ return 2; } int Broken() { return ; } int Later() { return 3; } }", ("dress_method_body", "expression"));
+        result.ShouldBe("class C { int Safe() => 1; int Commented() { /* keep */ return 2; } int Broken() { return ; } int Later() => 3; }");
     }
 
     [Fact]
     public void Directives_and_dangling_else_prevent_only_unsafe_brace_removal()
     {
-        const string source = "class C { void M() { if (a) { if (b) A(); } else { B(); } if (c) {\n#if X\n C();\n#endif\n} if (d) { D(); } } }";
-        var result = Normalize(Transform(source, ("dress_embedded_statement_braces", "compact")));
-        Assert.Contains("if (a) { if (b) A(); } else B();", result);
-        Assert.Contains("#if X", result);
-        Assert.Contains("if (d) D();", result);
+        var result = Transform("""
+            class C { void M() { if (a) { if (b) A(); } else { B(); } if (c) {
+            #if X
+             C();
+            #endif
+            } if (d) { D(); } } }
+            """, ("dress_embedded_statement_braces", "compact"));
+        result.ShouldBe("""
+            class C { void M() { if (a) { if (b) A(); } else B(); if (c) {
+            #if X
+             C();
+            #endif
+            } if (d) D(); } }
+            """);
     }
 
     [Fact]
     public void Built_in_rules_are_independently_selectable_deterministic_and_idempotent()
     {
-        const string source = "namespace N { class C { int P { get { return 1; } } int M() { return P; } void V() { if (P > 0) { M(); } else { V(); } } } }";
         var preferences = new[] { ("dress_method_body", "expression"), ("dress_property_body", "expression"), ("dress_namespace_style", "file_scoped"), ("dress_embedded_statement_braces", "balanced") };
-        var first = Transform(source, preferences);
+        var first = Transform("namespace N { class C { int P { get { return 1; } } int M() { return P; } void V() { if (P > 0) { M(); } else { V(); } } } }", preferences);
         var second = Transform(first, preferences);
-        Assert.Equal(first, second);
-        Assert.Empty(CSharpSyntaxTree.ParseText(first, cancellationToken: TestContext.Current.CancellationToken).GetDiagnostics(TestContext.Current.CancellationToken));
+        second.ShouldBe(first);
+        CSharpSyntaxTree.ParseText(first, cancellationToken: TestContext.Current.CancellationToken).GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
     }
 
     static string Transform(string source, params (string Key, string Value)[] preferences)
@@ -83,8 +86,8 @@ public class SyntaxConversionRuleTests
     static void AssertEquivalent(string expected, string actual, bool wrap = false)
     {
         if (wrap) expected = $"class C {{ void M() {{ {expected} }} }}";
-        Assert.Equal(Normalize(expected), Normalize(actual));
-        Assert.Empty(CSharpSyntaxTree.ParseText(actual, cancellationToken: TestContext.Current.CancellationToken).GetDiagnostics(TestContext.Current.CancellationToken));
+        Normalize(actual).ShouldBe(Normalize(expected));
+        CSharpSyntaxTree.ParseText(actual, cancellationToken: TestContext.Current.CancellationToken).GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
     }
 
     static string Normalize(string source) => Regex.Replace(CSharpSyntaxTree.ParseText(source).GetRoot().NormalizeWhitespace().ToFullString(), @"\s+", " ").Trim();

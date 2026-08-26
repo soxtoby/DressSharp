@@ -1,4 +1,5 @@
-using DressSharp.TestSupport;
+using System.CommandLine;
+using EasyAssertions;
 using Xunit;
 
 namespace DressSharp.UnitTests;
@@ -8,9 +9,8 @@ public sealed class CommandTests
     [Fact]
     public void Root_command_describes_the_tool()
     {
-        ExactAssert.Text(
-            "Format C# using explicit syntax-only preferences.",
-            Program.CreateCommand().Description ?? string.Empty);
+        Program.CreateCommand().Description
+            .ShouldBe("Format C# using explicit syntax-only preferences.");
     }
 
     [Theory]
@@ -19,30 +19,36 @@ public sealed class CommandTests
     [InlineData("init")]
     public void Root_command_exposes_documented_commands(string name)
     {
-        Assert.Contains(Program.CreateCommand().Subcommands, command => command.Name == name);
+        Program.CreateCommand().Subcommands
+            .ShouldContain(name, (c, n) => c.Name == n);
     }
 
     [Fact]
     public void Root_include_patterns_are_the_default_format_alias()
     {
-        var command = Program.CreateCommand();
-        var includes = Assert.Single(command.Options.OfType<System.CommandLine.Option<string[]>>(), option => option.Name == "--include");
-        var result = command.Parse(["--include", "one.cs", "--include", "src/**/*.cs"]);
+        var sut = Program.CreateCommand();
 
-        Assert.Empty(result.Errors);
-        Assert.Equal(["one.cs", "src/**/*.cs"], result.GetValue(includes) ?? []);
+        var result = sut.Parse(["--include", "one.cs", "--include", "src/**/*.cs"]);
+        result.Errors.ShouldBeEmpty();
+        sut.Options
+            .OfType<Option<string[]>>()
+            .Where(option => option.Name == "--include")
+            .ShouldBeASingular<Option<string[]>>()
+            .And(o => result.GetValue(o).ShouldMatch(["one.cs", "src/**/*.cs"]));
     }
 
     [Fact]
     public void File_command_accepts_one_pattern_per_include_occurrence()
     {
-        var root = Program.CreateCommand();
-        var command = Assert.Single(root.Subcommands, command => command.Name == "format");
-        var includes = Assert.Single(command.Options.OfType<System.CommandLine.Option<string[]>>(), option => option.Name == "--include");
-        var result = root.Parse(["format", "--include", "one.cs", "--include", "two.cs"]);
+        var sut = Program.CreateCommand();
 
-        Assert.Empty(result.Errors);
-        Assert.Equal(["one.cs", "two.cs"], result.GetValue(includes) ?? []);
+        var result = sut.Parse(["format", "--include", "one.cs", "--include", "two.cs"]);
+        result.Errors.ShouldBeEmpty();
+        sut.Subcommands.Where(command => command.Name == "format")
+            .ShouldBeASingular<Command>()
+            .And.Options.OfType<Option<string[]>>()
+            .Where(option => option.Name == "--include").ShouldBeASingular<Option<string[]>>()
+            .And(o => result.GetValue(o).ShouldMatch(["one.cs", "two.cs"]));
     }
 
     [Theory]
@@ -56,20 +62,21 @@ public sealed class CommandTests
     [InlineData("--include *.cs format")]
     public void Positional_inputs_and_invalid_options_are_rejected(string commandLine)
     {
-        var result = Program.CreateCommand().Parse(commandLine);
-
-        Assert.NotEmpty(result.Errors);
+        Program.CreateCommand().Parse(commandLine).Errors.ShouldNotBeEmpty();
     }
 
     [Fact]
     public void Init_target_is_an_option()
     {
-        var root = Program.CreateCommand();
-        var command = Assert.Single(root.Subcommands, command => command.Name == "init");
-        var target = Assert.Single(command.Options.OfType<System.CommandLine.Option<string?>>(), option => option.Name == "--target");
-        var result = root.Parse("init --target nested/.editorconfig");
+        var sut = Program.CreateCommand();
 
-        Assert.Empty(result.Errors);
-        Assert.Equal("nested/.editorconfig", result.GetValue(target));
+        var result = sut.Parse("init --target nested/.editorconfig");
+        result.Errors.ShouldBeEmpty();
+        sut.Subcommands
+            .Where(command => command.Name == "init")
+            .ShouldBeASingular<Command>()
+            .And.Options.OfType<Option<string?>>()
+            .Where(option => option.Name == "--target").ShouldBeASingular<Option<string?>>()
+            .And(o => result.GetValue(o).ShouldBe("nested/.editorconfig"));
     }
 }

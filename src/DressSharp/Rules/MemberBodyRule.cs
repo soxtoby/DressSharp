@@ -89,13 +89,14 @@ sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxForma
             {
                 case true when body is not null && TryExpression(body, statementBody, out var value):
                 {
-                    var clause = SyntaxFactory.ArrowExpressionClause(value).WithArrowToken(SyntaxFactory.Token(SyntaxKind.EqualsGreaterThanToken).WithLeadingTrivia(body.OpenBraceToken.LeadingTrivia));
-                    return (T)((dynamic)node).WithBody(null).WithExpressionBody(clause).WithSemicolonToken(SyntaxRuleSafety.SemicolonFrom(body.CloseBraceToken));
+                    var clause = SyntaxFactory.ArrowExpressionClause(value).WithArrowToken(Arrow());
+                    var rewritten = (T)((dynamic)node).WithBody(null).WithExpressionBody(clause).WithSemicolonToken(SyntaxRuleSafety.SemicolonFrom(body.CloseBraceToken));
+                    return RemoveTriviaBeforeArrow(rewritten, ((dynamic)rewritten).ExpressionBody.ArrowToken);
                 }
                 case false when arrow is not null:
                 {
                     var statement = statementBody ? (StatementSyntax)SyntaxFactory.ExpressionStatement(arrow.Expression) : Return(arrow.Expression);
-                    var block = SyntaxFactory.Block(statement).WithOpenBraceToken(SyntaxFactory.Token(SyntaxKind.OpenBraceToken).WithLeadingTrivia(arrow.ArrowToken.LeadingTrivia)).WithCloseBraceToken(SyntaxFactory.Token(SyntaxKind.CloseBraceToken).WithTrailingTrivia(semicolon.TrailingTrivia));
+                    var block = GeneratedSyntax.Mark(SyntaxFactory.Block(statement)).WithOpenBraceToken(SyntaxFactory.Token(SyntaxKind.OpenBraceToken).WithLeadingTrivia(arrow.ArrowToken.LeadingTrivia)).WithCloseBraceToken(SyntaxFactory.Token(SyntaxKind.CloseBraceToken).WithTrailingTrivia(semicolon.TrailingTrivia));
                     return (T)((dynamic)node).WithBody(block).WithExpressionBody(null).WithSemicolonToken(default(SyntaxToken));
                 }
                 default:
@@ -115,11 +116,12 @@ sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxForma
             switch (expression)
             {
                 case true when (node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body: not null } accessor] && TryExpression(accessor.Body, false, out var value)):
-                    return node
+                    var rewritten = node
                         .WithAccessorList(null)
                         .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(value)
-                            .WithArrowToken(SyntaxFactory.Token(SyntaxKind.EqualsGreaterThanToken).WithLeadingTrivia(node.AccessorList.OpenBraceToken.LeadingTrivia)))
+                            .WithArrowToken(Arrow()))
                         .WithSemicolonToken(SyntaxRuleSafety.SemicolonFrom(node.AccessorList.CloseBraceToken));
+                    return RemoveTriviaBeforeArrow(rewritten, rewritten.ExpressionBody!.ArrowToken);
                 case false when node.ExpressionBody is { } arrow:
                     return node
                         .WithExpressionBody(null)
@@ -140,11 +142,12 @@ sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxForma
             switch (expression)
             {
                 case true when (node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body: not null } accessor] && TryExpression(accessor.Body, false, out var value)):
-                    return node
+                    var rewritten = node
                         .WithAccessorList(null)
                         .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(value)
-                            .WithArrowToken(SyntaxFactory.Token(SyntaxKind.EqualsGreaterThanToken).WithLeadingTrivia(node.AccessorList.OpenBraceToken.LeadingTrivia)))
+                            .WithArrowToken(Arrow()))
                         .WithSemicolonToken(SyntaxRuleSafety.SemicolonFrom(node.AccessorList.CloseBraceToken));
+                    return RemoveTriviaBeforeArrow(rewritten, rewritten.ExpressionBody!.ArrowToken);
                 case false when node.ExpressionBody is { } arrow:
                     return node
                         .WithExpressionBody(null)
@@ -167,12 +170,12 @@ sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxForma
             {
                 case true when node.Body is not null && TryExpression(node.Body, statementBody, out var value):
                 {
-                    return node
+                    var rewritten = node
                         .WithBody(null)
                         .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(value)
-                            .WithArrowToken(SyntaxFactory.Token(SyntaxKind.EqualsGreaterThanToken)
-                                .WithLeadingTrivia(node.Body.OpenBraceToken.LeadingTrivia)))
+                            .WithArrowToken(Arrow()))
                         .WithSemicolonToken(SyntaxRuleSafety.SemicolonFrom(node.Body.CloseBraceToken));
+                    return RemoveTriviaBeforeArrow(rewritten, rewritten.ExpressionBody!.ArrowToken);
                 }
                 case false when node.ExpressionBody is { } arrow:
                 {
@@ -182,7 +185,7 @@ sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxForma
                     return node
                         .WithExpressionBody(null)
                         .WithSemicolonToken(default)
-                        .WithBody(SyntaxFactory.Block(statement)
+                        .WithBody(GeneratedSyntax.Mark(SyntaxFactory.Block(statement))
                             .WithOpenBraceToken(SyntaxFactory.Token(SyntaxKind.OpenBraceToken)
                                 .WithLeadingTrivia(arrow.ArrowToken.LeadingTrivia))
                             .WithCloseBraceToken(SyntaxFactory.Token(SyntaxKind.CloseBraceToken)
@@ -196,7 +199,7 @@ sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxForma
         }
 
         static AccessorListSyntax Getter(ArrowExpressionClauseSyntax arrow, SyntaxToken semicolon) =>
-            SyntaxFactory.AccessorList(SyntaxFactory.SingletonList(SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration, SyntaxFactory.Block(Return(arrow.Expression)))))
+            SyntaxFactory.AccessorList(SyntaxFactory.SingletonList(SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration, GeneratedSyntax.Mark(SyntaxFactory.Block(Return(arrow.Expression))))))
                 .WithOpenBraceToken(SyntaxFactory.Token(SyntaxKind.OpenBraceToken)
                     .WithLeadingTrivia(arrow.ArrowToken.LeadingTrivia))
                 .WithCloseBraceToken(SyntaxFactory.Token(SyntaxKind.CloseBraceToken)
@@ -205,6 +208,17 @@ sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxForma
         static ReturnStatementSyntax Return(ExpressionSyntax expression) =>
             SyntaxFactory.ReturnStatement(expression.WithoutLeadingTrivia())
                 .WithReturnKeyword(SyntaxFactory.Token(SyntaxKind.ReturnKeyword).WithTrailingTrivia(SyntaxFactory.Space));
+
+        static SyntaxToken Arrow() =>
+            SyntaxFactory.Token(SyntaxKind.EqualsGreaterThanToken)
+                .WithLeadingTrivia(SyntaxFactory.Space)
+                .WithTrailingTrivia(SyntaxFactory.Space);
+
+        static T RemoveTriviaBeforeArrow<T>(T node, SyntaxToken arrow) where T : SyntaxNode
+        {
+            var previous = arrow.GetPreviousToken();
+            return (T)node.ReplaceToken(previous, previous.WithTrailingTrivia(default(SyntaxTriviaList)));
+        }
 
         bool CanConvert(BlockSyntax? body, ArrowExpressionClauseSyntax? arrow, bool statementBody) =>
             expression

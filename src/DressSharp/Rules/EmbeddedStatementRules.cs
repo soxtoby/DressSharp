@@ -284,9 +284,11 @@ static class EmbeddedStatementBraces
             var leading = statement.GetLeadingTrivia();
             var trailing = statement.GetTrailingTrivia();
             if (statement is EmptyStatementSyntax)
-                return SyntaxFactory.Block().WithLeadingTrivia(leading).WithTrailingTrivia(trailing);
+                return GeneratedSyntax.Mark(SyntaxFactory.Block())
+                    .WithLeadingTrivia(leading)
+                    .WithTrailingTrivia(trailing);
             var inner = statement.WithoutLeadingTrivia().WithoutTrailingTrivia();
-            var block = SyntaxFactory.Block(inner);
+            var block = GeneratedSyntax.Mark(SyntaxFactory.Block(inner));
             if (IsMultiline(statement))
             {
                 var lineEnding = SyntaxFactory.EndOfLine(context.LineEnding);

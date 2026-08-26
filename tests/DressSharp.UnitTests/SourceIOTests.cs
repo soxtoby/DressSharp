@@ -1,31 +1,32 @@
 using System.Text;
 using DressSharp.IO;
 using DressSharp.TestSupport;
+using EasyAssertions;
 using Xunit;
 
 namespace DressSharp.UnitTests;
 
 public sealed class SourceIOTests : IDisposable
 {
-    readonly string directory = Path.Combine(Path.GetTempPath(), $"DressSharp-{Guid.NewGuid():N}");
+    readonly string _directory = Path.Combine(Path.GetTempPath(), $"DressSharp-{Guid.NewGuid():N}");
 
-    public SourceIOTests() => Directory.CreateDirectory(directory);
+    public SourceIOTests() => Directory.CreateDirectory(_directory);
 
     [Fact]
     public async Task NoOpPreservesExactBytesAndDoesNotWrite()
     {
-        var path = File([0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("a\r\nb\nc")]);
+        var path = File([0xEF, 0xBB, 0xBF, .. "a\r\nb\nc"u8.ToArray()]);
         var document = await SourceDocument.ReadAsync(path, Token);
         var before = System.IO.File.GetLastWriteTimeUtc(path);
 
         var bytes = document.Encode(document.Text, new());
         var changed = await new AtomicFilePersistence().WriteIfChangedAsync(document, bytes, Token);
 
-        Assert.False(changed);
-        Assert.Equal(before, System.IO.File.GetLastWriteTimeUtc(path));
+        changed.ShouldBe(false);
+        System.IO.File.GetLastWriteTimeUtc(path).ShouldBe(before);
         var persisted = await System.IO.File.ReadAllBytesAsync(path, Token);
         ExactAssert.Bytes(document.OriginalBytes.Span, persisted);
-        Assert.Equal("\r\n", document.PreferredLineEnding);
+        document.PreferredLineEnding.ShouldBe("\r\n");
     }
 
     [Theory]
@@ -39,24 +40,24 @@ public sealed class SourceIOTests : IDisposable
         var bytes = Encode(encoding, text);
         var document = await SourceDocument.ReadAsync(File(bytes), Token);
 
-        Assert.Equal(encoding, document.SourceEncoding);
-        Assert.Equal(text, document.Text);
+        document.SourceEncoding.ShouldBe(encoding);
+        document.Text.ShouldBe(text);
         ExactAssert.Bytes(bytes, document.Encode(text, new()));
     }
 
     [Fact]
     public async Task BomlessUtf16IsTreatedAsValidUtf8RatherThanGuessed()
     {
-        var document = await SourceDocument.ReadAsync(File([0x61, 0x00, 0x62, 0x00]), Token);
-        Assert.Equal(SourceEncoding.Utf8, document.SourceEncoding);
-        Assert.Equal("a\0b\0", document.Text);
+        var document = await SourceDocument.ReadAsync(File([.. "a\0b\0"u8]), Token);
+        document.SourceEncoding.ShouldBe(SourceEncoding.Utf8);
+        document.Text.ShouldBe("a\0b\0");
     }
 
     [Fact]
     public async Task UnsupportedBomFailsWithoutChangingFile()
     {
         var path = File([0xFF, 0xFE, 0x00, 0x00, 0x61]);
-        await Assert.ThrowsAsync<SourceIOException>(async () => await SourceDocument.ReadAsync(path, Token));
+        SourceDocument.ReadAsync(path, Token).AsTask().ShouldFailWith<SourceIOException>();
         var persisted = await System.IO.File.ReadAllBytesAsync(path, Token);
         ExactAssert.Bytes([0xFF, 0xFE, 0x00, 0x00, 0x61], persisted);
     }
@@ -67,7 +68,7 @@ public sealed class SourceIOTests : IDisposable
         var bytes = new byte[] { 0xFF, 0xFE, 0x00 };
         var path = File(bytes);
 
-        await Assert.ThrowsAsync<SourceIOException>(async () => await SourceDocument.ReadAsync(path, Token));
+        SourceDocument.ReadAsync(path, Token).AsTask().ShouldFailWith<SourceIOException>();
 
         var persisted = await System.IO.File.ReadAllBytesAsync(path, Token);
         ExactAssert.Bytes(bytes, persisted);
@@ -76,40 +77,39 @@ public sealed class SourceIOTests : IDisposable
     [Fact]
     public async Task ExplicitRepresentationPreferencesApplyToWholeDecodedText()
     {
-        var document = await SourceDocument.ReadAsync(File(Encoding.UTF8.GetBytes("a  \r\n#if false\r\nb  \r\n#endif")), Token);
+        var document = await SourceDocument.ReadAsync(File([.. "a  \r\n#if false\r\nb  \r\n#endif"u8]), Token);
         var bytes = document.Encode(document.Text, new(SourceEncoding.Utf8Bom, "\n", true, true));
 
-        ExactAssert.Bytes([0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("a\n#if false\nb\n#endif\n")], bytes);
+        ExactAssert.Bytes([0xEF, 0xBB, 0xBF, .. "a\n#if false\nb\n#endif\n"u8], bytes);
     }
 
     [Fact]
     public async Task DetectsConcurrentChangeBeforeReplacement()
     {
-        var path = File(Encoding.UTF8.GetBytes("before"));
+        var path = File([.. "before"u8]);
         var document = await SourceDocument.ReadAsync(path, Token);
         await System.IO.File.WriteAllTextAsync(path, "concurrent", Token);
 
-        await Assert.ThrowsAsync<SourceIOException>(async () =>
-            await new AtomicFilePersistence().WriteIfChangedAsync(document, Encoding.UTF8.GetBytes("after"), Token));
-        Assert.Equal("concurrent", await System.IO.File.ReadAllTextAsync(path, Token));
+        new AtomicFilePersistence().WriteIfChangedAsync(document, "after"u8.ToArray(), Token).AsTask().ShouldFailWith<SourceIOException>();
+        (await System.IO.File.ReadAllTextAsync(path, Token)).ShouldBe("concurrent");
     }
 
     [Fact]
     public async Task ReplacementChangesContent()
     {
-        var path = File(Encoding.UTF8.GetBytes("before"));
+        var path = File([.. "before"u8]);
         var document = await SourceDocument.ReadAsync(path, Token);
 
-        Assert.True(await new AtomicFilePersistence().WriteIfChangedAsync(document, Encoding.UTF8.GetBytes("after"), Token));
-        Assert.Equal("after", await System.IO.File.ReadAllTextAsync(path, Token));
-        Assert.Empty(Directory.GetFiles(directory, "*.dresssharp.tmp"));
+        (await new AtomicFilePersistence().WriteIfChangedAsync(document, "after"u8.ToArray(), Token)).ShouldBe(true);
+        (await System.IO.File.ReadAllTextAsync(path, Token)).ShouldBe("after");
+        Directory.GetFiles(_directory, "*.dresssharp.tmp").ShouldBeEmpty();
     }
 
     [Fact]
     public async Task ReplacementThroughSymbolicLinkPreservesTheLink()
     {
-        var target = File(Encoding.UTF8.GetBytes("before"));
-        var link = Path.Combine(directory, "link.cs");
+        var target = File([.. "before"u8]);
+        var link = Path.Combine(_directory, "link.cs");
         try
         {
             System.IO.File.CreateSymbolicLink(link, target);
@@ -120,15 +120,15 @@ public sealed class SourceIOTests : IDisposable
         }
         var document = await SourceDocument.ReadAsync(link, Token);
 
-        await new AtomicFilePersistence().WriteIfChangedAsync(document, Encoding.UTF8.GetBytes("after"), Token);
+        await new AtomicFilePersistence().WriteIfChangedAsync(document, "after"u8.ToArray(), Token);
 
-        Assert.NotNull(new FileInfo(link).LinkTarget);
-        Assert.Equal("after", await System.IO.File.ReadAllTextAsync(target, Token));
+        new FileInfo(link).LinkTarget.ShouldNotBeNull();
+        (await System.IO.File.ReadAllTextAsync(target, Token)).ShouldBe("after");
     }
 
     string File(byte[] bytes)
     {
-        var path = Path.Combine(directory, $"{Guid.NewGuid():N}.cs");
+        var path = Path.Combine(_directory, $"{Guid.NewGuid():N}.cs");
         System.IO.File.WriteAllBytes(path, bytes);
         return path;
     }
@@ -148,5 +148,5 @@ public sealed class SourceIOTests : IDisposable
 
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    public void Dispose() => Directory.Delete(directory, true);
+    public void Dispose() => Directory.Delete(_directory, true);
 }

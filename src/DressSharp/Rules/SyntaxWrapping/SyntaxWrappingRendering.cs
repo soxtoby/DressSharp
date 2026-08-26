@@ -17,8 +17,10 @@ static class SyntaxWrappingRendering
     internal enum GapStyle
     {
         DelimitedFirst,
+        DelimitedSpacedFirst,
         DelimitedLater,
         DelimitedClose,
+        DelimitedSpacedClose,
         SeparatedFirst,
         SeparatedLater,
         Item,
@@ -90,6 +92,10 @@ static class SyntaxWrappingRendering
                 left = Trailing(leftTrailing, multi ? line : default);
                 right = Leading(rightLeading, default);
                 break;
+            case GapStyle.DelimitedSpacedFirst:
+                left = Trailing(leftTrailing, multi ? line : space);
+                right = Leading(rightLeading, default);
+                break;
             case GapStyle.DelimitedLater:
                 left = Trailing(leftTrailing, multi ? line : space);
                 right = Leading(rightLeading, default);
@@ -97,6 +103,10 @@ static class SyntaxWrappingRendering
             case GapStyle.DelimitedClose:
                 left = WithoutWhitespace(leftTrailing);
                 right = Leading(rightLeading, multi ? baseLine : default);
+                break;
+            case GapStyle.DelimitedSpacedClose:
+                left = WithoutWhitespace(leftTrailing);
+                right = Leading(rightLeading, multi ? baseLine : space);
                 break;
             case GapStyle.SeparatedFirst:
                 left = WithoutWhitespace(leftTrailing);
@@ -138,7 +148,9 @@ static class SyntaxWrappingRendering
     }
 
     static bool WantsSingleSpace(GapStyle style) => style is
-        GapStyle.DelimitedLater
+        GapStyle.DelimitedSpacedFirst
+        or GapStyle.DelimitedLater
+        or GapStyle.DelimitedSpacedClose
         or GapStyle.SeparatedFirst
         or GapStyle.SeparatedLater
         or GapStyle.Item;

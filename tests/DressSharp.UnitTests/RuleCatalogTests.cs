@@ -1,6 +1,7 @@
 using DressSharp.Architecture;
 using DressSharp.Rules;
 using Xunit;
+using EasyAssertions;
 
 namespace DressSharp.UnitTests;
 
@@ -23,21 +24,19 @@ public class RuleCatalogTests
         var expected = Enum.GetValues<RuleKey>().Except(settings).Order().ToArray();
         var actual = RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata.RuleKey).Order().ToArray();
 
-        Assert.Equal(expected, actual);
+        actual.ShouldMatch(expected);
     }
 
     [Fact]
     public void Catalog_metadata_validates_open_and_closed_value_sets()
     {
-        var blankLines = RuleCatalog.BuiltIn.Rules.Single(
-            rule => rule.Metadata.RuleKey == RuleKey.DressBlankLinesBetweenMembers);
-        var namespaceStyle = RuleCatalog.BuiltIn.Rules.Single(
-            rule => rule.Metadata.RuleKey == RuleKey.DressNamespaceStyle);
+        var blankLines = RuleCatalog.BuiltIn.Rules.Single(rule => rule.Metadata.RuleKey == RuleKey.DressBlankLinesBetweenMembers);
+        var namespaceStyle = RuleCatalog.BuiltIn.Rules.Single(rule => rule.Metadata.RuleKey == RuleKey.DressNamespaceStyle);
 
-        Assert.True(blankLines.Metadata.Accepts("0"));
-        Assert.True(blankLines.Metadata.Accepts("12"));
-        Assert.False(blankLines.Metadata.Accepts("-1"));
-        Assert.True(namespaceStyle.Metadata.Accepts("file_scoped"));
-        Assert.False(namespaceStyle.Metadata.Accepts("invalid"));
+        blankLines.Metadata.Accepts("0").ShouldBe(true);
+        blankLines.Metadata.Accepts("12").ShouldBe(true);
+        blankLines.Metadata.Accepts("-1").ShouldBe(false);
+        namespaceStyle.Metadata.Accepts("file_scoped").ShouldBe(true);
+        namespaceStyle.Metadata.Accepts("invalid").ShouldBe(false);
     }
 }

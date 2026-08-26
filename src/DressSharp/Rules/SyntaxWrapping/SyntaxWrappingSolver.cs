@@ -21,6 +21,7 @@ sealed class SyntaxWrappingSolver
     TriviaLayoutPlan? _trivia;
     SparseGapWidths? _plannedWidths;
     Dictionary<int, int>? _baseGapWidths;
+    int[]? _braceDepths;
     internal SyntaxWrappingSolver(
         string source,
         EffectiveTokenStream stream,
@@ -82,9 +83,12 @@ sealed class SyntaxWrappingSolver
     }
     void Decide()
     {
-        for (var occurrenceIndex = _occurrences.Length - 1; occurrenceIndex >= 0; occurrenceIndex--)
+        for (var occurrenceIndex = 0; occurrenceIndex < _occurrences.Length; occurrenceIndex++)
         {
             var occurrence = _occurrences[occurrenceIndex];
+            if (occurrence.Setting.Mode == WrappingMode.Auto && HasLineBreak(occurrence))
+                continue;
+
             var multi = occurrence.Setting.Mode == WrappingMode.Multi;
             var hasLineComment = false;
             var checkedLineComments = false;
@@ -184,6 +188,18 @@ sealed class SyntaxWrappingSolver
             {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    bool HasLineBreak(Occurrence occurrence)
+    {
+        for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+        {
+            var boundary = _boundaries[occurrence.BoundaryStart + offset];
+            if (_trivia!.HasLineBreak(boundary.RightIndex))
+                return true;
         }
 
         return false;
@@ -318,10 +334,20 @@ sealed class SyntaxWrappingSolver
     {
         var occurrence = _occurrences[occurrenceIndex];
         var node = occurrence.Node;
-        var position = node is InitializerExpressionSyntax or CollectionExpressionSyntax
-            ? node.GetFirstToken().GetPreviousToken().SpanStart
-            : node.SpanStart;
-        var text = node.SyntaxTree.GetText();
+        var units = extra + MultilineLayoutAncestors(occurrenceIndex);
+        var unit = _settings.IndentUnit;
+        if (_emitterPlan.IndentBlockContents == true)
+        {
+            var blockDepth = BraceDepth(occurrence.FirstToken);
+            return string.Concat(Enumerable.Repeat(unit, blockDepth + units));
+        }
+
+        var pieceIndex = node is InitializerExpressionSyntax or CollectionExpressionSyntax
+            ? Math.Max(0, occurrence.FirstToken - 1)
+            : occurrence.FirstToken;
+        var piece = _stream.Pieces[pieceIndex];
+        var position = piece.Token.SpanStart;
+        var text = Microsoft.CodeAnalysis.Text.SourceText.From(piece.Source);
         var line = text.Lines.GetLineFromPosition(position);
         var leading = 0;
         while (line.Start + leading < line.End
@@ -330,8 +356,6 @@ sealed class SyntaxWrappingSolver
             leading++;
         }
 
-        var units = extra + MultilineLayoutAncestors(occurrenceIndex);
-        var unit = _settings.IndentUnit;
         return string.Create(
             leading + units * unit.Length,
             (text, line.Start, leading, unit, units),
@@ -348,6 +372,26 @@ sealed class SyntaxWrappingSolver
                 });
     }
 
+    int BraceDepth(int tokenIndex)
+    {
+        if (_braceDepths is null)
+        {
+            _braceDepths = new int[_stream.Pieces.Length];
+            var depth = 0;
+            for (var index = 0; index < _stream.Pieces.Length; index++)
+            {
+                _braceDepths[index] = depth;
+                var token = _stream.Pieces[index].Token;
+                if (token.IsKind(SyntaxKind.OpenBraceToken))
+                    depth++;
+                else if (token.IsKind(SyntaxKind.CloseBraceToken))
+                    depth--;
+            }
+        }
+
+        return _braceDepths[tokenIndex];
+    }
+
     int MultilineLayoutAncestors(int occurrenceIndex)
     {
         var count = 0;
@@ -355,8 +399,11 @@ sealed class SyntaxWrappingSolver
         for (var parentIndex = occurrence.Parent; parentIndex >= 0;)
         {
             var parent = _occurrences[parentIndex];
-            if (!StartsOnSameLine(occurrence.Node, parent.Node))
+            if (_emitterPlan.IndentBlockContents != true
+                && !StartsOnSameLine(occurrence.Node, parent.Node))
+            {
                 break;
+            }
             if (parent is { Applies: true, Multi: true })
                 count++;
             parentIndex = parent.Parent;

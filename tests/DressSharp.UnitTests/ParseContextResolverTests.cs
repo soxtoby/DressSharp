@@ -2,6 +2,7 @@ using DressSharp.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using EasyAssertions;
 
 namespace DressSharp.UnitTests;
 
@@ -23,9 +24,9 @@ public sealed class ParseContextResolverTests : IDisposable
 
         var result = await Resolve(evaluator, file, "Release");
 
-        Assert.Equal(LanguageVersion.CSharp12, result.Options!.LanguageVersion);
-        Assert.Contains("NET8", result.Options.PreprocessorSymbolNames);
-        Assert.All(evaluator.Configurations, value => Assert.Equal("Release", value));
+        result.Options!.LanguageVersion.ShouldBe(LanguageVersion.CSharp12);
+        result.Options.PreprocessorSymbolNames.ShouldContain("NET8");
+        evaluator.Configurations.AllItemsSatisfy(value => value.ShouldBe("Release"));
     }
 
     [Fact]
@@ -42,8 +43,8 @@ public sealed class ParseContextResolverTests : IDisposable
 
         var result = await Resolve(evaluator, file);
 
-        Assert.False(result.CanFormat);
-        Assert.Contains("differing parse contexts", result.Diagnostics.Single());
+        result.CanFormat.ShouldBe(false);
+        result.Diagnostics.Single().ShouldContain("differing parse contexts");
     }
 
     [Fact]
@@ -56,7 +57,7 @@ public sealed class ParseContextResolverTests : IDisposable
 
         await new ParseContextResolver(root, evaluator).Resolve([file], null, TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, evaluator.MaximumConcurrency);
+        evaluator.MaximumConcurrency.ShouldBe(2);
     }
 
     [Fact]
@@ -68,8 +69,8 @@ public sealed class ParseContextResolverTests : IDisposable
 
         var result = await Resolve(evaluator, file);
 
-        Assert.False(result.CanFormat);
-        Assert.Contains("broken import", result.Diagnostics.Single());
+        result.CanFormat.ShouldBe(false);
+        result.Diagnostics.Single().ShouldContain("broken import");
     }
 
     [Fact]
@@ -80,11 +81,11 @@ public sealed class ParseContextResolverTests : IDisposable
 
         var result = await Resolve(evaluator, file);
 
-        Assert.True(result.CanFormat);
-        Assert.Equal(LanguageVersion.Latest.MapSpecifiedToEffectiveVersion(), result.Options!.LanguageVersion);
-        Assert.Equal(DocumentationMode.Parse, result.Options.DocumentationMode);
-        Assert.Empty(result.Options.PreprocessorSymbolNames);
-        Assert.Contains("latest-stable fallback", result.Diagnostics.Single());
+        result.CanFormat.ShouldBe(true);
+        result.Options!.LanguageVersion.ShouldBe(LanguageVersion.Latest.MapSpecifiedToEffectiveVersion());
+        result.Options.DocumentationMode.ShouldBe(DocumentationMode.Parse);
+        result.Options.PreprocessorSymbolNames.ShouldBeEmpty();
+        result.Diagnostics.Single().ShouldContain("latest-stable fallback");
     }
 
     [Fact]
@@ -99,8 +100,8 @@ public sealed class ParseContextResolverTests : IDisposable
 
         var result = await Resolve(evaluator, file);
 
-        Assert.False(result.CanFormat);
-        Assert.Contains("Language version", result.Diagnostics.Single());
+        result.CanFormat.ShouldBe(false);
+        result.Diagnostics.Single().ShouldContain("Language version");
     }
 
     [Fact]
@@ -114,11 +115,11 @@ public sealed class ParseContextResolverTests : IDisposable
 
         var results = await new ParseContextResolver(projectRoot).Resolve([file], null, TestContext.Current.CancellationToken);
 
-        Assert.True(results[file].CanFormat, string.Join(Environment.NewLine, results[file].Diagnostics));
-        var options = Assert.IsType<CSharpParseOptions>(results[file].Options);
-        Assert.Contains("NET10_0", options.PreprocessorSymbolNames);
-        Assert.Contains("DEBUG", options.PreprocessorSymbolNames);
-        Assert.Equal(SourceCodeKind.Regular, options.Kind);
+        results[file].CanFormat.ShouldBe(true, string.Join(Environment.NewLine, results[file].Diagnostics));
+        var options = results[file].Options.ShouldBeA<CSharpParseOptions>().And;
+        options.PreprocessorSymbolNames.ShouldContain("NET10_0");
+        options.PreprocessorSymbolNames.ShouldContain("DEBUG");
+        options.Kind.ShouldBe(SourceCodeKind.Regular);
     }
 
     async Task<DressSharp.Architecture.ParseContextResolution> Resolve(FakeEvaluator evaluator, string file, string? configuration = null)
@@ -168,27 +169,27 @@ public sealed class ParseContextResolverTests : IDisposable
 
     sealed class ConcurrentEvaluator(string compileItem, int expectedConcurrency) : IMSBuildEvaluator
     {
-        readonly TaskCompletionSource allStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        int active;
-        int maximumConcurrency;
+        readonly TaskCompletionSource _allStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int _active;
+        int _maximumConcurrency;
 
-        internal int MaximumConcurrency => Volatile.Read(ref maximumConcurrency);
+        internal int MaximumConcurrency => Volatile.Read(ref _maximumConcurrency);
 
         public async ValueTask<MSBuildEvaluation> EvaluateAsync(string target, string configuration, string? targetFramework, CancellationToken cancellationToken)
         {
-            var concurrency = Interlocked.Increment(ref active);
-            var observed = Volatile.Read(ref maximumConcurrency);
+            var concurrency = Interlocked.Increment(ref _active);
+            var observed = Volatile.Read(ref _maximumConcurrency);
             while (observed < concurrency)
             {
-                var exchanged = Interlocked.CompareExchange(ref maximumConcurrency, concurrency, observed);
+                var exchanged = Interlocked.CompareExchange(ref _maximumConcurrency, concurrency, observed);
                 if (exchanged == observed)
                     break;
                 observed = exchanged;
             }
             if (concurrency == expectedConcurrency)
-                allStarted.TrySetResult();
-            await Task.WhenAny(allStarted.Task, Task.Delay(250, cancellationToken));
-            Interlocked.Decrement(ref active);
+                _allStarted.TrySetResult();
+            await Task.WhenAny(_allStarted.Task, Task.Delay(250, cancellationToken));
+            Interlocked.Decrement(ref _active);
             return Success(compileItem, ("TargetFramework", "net10.0"), ("LangVersion", "latest"));
         }
     }
