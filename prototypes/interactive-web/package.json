@@ -1,0 +1,14 @@
+{
+  "name": "dresssharp-interactive-prototype",
+  "private": true,
+  "scripts": {
+    "dev": "vite --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@pierre/diffs": "1.3.6",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {}
+}
