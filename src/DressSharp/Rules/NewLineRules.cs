@@ -6,13 +6,33 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class NewLineRule(RuleKey ruleKey, NewLineKind kind, ImmutableArray<string> values) : IFormattingRule
+sealed class NewLineRule(RuleKey ruleKey, NewLineKind kind, RuleValueDefinition values, string defaultValue) : IFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        ruleKey,
-        values,
-        "owned token boundaries",
-        "Only boundary whitespace changes");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = ruleKey,
+        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        GroupName = "Braces and bodies",
+        Description = "Controls owned token boundaries. Only boundary whitespace changes.",
+        Values = values,
+        DefaultValue = defaultValue,
+        Example = """
+            class Example
+            {
+                void Run()
+                {
+                    if (true)
+                    {
+                    }
+                    else
+                    {
+                    }
+                }
+            }
+            """,
+        OwnedSyntax = "owned token boundaries",
+        Invariant = "Only boundary whitespace changes"
+    };
 
     internal NewLineKind Kind => kind;
     internal bool RequiresLaterElement => kind is NewLineKind.ObjectInitializerMembers or NewLineKind.AnonymousTypeMembers;

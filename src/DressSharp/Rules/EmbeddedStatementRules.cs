@@ -35,11 +35,29 @@ sealed record EmbeddedStatementSettings(
 sealed class EmbeddedStatementPreferenceRule(
     RuleKey key,
     ImmutableArray<string> values,
+    string defaultValue,
     string ownedSyntax,
     string invariant
 ) : IFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(key, values, ownedSyntax, invariant);
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = key,
+        Name = RuleMetadata.Humanize(key.ToName()),
+        GroupName = "Braces and bodies",
+        Description = $"Controls {ownedSyntax}. {invariant}.",
+        Values = RuleValues.From(values),
+        DefaultValue = defaultValue,
+        Example = """
+            class Example
+            {
+                void Run() { if (true) Work(); }
+                void Work() { }
+            }
+            """,
+        OwnedSyntax = ownedSyntax,
+        Invariant = invariant
+    };
 }
 
 enum EmbeddedStatementBraceMode

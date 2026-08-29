@@ -5,13 +5,29 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class InitializerIndentationRule(RuleKey key, InitializerKind kind) : IFormattingRule
+sealed class InitializerIndentationRule(RuleKey key, InitializerKind kind, string defaultValue) : IFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        key,
-        ["indented", "not_indented"],
-        "multiline non-empty initializer delimiters",
-        "Only delimiter indentation changes");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = key,
+        Name = RuleMetadata.Humanize(key.ToName()),
+        GroupName = "Indentation",
+        Description = "Controls multiline non-empty initializer delimiters. Only delimiter indentation changes.",
+        Values = RuleValues.From(["indented", "not_indented"]),
+        DefaultValue = defaultValue,
+        Example = """
+        class Example
+        {
+            object Value = new Example
+            {
+                Number = 1
+            };
+            int Number { get; set; }
+        }
+        """,
+        OwnedSyntax = "multiline non-empty initializer delimiters",
+        Invariant = "Only delimiter indentation changes"
+    };
 
     internal InitializerKind Kind => kind;
 

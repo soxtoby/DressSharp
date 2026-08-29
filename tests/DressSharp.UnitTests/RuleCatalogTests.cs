@@ -1,16 +1,40 @@
 using DressSharp.Architecture;
+using DressSharp.Configuration;
 using DressSharp.Rules;
-using Xunit;
 using EasyAssertions;
+using Xunit;
 
 namespace DressSharp.UnitTests;
 
 public class RuleCatalogTests
 {
     [Fact]
-    public void Every_formatting_preference_has_exactly_one_catalog_rule()
+    public void Catalog_version_is_explicit() => RuleCatalog.BuiltIn.Version.ShouldBe(1);
+
+    [Fact]
+    public void Every_supported_preference_has_exactly_one_rule()
     {
-        RuleKey[] settings =
+        RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata.RuleKey).Order().ToArray()
+            .ShouldMatch(Enum.GetValues<RuleKey>().Order().ToArray());
+    }
+
+    [Fact]
+    public void Every_rule_exposes_complete_metadata()
+    {
+        foreach (var metadata in RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata))
+        {
+            string.IsNullOrWhiteSpace(metadata.Name).ShouldBe(false);
+            string.IsNullOrWhiteSpace(metadata.GroupName).ShouldBe(false);
+            string.IsNullOrWhiteSpace(metadata.Description).ShouldBe(false);
+            string.IsNullOrWhiteSpace(metadata.Example).ShouldBe(false);
+            metadata.Accepts(metadata.DefaultValue).ShouldBe(true);
+        }
+    }
+
+    [Fact]
+    public void Non_syntax_preferences_are_rules_without_formatting_implementations()
+    {
+        RuleKey[] expected =
         [
             RuleKey.Charset,
             RuleKey.EndOfLine,
@@ -21,22 +45,30 @@ public class RuleCatalogTests
             RuleKey.TabWidth,
             RuleKey.MaxLineLength
         ];
-        var expected = Enum.GetValues<RuleKey>().Except(settings).Order().ToArray();
-        var actual = RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata.RuleKey).Order().ToArray();
 
-        actual.ShouldMatch(expected);
+        RuleCatalog.BuiltIn.Rules.Where(rule => rule is not IFormattingRule).Select(rule => rule.Metadata.RuleKey).ToArray()
+            .ShouldMatch(expected);
     }
 
     [Fact]
-    public void Catalog_metadata_validates_open_and_closed_value_sets()
+    public void Defaults_are_projected_from_rule_metadata()
     {
-        var blankLines = RuleCatalog.BuiltIn.Rules.Single(rule => rule.Metadata.RuleKey == RuleKey.DressBlankLinesBetweenMembers);
-        var namespaceStyle = RuleCatalog.BuiltIn.Rules.Single(rule => rule.Metadata.RuleKey == RuleKey.DressNamespaceStyle);
+        PreferenceCatalog.Defaults.ToArray().ShouldMatch(
+            RuleCatalog.BuiltIn.Rules.Select(rule => (RuleKey: rule.Metadata.RuleKey, rule.Metadata.DefaultValue)).ToArray());
+    }
 
-        blankLines.Metadata.Accepts("0").ShouldBe(true);
-        blankLines.Metadata.Accepts("12").ShouldBe(true);
-        blankLines.Metadata.Accepts("-1").ShouldBe(false);
-        namespaceStyle.Metadata.Accepts("file_scoped").ShouldBe(true);
-        namespaceStyle.Metadata.Accepts("invalid").ShouldBe(false);
+    [Fact]
+    public void Rule_metadata_validates_open_closed_selection_and_permutation_values()
+    {
+        var rules = RuleCatalog.BuiltIn.Rules.ToDictionary(rule => rule.Metadata.RuleKey);
+
+        rules[RuleKey.DressBlankLinesBetweenMembers].Metadata.Accepts("12").ShouldBe(true);
+        rules[RuleKey.DressBlankLinesBetweenMembers].Metadata.Accepts("-1").ShouldBe(false);
+        rules[RuleKey.DressNamespaceStyle].Metadata.Accepts("file_scoped").ShouldBe(true);
+        rules[RuleKey.DressNamespaceStyle].Metadata.Accepts("invalid").ShouldBe(false);
+        rules[RuleKey.CSharpNewLineBeforeOpenBrace].Metadata.Accepts("methods,properties").ShouldBe(true);
+        rules[RuleKey.CSharpNewLineBeforeOpenBrace].Metadata.Accepts("methods,wat").ShouldBe(false);
+        rules[RuleKey.DressUsingKindOrder].Metadata.Accepts("alias,ordinary,static").ShouldBe(true);
+        rules[RuleKey.DressUsingKindOrder].Metadata.Accepts("ordinary,ordinary,static").ShouldBe(false);
     }
 }

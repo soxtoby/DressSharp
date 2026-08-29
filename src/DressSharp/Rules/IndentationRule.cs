@@ -3,11 +3,28 @@ using DressSharp.Architecture;
 
 namespace DressSharp.Rules;
 
-sealed class IndentationRule(RuleKey key, ImmutableArray<string> values) : IFormattingRule
+sealed class IndentationRule(RuleKey key, ImmutableArray<string> values, string defaultValue) : IFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        key,
-        values,
-        "syntax indentation",
-        "Only indentation whitespace changes");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = key,
+        Name = RuleMetadata.Humanize(key.ToName()),
+        GroupName = "Indentation",
+        Description = "Controls syntax indentation. Only indentation whitespace changes.",
+        Values = RuleValues.From(values),
+        DefaultValue = defaultValue,
+        Example = """
+            class Example
+            {
+            void Run()
+            {
+            if (true)
+            Work();
+            }
+            void Work() { }
+            }
+            """,
+        OwnedSyntax = "syntax indentation",
+        Invariant = "Only indentation whitespace changes"
+    };
 }

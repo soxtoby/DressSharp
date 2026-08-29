@@ -7,17 +7,30 @@ namespace DressSharp.Rules;
 
 sealed class NamespaceStyleRule : ISyntaxFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        RuleKey.DressNamespaceStyle,
-            ["file_scoped", "block_scoped"],
-        "compilation-unit namespace declaration",
-        "The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = RuleKey.DressNamespaceStyle,
+        Name = RuleMetadata.Humanize(RuleKey.DressNamespaceStyle.ToName()),
+        GroupName = "Braces and bodies",
+        Description =
+            "Controls compilation-unit namespace declaration. The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.",
+        Values = RuleValues.From(["file_scoped", "block_scoped"]),
+        DefaultValue = "file_scoped",
+        Example = """
+            namespace Example
+            {
+                class Value { }
+            }
+            """,
+        OwnedSyntax = "compilation-unit namespace declaration",
+        Invariant = "The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes."
+    };
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {
         if (root is not CompilationUnitSyntax unit)
             return root;
-        return preference.Equals("file_scoped", StringComparison.OrdinalIgnoreCase) 
+        return preference.Equals("file_scoped", StringComparison.OrdinalIgnoreCase)
             ? ToFileScoped(unit, context)
             : ToBlockScoped(unit, context);
     }

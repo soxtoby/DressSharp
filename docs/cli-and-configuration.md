@@ -33,7 +33,7 @@ DressSharp resolves EditorConfig independently for each file using ordinary trav
 
 Known invalid effective values and malformed EditorConfig fail preflight before source writes. Unknown well-formed keys are ignored for forward compatibility. Standard C# values may include a diagnostic severity suffix such as `:warning`; DressSharp ignores that suffix.
 
-See [rules-v1.md](rules-v1.md) for supported keys and values.
+`dotnet dress init` writes every supported key with its Default value. The versioned rule catalog is the authoritative source for supported values and interactive documentation.
 
 ## Safety and file handling
 

@@ -1,0 +1,3 @@
+# Interactive configuration is local and catalog-driven
+
+`dotnet dress interactive` hosts an offline browser UI on a random loopback port using a narrowly configured `HttpListener`, avoiding an ASP.NET Core runtime requirement for the CLI tool. The versioned Rule catalog is the authoritative source for every supported preference and its interactive documentation; the detailed Markdown rule reference is retired. The session edits exact `[*.cs]` assignments in one discovered or specified EditorConfig, previews all pending preferences against transient C# as a side-by-side diff, and merges only user-changed preferences into the latest file when saving.

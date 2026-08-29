@@ -7,17 +7,28 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class UsingOrderRule(RuleKey ruleKey) : IUsingFormattingRule
+sealed class UsingOrderRule(RuleKey ruleKey, RuleValueDefinition values, string defaultValue) : IUsingFormattingRule
 {
     static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 
-    public RuleMetadata Metadata { get; } = new(
-        ruleKey,
-        ruleKey == RuleKey.DressGlobalUsingOrder
-            ? ["first", "last", "mixed"]
-            : Permutations(),
-        "contiguous using directive runs",
-        "Directives and comments remain boundaries");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = ruleKey,
+        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        GroupName = "Using directives",
+        Description = "Controls contiguous using directive runs. Directives and comments remain boundaries.",
+        Values = values,
+        DefaultValue = defaultValue,
+        Example = """
+            using Zeta;
+            using static System.Math;
+            using Alias = System.String;
+
+            class Example { }
+            """,
+        OwnedSyntax = "contiguous using directive runs",
+        Invariant = "Directives and comments remain boundaries"
+    };
 
     public ImmutableArray<SyntaxKind> TargetKinds { get; } = [SyntaxKind.UsingDirective];
 
@@ -69,20 +80,22 @@ sealed class UsingOrderRule(RuleKey ruleKey) : IUsingFormattingRule
         return true;
     }
 
-    static ImmutableArray<string> Permutations() =>
-        new[] { "ordinary", "static", "alias" }
-            .Permute()
-            .Select(x => string.Join(',', x))
-            .ToImmutableArray();
 }
 
 sealed class ModifierOrderRule : ISyntaxFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        RuleKey.CSharpPreferredModifierOrder,
-        ["public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"],
-        "member modifier lists",
-        "Only modifier token order changes");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = RuleKey.CSharpPreferredModifierOrder,
+        Name = RuleMetadata.Humanize(RuleKey.CSharpPreferredModifierOrder.ToName()),
+        GroupName = "Braces and bodies",
+        Description = "Controls member modifier lists. Only modifier token order changes.",
+        Values = RuleValues.Permutation("public", "protected", "internal", "private", "file", "new", "static", "abstract", "virtual", "sealed", "override", "readonly", "unsafe", "required", "volatile", "async"),
+        DefaultValue = "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async",
+        Example = new("static public class Example { }"),
+        OwnedSyntax = "member modifier lists",
+        Invariant = "Only modifier token order changes"
+    };
 
     static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 

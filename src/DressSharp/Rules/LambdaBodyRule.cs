@@ -7,11 +7,23 @@ namespace DressSharp.Rules;
 
 sealed class LambdaBodyRule : ISyntaxFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        RuleKey.DressLambdaBody,
-            ["block", "expression"],
-        "lambda bodies",
-        "A single return or expression statement and its expression-bodied form represent the same expression.");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = RuleKey.DressLambdaBody,
+        Name = RuleMetadata.Humanize(RuleKey.DressLambdaBody.ToName()),
+        GroupName = "Braces and bodies",
+        Description = "Controls lambda bodies. A single return or expression statement and its expression-bodied form represent the same expression.",
+        Values = RuleValues.From(["block", "expression"]),
+        DefaultValue = "expression",
+        Example = """
+            class Example
+            {
+                Func<int> Value = () => { return 1; };
+            }
+            """,
+        OwnedSyntax = "lambda bodies",
+        Invariant = "A single return or expression statement and its expression-bodied form represent the same expression."
+    };
 
     public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } =
         [SyntaxKind.SimpleLambdaExpression, SyntaxKind.ParenthesizedLambdaExpression];
@@ -51,8 +63,8 @@ sealed class LambdaBodyRule : ISyntaxFormattingRule
 
         bool CanConvert(LambdaExpressionSyntax node) => expression
             && node.Body is BlockSyntax
-                {
-                    Statements: [ReturnStatementSyntax { Expression: not null } or ExpressionStatementSyntax]
-                };
+            {
+                Statements: [ReturnStatementSyntax { Expression: not null } or ExpressionStatementSyntax]
+            };
     }
 }

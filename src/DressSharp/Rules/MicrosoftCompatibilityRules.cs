@@ -8,15 +8,29 @@ namespace DressSharp.Rules;
 
 abstract class TokenSpacingRule(
     RuleKey ruleKey,
-    ImmutableArray<string> acceptedValues,
+    RuleValueDefinition values,
+    string defaultValue,
     string ownedSyntax
 ) : IFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        ruleKey,
-        acceptedValues,
-        ownedSyntax,
-        "Only same-line whitespace changes");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = ruleKey,
+        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        GroupName = "Spacing",
+        Description = $"Controls {ownedSyntax}. Only same-line whitespace changes.",
+        Values = values,
+        DefaultValue = defaultValue,
+        Example = """
+            class Example : Base
+            {
+                int Add(int left,int right) => left+right;
+                void Run() { if(true) Add(1,2); }
+            }
+            """,
+        OwnedSyntax = ownedSyntax,
+        Invariant = "Only same-line whitespace changes"
+    };
 
     /// <summary>
     /// The token kinds that can make <see cref="DesiredSpace"/> claim a pair, on either side. A pair
@@ -25,6 +39,15 @@ abstract class TokenSpacingRule(
     internal abstract ImmutableArray<SyntaxKind> TriggerKinds { get; }
 
     internal abstract bool? DesiredSpace(SyntaxToken left, SyntaxToken right, string preference);
+
+    protected TokenSpacingRule(
+        RuleKey ruleKey,
+        ImmutableArray<string> acceptedValues,
+        string defaultValue,
+        string ownedSyntax)
+        : this(ruleKey, RuleValues.From(acceptedValues), defaultValue, ownedSyntax)
+    {
+    }
 }
 
 /// <summary>
@@ -44,7 +67,8 @@ sealed class TokenPair
 
 sealed class CastSpacingRule() : TokenSpacingRule(
     RuleKey.CSharpSpaceAfterCast,
-        ["true", "false"],
+    ["true", "false"],
+    "false",
     "cast expressions")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.CloseParenToken];
@@ -57,7 +81,8 @@ sealed class CastSpacingRule() : TokenSpacingRule(
 
 sealed class ControlFlowKeywordSpacingRule() : TokenSpacingRule(
     RuleKey.CSharpSpaceAfterKeywordsInControlFlowStatements,
-        ["true", "false"],
+    ["true", "false"],
+    "true",
     "control-flow keywords")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken];
@@ -80,7 +105,8 @@ sealed class ControlFlowKeywordSpacingRule() : TokenSpacingRule(
 
 sealed class ParenthesisSpacingRule() : TokenSpacingRule(
     RuleKey.CSharpSpaceBetweenParentheses,
-    AcceptedValues(),
+    RuleValues.MultipleChoice(["control_flow_statements", "expressions", "type_casts"], "false"),
+    "false",
     "parenthesized syntax")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
@@ -157,7 +183,8 @@ enum SpacingSide
 
 sealed class BaseListColonSpacingRule(SpacingSide side) : TokenSpacingRule(
     side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeColonInInheritanceClause : RuleKey.CSharpSpaceAfterColonInInheritanceClause,
-        ["true", "false"],
+    ["true", "false"],
+    "true",
     "base-list colons")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.ColonToken];
@@ -173,7 +200,8 @@ sealed class BaseListColonSpacingRule(SpacingSide side) : TokenSpacingRule(
 
 sealed class BinaryOperatorSpacingRule() : TokenSpacingRule(
     RuleKey.CSharpSpaceAroundBinaryOperators,
-        ["before_and_after", "ignore", "none"],
+    ["before_and_after", "ignore", "none"],
+    "before_and_after",
     "binary and assignment operators")
 {
     // Derived from Roslyn rather than hand-listed so the trigger set cannot drift from IsOperator.
@@ -207,7 +235,8 @@ sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind) : TokenSp
             ParenthesisSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenMethodDeclarationEmptyParameterListParentheses,
             _ => RuleKey.CSharpSpaceBetweenMethodDeclarationNameAndOpenParenthesis
         },
-        ["true", "false"],
+    ["true", "false"],
+    "false",
     "method declaration parameter lists")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
@@ -238,7 +267,8 @@ sealed class MethodCallSpacingRule(ParenthesisSpacingKind kind) : TokenSpacingRu
             ParenthesisSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenMethodCallEmptyParameterListParentheses,
             _ => RuleKey.CSharpSpaceBetweenMethodCallNameAndOpeningParenthesis
         },
-        ["true", "false"],
+    ["true", "false"],
+    "false",
     "invocation argument lists")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
@@ -267,8 +297,8 @@ enum ParenthesisSpacingKind
     BeforeOpening
 }
 
-abstract class PunctuationSpacingRule(RuleKey ruleKey, SyntaxKind tokenKind, SpacingSide side, string ownedSyntax)
-    : TokenSpacingRule(ruleKey, ["true", "false"], ownedSyntax)
+abstract class PunctuationSpacingRule(RuleKey ruleKey, SyntaxKind tokenKind, SpacingSide side, string defaultValue, string ownedSyntax)
+    : TokenSpacingRule(ruleKey, ["true", "false"], defaultValue, ownedSyntax)
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [tokenKind];
 
@@ -285,18 +315,21 @@ sealed class CommaSpacingRule(SpacingSide side) : PunctuationSpacingRule(
     side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeComma : RuleKey.CSharpSpaceAfterComma,
     SyntaxKind.CommaToken,
     side,
+    side == SpacingSide.After ? "true" : "false",
     "comma separators");
 
 sealed class DotSpacingRule(SpacingSide side) : PunctuationSpacingRule(
     side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeDot : RuleKey.CSharpSpaceAfterDot,
     SyntaxKind.DotToken,
     side,
+    "false",
     "member-access dots");
 
 sealed class ForSemicolonSpacingRule(SpacingSide side) : PunctuationSpacingRule(
     side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeSemicolonInForStatement : RuleKey.CSharpSpaceAfterSemicolonInForStatement,
     SyntaxKind.SemicolonToken,
     side,
+    side == SpacingSide.After ? "true" : "false",
     "for-statement semicolons")
 {
     protected override bool IsOwned(SyntaxToken token) => token.Parent is ForStatementSyntax;
@@ -305,6 +338,7 @@ sealed class ForSemicolonSpacingRule(SpacingSide side) : PunctuationSpacingRule(
 sealed class DeclarationSpacingRule() : TokenSpacingRule(
     RuleKey.CSharpSpaceAroundDeclarationStatements,
     ["false", "ignore"],
+    "false",
     "declaration equals tokens")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.EqualsToken];
@@ -337,7 +371,8 @@ sealed class BracketSpacingRule(BracketSpacingKind kind) : TokenSpacingRule(
             BracketSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenEmptySquareBrackets,
             _ => RuleKey.CSharpSpaceBetweenSquareBrackets
         },
-        ["true", "false"],
+    ["true", "false"],
+    "false",
     "array and element-access brackets")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } =
@@ -397,29 +432,51 @@ enum SingleLinePreservationKind
 
 sealed class SingleLinePreservationRule(SingleLinePreservationKind kind) : IFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        kind == SingleLinePreservationKind.Blocks
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = kind == SingleLinePreservationKind.Blocks
             ? RuleKey.CSharpPreserveSingleLineBlocks
             : RuleKey.CSharpPreserveSingleLineStatements,
-            ["true", "false"],
-        kind == SingleLinePreservationKind.Blocks
+        Name = RuleMetadata.Humanize((kind == SingleLinePreservationKind.Blocks
+            ? RuleKey.CSharpPreserveSingleLineBlocks
+            : RuleKey.CSharpPreserveSingleLineStatements).ToName()),
+        GroupName = "Braces and bodies",
+        Description = $"Controls {(kind == SingleLinePreservationKind.Blocks ? "existing single-line blocks and accessor lists" : "adjacent statements and member declarations")}. {(kind == SingleLinePreservationKind.Blocks ? "False expands safe single-line blocks and accessor lists" : "False separates safe adjacent statements and members")}.",
+        Values = RuleValues.From(["true", "false"]),
+        DefaultValue = "true",
+        Example = "class Example { void Run() { Work(); } void Work() { } }",
+        OwnedSyntax = kind == SingleLinePreservationKind.Blocks
             ? "existing single-line blocks and accessor lists"
             : "adjacent statements and member declarations",
-        kind == SingleLinePreservationKind.Blocks
+        Invariant = kind == SingleLinePreservationKind.Blocks
             ? "False expands safe single-line blocks and accessor lists"
-            : "False separates safe adjacent statements and members");
+            : "False separates safe adjacent statements and members"
+    };
 }
 
 abstract class UsingDirectiveRule(
     RuleKey ruleKey,
+    string defaultValue,
     string invariant
 ) : IUsingFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        ruleKey,
-            ["true", "false"],
-        "using directive groups",
-        invariant);
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = ruleKey,
+        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        GroupName = "Using directives",
+        Description = $"Controls using directive groups. {invariant}.",
+        Values = RuleValues.Boolean(),
+        DefaultValue = defaultValue,
+        Example = """
+            using Zeta;
+            using System;
+
+            class Example { }
+            """,
+        OwnedSyntax = "using directive groups",
+        Invariant = invariant
+    };
 
     public SyntaxList<UsingDirectiveSyntax> Rewrite(
         SyntaxList<UsingDirectiveSyntax> source,
@@ -440,6 +497,7 @@ abstract class UsingDirectiveRule(
 
 sealed class SystemUsingSortRule() : UsingDirectiveRule(
     RuleKey.DotnetSortSystemDirectivesFirst,
+    "true",
     "Using directives remain stable within System groups")
 {
     protected override SyntaxList<UsingDirectiveSyntax> Rewrite(SyntaxList<UsingDirectiveSyntax> source, bool enabled, RuleContext context) =>
@@ -464,6 +522,7 @@ sealed class SystemUsingSortRule() : UsingDirectiveRule(
 
 sealed class ImportGroupSeparationRule() : UsingDirectiveRule(
     RuleKey.DotnetSeparateImportDirectiveGroups,
+    "false",
     "Only System and non-System group boundaries change")
 {
     protected override SyntaxList<UsingDirectiveSyntax> Rewrite(

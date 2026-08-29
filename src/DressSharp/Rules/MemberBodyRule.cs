@@ -6,13 +6,25 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind) : ISyntaxFormattingRule
+sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind, string defaultValue) : ISyntaxFormattingRule
 {
-    public RuleMetadata Metadata { get; } = new(
-        ruleKey,
-            ["block", "expression"],
-        $"{kind.ToString().ToLowerInvariant()} bodies",
-        "The selected body form preserves the represented statement or returned expression.");
+    public RuleMetadata Metadata { get; } = new()
+    {
+        RuleKey = ruleKey,
+        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        GroupName = "Braces and bodies",
+        Description = $"Controls {kind.ToString().ToLowerInvariant()} bodies. The selected body form preserves the represented statement or returned expression.",
+        Values = RuleValues.From(["block", "expression"]),
+        DefaultValue = defaultValue,
+        Example = """
+            class Example
+            {
+                int Value() { return 1; }
+            }
+            """,
+        OwnedSyntax = $"{kind.ToString().ToLowerInvariant()} bodies",
+        Invariant = "The selected body form preserves the represented statement or returned expression."
+    };
 
     /// <summary>
     /// The declaration kinds this rule's rewriter visits, which follow directly from its member kind.
