@@ -27,17 +27,22 @@ _Avoid_: Familiar preferences, Familiar preset
 Adding each missing supported preference to an EditorConfig file. Existing assignments in any section remain authoritative; missing preferences go into an existing `[*.cs]` section or a new one at the end.
 _Avoid_: Managed configuration block
 
-**Interactive configuration session**:
-A local browser session that edits supported preferences in one target EditorConfig and previews the pending preferences against transient C# source.
+**Interactive configuration**:
+A local browser workflow that edits supported preferences in one target EditorConfig and previews the pending preferences against transient C# source.
+_Avoid_: Interactive configuration session, session
+
+**CSRF token**:
+An unguessable, per-launch value that the interactive browser sends in a request header when changing local state. It prevents unrelated browser content from invoking write operations on the local server.
+_Avoid_: Session token, authentication token, loopback capability
 
 **Target EditorConfig**:
-The EditorConfig selected explicitly or discovered nearest to the invocation directory for an interactive configuration session. The session reads and writes only its `[*.cs]` sections.
+The EditorConfig selected explicitly or discovered nearest to the invocation directory for an interactive configuration. The interactive configuration reads and writes only its `[*.cs]` sections.
 
 **Interactive root**:
-The directory containing the target EditorConfig. It anchors inherited preference resolution, preview context, and the optional post-save file selection.
+The directory containing the target EditorConfig. It anchors inherited preference resolution, preview context, and the optional post-save file selection for an interactive configuration.
 
 **Preview source**:
-Transient C# supplied within an interactive configuration session to demonstrate the pending preferences. DressSharp never saves it.
+Transient C# supplied within an interactive configuration to demonstrate the pending preferences. DressSharp never saves it.
 _Avoid_: Sample file
 
 **Preview diff**:
@@ -47,10 +52,10 @@ The difference between preview source and its formatted output under the pending
 A read-only, ephemeral illustration of one formatting rule and its outcomes. It explains the rule but does not replace or modify the preview source.
 
 **Pending preferences**:
-The effective formatting preferences represented by the interactive controls, including unsaved edits. DressSharp applies all of them to the preview source.
+The effective formatting preferences represented by an interactive configuration's controls, including unsaved edits. DressSharp applies all of them to the preview source.
 
 **Inherited preference**:
-An effective formatting preference contributed from outside the target EditorConfig. The interactive session displays it but writes an override only when the user changes it.
+An effective formatting preference contributed from outside the target EditorConfig. The interactive configuration displays it but writes an override only when the user changes it.
 
 **Interactive effective preference**:
 The value produced by exact `[*.cs]` sections from the target EditorConfig and its parent chain at the interactive root. More-specific sections may override it for individual source files.

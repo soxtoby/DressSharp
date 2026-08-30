@@ -1,6 +1,7 @@
 artifacts/
 bin/
 obj/
+dist/
 TestResults/
 *.user
 .benchmarks/corpus/files/

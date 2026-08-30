@@ -1,7 +1,9 @@
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using DressSharp.CommandLine;
 using DressSharp.Configuration;
 using DressSharp.Execution;
+using DressSharp.Interactive;
 
 namespace DressSharp;
 
@@ -14,15 +16,16 @@ static class Program
         return result.Errors.Count == 0 ? exitCode : 2;
     }
 
-    internal static RootCommand CreateCommand()
+    internal static RootCommand CreateCommand(IInteractiveApplication? interactiveApplication = null, TextWriter? error = null)
     {
+        interactiveApplication ??= InteractiveApplication.CreateDefault();
+        error ??= Console.Error;
         var includes = CreateIncludeOption();
         var verbose = new Option<bool>("--verbose") { Description = "List changed files and report an empty selection.", Recursive = true };
         var configuration = new Option<string?>("--configuration")
             {
                 Description = "Use an MSBuild configuration other than Debug.",
                 Recursive = true,
-                Aliases = { "--config" },
             };
 
         var root = new RootCommand("Format C# using explicit syntax-only preferences.")
@@ -34,6 +37,7 @@ static class Program
                         CreateFileCommand("format", "Format selected C# files.", CommandKind.Format, verbose, configuration),
                         CreateFileCommand("check", "List selected C# files that require formatting.", CommandKind.Check, verbose, configuration),
                         CreateInitCommand(),
+                        CreateInteractiveCommand(interactiveApplication, error, includes, verbose, configuration),
                     },
             };
         foreach (var command in root.Subcommands)
@@ -49,6 +53,47 @@ static class Program
             Environment.CurrentDirectory));
 
         return root;
+    }
+
+    static Command CreateInteractiveCommand(
+        IInteractiveApplication application,
+        TextWriter error,
+        Option<string[]> includes,
+        Option<bool> verbose,
+        Option<string?> configuration)
+    {
+        var config = new Option<string?>("--config") { Description = "Select an EditorConfig file or directory." };
+        var interactive = new Command("interactive", "Open the local interactive configuration application.") { config };
+        interactive.Validators.Add(result =>
+            {
+                RejectInheritedOption(result, includes);
+                RejectInheritedOption(result, verbose);
+                RejectInheritedOption(result, configuration);
+            });
+        interactive.SetAction(async (parseResult, cancellationToken) =>
+            {
+                try
+                {
+                    await application.Run(parseResult.GetValue(config), cancellationToken);
+                    return 0;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return 0;
+                }
+                catch (Exception exception)
+                {
+                    await error.WriteLineAsync(exception.Message);
+                    return 2;
+                }
+            });
+        return interactive;
+
+        static void RejectInheritedOption<T>(CommandResult result, Option<T> option)
+        {
+            if (result.GetResult(option) is not null)
+                result.AddError($"Option '{option.Name}' is not valid for command 'interactive'.");
+        }
     }
 
     static Command CreateInitCommand()

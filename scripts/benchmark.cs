@@ -31,6 +31,7 @@ var corpus = benchmarkRoot / "corpus" / "files";
 var resultsDirectory = (benchmarkRoot / "results").EnsureDirectoryExists();
 var timestamp = DateTimeOffset.UtcNow;
 
+await (Bun.Run with { Target = "build", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
 await (DotNet.Build with
     {
         Targets = [Do.RootDirectory / "src/DressSharp/DressSharp.csproj"],

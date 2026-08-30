@@ -26,6 +26,15 @@
     <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="InteractiveWeb/dist/index.html" LogicalName="DressSharp.Interactive.index.html" />
+    <EmbeddedResource Include="InteractiveWeb/dist/app.js" LogicalName="DressSharp.Interactive.app.js" />
+    <EmbeddedResource Include="InteractiveWeb/dist/app.css" LogicalName="DressSharp.Interactive.app.css" />
+  </ItemGroup>
+  <Target Name="RequireInteractiveAssets" BeforeTargets="PrepareForBuild"
+          Condition="!Exists('InteractiveWeb/dist/index.html') Or !Exists('InteractiveWeb/dist/app.js') Or !Exists('InteractiveWeb/dist/app.css')">
+    <Error Text="Interactive browser assets are missing. Run 'dotnet do build-interactive' before building DressSharp." />
+  </Target>
+  <ItemGroup>
     <InternalsVisibleTo Include="DressSharp.UnitTests" />
     <InternalsVisibleTo Include="DressSharp.IntegrationTests" />
   </ItemGroup>
