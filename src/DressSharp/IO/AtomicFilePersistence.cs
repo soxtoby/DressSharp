@@ -19,7 +19,7 @@ sealed class AtomicFilePersistence
         }
         
         if (!current.AsSpan().SequenceEqual(document.OriginalBytes.Span))
-            throw new SourceIOException($"'{document.Path}' changed after it was read.");
+            throw new ConcurrentFileChangeException($"'{document.Path}' changed after it was read.");
 
         var directory = Path.GetDirectoryName(destination)!;
         var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.dresssharp.tmp");

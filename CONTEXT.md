@@ -38,6 +38,10 @@ _Avoid_: Session token, authentication token, loopback capability
 **Target EditorConfig**:
 The EditorConfig selected explicitly or discovered nearest to the invocation directory for an interactive configuration. The interactive configuration reads and writes only its `[*.cs]` sections.
 
+**Exact C# section**:
+An EditorConfig section whose parsed glob is exactly the ordinal, case-sensitive text `*.cs`. Surrounding whitespace is permitted; paths, brace expansions, lists, case variants, and trailing text are different or invalid sections.
+_Avoid_: C# section
+
 **Interactive root**:
 The directory containing the target EditorConfig. It anchors inherited preference resolution, preview context, and the optional post-save file selection for an interactive configuration.
 
@@ -55,16 +59,16 @@ A read-only, ephemeral illustration of one formatting rule and its outcomes. It 
 The effective formatting preferences represented by an interactive configuration's controls, including unsaved edits. DressSharp applies all of them to the preview source.
 
 **Inherited preference**:
-An effective formatting preference contributed from outside the target EditorConfig. The interactive configuration displays it but writes an override only when the user changes it.
+The authoritative upstream assignment state for one supported preference outside the target EditorConfig. It is absent, `unset`, or explicit; the interactive configuration displays it independently even when a local assignment masks it.
 
 **Interactive effective preference**:
-The value produced by exact `[*.cs]` sections from the target EditorConfig and its parent chain at the interactive root. More-specific sections may override it for individual source files.
+The outcome produced by exact `[*.cs]` sections from the target EditorConfig and its parent chain at the interactive root, including values derived by EditorConfig rules; `unset` produces no outcome. More-specific sections may override it for individual source files.
 
 **Interactive configuration edit**:
 A user-directed preference change tracked independently of the loaded EditorConfig text. On save, it overrides the corresponding target assignment in the latest file while preserving unrelated external edits.
 
 **Local assignment**:
-The target EditorConfig's assignment for one supported preference. It is either absent, `unset`, or an explicit value; its state may differ from the interactive effective preference.
+The target EditorConfig's authoritative assignment for one supported preference across exact `[*.cs]` sections. The last occurrence wins; it is absent only when no occurrence exists, otherwise it is `unset` or an explicit value, and may differ from the interactive effective preference.
 
 **Rule catalog**:
 The versioned reference of every supported formatting preference, including its values, Default, documentation, examples, and any formatting rule that implements it.

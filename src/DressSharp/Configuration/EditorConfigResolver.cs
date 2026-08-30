@@ -66,7 +66,7 @@ sealed class EditorConfigResolver
                 configPath,
                 key => new Lazy<bool>(() =>
                     {
-                        EditorConfigSyntaxValidator.Validate(key, File.ReadAllText(key));
+                        EditorConfigSyntaxValidator.DecodeAndValidate(key, File.ReadAllBytes(key));
                         return true;
                     })).Value;
         }

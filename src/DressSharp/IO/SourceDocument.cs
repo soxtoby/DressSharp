@@ -199,4 +199,6 @@ sealed record RepresentationPreferences(
     bool? InsertFinalNewline = null,
     bool? TrimTrailingWhitespace = null);
 
-sealed class SourceIOException(string message, Exception? innerException = null) : IOException(message, innerException);
+class SourceIOException(string message, Exception? innerException = null) : IOException(message, innerException);
+
+sealed class ConcurrentFileChangeException(string message) : SourceIOException(message);

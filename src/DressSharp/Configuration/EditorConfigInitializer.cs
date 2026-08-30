@@ -11,11 +11,11 @@ static class EditorConfigInitializer
         string? target, string invocationDirectory, CancellationToken cancellationToken)
     {
         var path = ResolveTarget(target, invocationDirectory);
-        var original = File.Exists(path) 
-            ? await File.ReadAllTextAsync(path, cancellationToken) 
+        var original = File.Exists(path)
+            ? EditorConfigSyntaxValidator.DecodeAndValidate(
+                path,
+                await File.ReadAllBytesAsync(path, cancellationToken))
             : string.Empty;
-        if (original.Length > 0)
-            EditorConfigSyntaxValidator.Validate(path, original);
 
         var newline = DetectNewline(original);
         var lines = SplitLines(original);

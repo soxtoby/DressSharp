@@ -147,7 +147,7 @@ public sealed class EditorConfigTests : IDisposable
     {
         await File.WriteAllTextAsync(
             Path.Combine(_directory, ".editorconfig"),
-            "[*.cs]\nbad key = value\n",
+            "[*.cs]\nbad key: value\n",
             TestContext.Current.CancellationToken);
 
         Should.Throw<ConfigurationException>(() =>
@@ -244,7 +244,7 @@ public sealed class EditorConfigTests : IDisposable
     [Theory]
     [InlineData("[*.cs\nindent_size = 4\n")]
     [InlineData("[*.cs]\nmissing value\n")]
-    [InlineData("[*.cs]\nbad key = value\n")]
+    [InlineData("[*.cs]\nbad key: value\n")]
     [InlineData("root = perhaps\n")]
     public async Task Init_rejects_malformed_configuration_even_when_forced(string text)
     {
