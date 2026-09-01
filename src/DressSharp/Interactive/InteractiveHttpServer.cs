@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DressSharp.Architecture;
+using DressSharp.Configuration;
 using DressSharp.Rules;
 
 namespace DressSharp.Interactive;
@@ -17,13 +18,13 @@ interface IInteractiveServer : IAsyncDisposable
 
 interface IInteractiveServerFactory
 {
-    Task<IInteractiveServer> Start(string? configPath, CancellationToken cancellationToken);
+    Task<IInteractiveServer> Start(string? configPath, string invocationDirectory, CancellationToken cancellationToken);
 }
 
 sealed class InteractiveHttpServerFactory : IInteractiveServerFactory
 {
-    public async Task<IInteractiveServer> Start(string? configPath, CancellationToken cancellationToken) =>
-        await InteractiveHttpServer.Start(configPath, cancellationToken);
+    public async Task<IInteractiveServer> Start(string? configPath, string invocationDirectory, CancellationToken cancellationToken) =>
+        await InteractiveHttpServer.Start(configPath, invocationDirectory, cancellationToken);
 }
 
 sealed class InteractiveHttpServer : IInteractiveServer
@@ -35,13 +36,15 @@ sealed class InteractiveHttpServer : IInteractiveServer
     readonly TaskCompletionSource _shutdownRequested = new(TaskCreationOptions.RunContinuationsAsynchronously);
     readonly Task _requestLoop;
     readonly string _csrfToken;
-    readonly string? _configPath;
+    readonly string _targetPath;
+    readonly string _invocationDirectory;
     bool _disposed;
 
-    InteractiveHttpServer(HttpListener listener, Uri address, string? configPath)
+    InteractiveHttpServer(HttpListener listener, Uri address, string targetPath, string invocationDirectory)
     {
         _listener = listener;
-        _configPath = configPath;
+        _targetPath = targetPath;
+        _invocationDirectory = invocationDirectory;
         Address = address;
         _csrfToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         _requestLoop = Listen();
@@ -49,9 +52,13 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
     public Uri Address { get; }
 
-    internal static Task<InteractiveHttpServer> Start(string? configPath, CancellationToken cancellationToken)
+    internal static async Task<InteractiveHttpServer> Start(
+        string? configPath,
+        string invocationDirectory,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var configuration = await InteractiveEditorConfig.LoadAsync(configPath, invocationDirectory, cancellationToken);
         Exception? lastFailure = null;
         for (var attempt = 0; attempt < 10; attempt++)
         {
@@ -61,7 +68,7 @@ sealed class InteractiveHttpServer : IInteractiveServer
             try
             {
                 listener.Start();
-                return Task.FromResult(new InteractiveHttpServer(listener, address, configPath));
+                return new InteractiveHttpServer(listener, address, configuration.TargetPath, invocationDirectory);
             }
             catch (HttpListenerException exception)
             {
@@ -144,6 +151,31 @@ sealed class InteractiveHttpServer : IInteractiveServer
                 return;
             }
 
+            if (context.Request.HttpMethod == "GET" && path == "/api/configuration")
+            {
+                await WriteConfiguration(context.Response, await LoadConfiguration());
+                return;
+            }
+
+            if (context.Request.HttpMethod == "POST" && path == "/api/configuration")
+            {
+                if (!TokenMatches(context.Request.Headers[CsrfHeader]))
+                {
+                    await WriteError(context.Response, 403, "forbidden", "Forbidden");
+                    return;
+                }
+                var request = await JsonSerializer.DeserializeAsync<SaveRequest>(
+                    context.Request.InputStream,
+                    JsonOptions,
+                    _stopping.Token) ?? throw new JsonException("A request body is required.");
+                if (request.Edits is null)
+                    throw new JsonException("Edits are required.");
+                var edits = request.Edits.Select(ToEdit).ToArray();
+                var current = await LoadConfiguration();
+                await WriteConfiguration(context.Response, await InteractiveEditorConfig.MergeAsync(current, edits, _stopping.Token));
+                return;
+            }
+
             if (context.Request.HttpMethod == "POST" && path == "/api/shutdown")
             {
                 if (!TokenMatches(context.Request.Headers[CsrfHeader]))
@@ -158,18 +190,30 @@ sealed class InteractiveHttpServer : IInteractiveServer
                 return;
             }
 
-            if (path is "/" or "/app.js" or "/app.css" or "/api/bootstrap" or "/api/shutdown")
+            if (path is "/" or "/app.js" or "/app.css" or "/api/bootstrap" or "/api/configuration" or "/api/shutdown")
             {
-                context.Response.Headers[HttpResponseHeader.Allow] = path == "/api/shutdown" ? "POST" : "GET";
+                context.Response.Headers[HttpResponseHeader.Allow] = path is "/api/shutdown" ? "POST" : path is "/api/configuration" ? "GET, POST" : "GET";
                 await Write(context.Response, 405, "text/plain; charset=utf-8", "Method not allowed");
                 return;
             }
 
             await Write(context.Response, 404, "text/plain; charset=utf-8", "Not found");
         }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        {
+            await WriteError(context.Response, 400, "invalid_request", exception.Message);
+        }
+        catch (ConfigurationException exception)
+        {
+            await WriteError(context.Response, 409, "configuration_unavailable", exception.Message);
+        }
         catch (Exception exception) when (exception is HttpListenerException or IOException or ObjectDisposedException)
         {
             context.Response.Abort();
+        }
+        catch (Exception)
+        {
+            await WriteError(context.Response, 500, "internal_error", "DressSharp could not complete the request.");
         }
     }
 
@@ -195,10 +239,56 @@ sealed class InteractiveHttpServer : IInteractiveServer
         return JsonSerializer.SerializeToUtf8Bytes(new
             {
                 csrfToken = _csrfToken,
-                requestedConfig = _configPath,
+                requestedConfig = _targetPath,
                 catalog = new { version = RuleCatalog.BuiltIn.Version, rules },
             }, JsonOptions);
     }
+
+    async Task<InteractiveEditorConfigData> LoadConfiguration() =>
+        await InteractiveEditorConfig.LoadAsync(_targetPath, _invocationDirectory, _stopping.Token);
+
+    static InteractivePreferenceEdit ToEdit(SaveEdit edit)
+    {
+        if (!RuleKeys.TryParse(edit.Key, out var key))
+            throw new ArgumentException($"Unknown preference '{edit.Key}'.");
+        var desired = edit.Kind switch
+        {
+            "absent" when edit.Value is null => PreferenceAssignment.Absent,
+            "unset" when edit.Value is null => PreferenceAssignment.Unset,
+            "explicit" when edit.Value is not null => PreferenceAssignment.Explicit(edit.Value),
+            _ => throw new ArgumentException($"Invalid assignment for '{edit.Key}'.")
+        };
+        return new InteractivePreferenceEdit(key, desired);
+    }
+
+    static async Task WriteConfiguration(HttpListenerResponse response, InteractiveEditorConfigData data) =>
+        await WriteJson(response, 200, new
+            {
+                targetPath = data.TargetPath,
+                interactiveRoot = data.InteractiveRoot,
+                revision = data.Revision,
+                preferences = data.Preferences.Select(preference => new
+                    {
+                        key = preference.RuleKey.ToName(),
+                        local = Assignment(preference.Local),
+                        inherited = Assignment(preference.Inherited),
+                        inheritedSourcePath = preference.InheritedSourcePath,
+                        effectiveValue = preference.EffectiveValue,
+                        effectiveSourcePath = preference.EffectiveSourcePath,
+                    })
+            });
+
+    static object Assignment(PreferenceAssignment assignment) => new
+        {
+            kind = assignment.Kind.ToString().ToLowerInvariant(),
+            assignment.Value,
+        };
+
+    static async Task WriteError(HttpListenerResponse response, int status, string code, string message) =>
+        await WriteJson(response, status, new { code, message });
+
+    static async Task WriteJson(HttpListenerResponse response, int status, object value) =>
+        await Write(response, status, "application/json; charset=utf-8", JsonSerializer.SerializeToUtf8Bytes(value, JsonOptions));
 
     bool TokenMatches(string? candidate)
     {
@@ -242,4 +332,7 @@ sealed class InteractiveHttpServer : IInteractiveServer
             reservation.Stop();
         }
     }
+
+    sealed record SaveRequest(IReadOnlyList<SaveEdit> Edits);
+    sealed record SaveEdit(string Key, string Kind, string? Value);
 }

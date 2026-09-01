@@ -132,7 +132,7 @@ public sealed class CommandTests
         internal string? ConfigPath { get; private set; }
         internal CancellationToken CancellationToken { get; private set; }
 
-        public Task Run(string? configPath, CancellationToken cancellationToken)
+        public Task Run(string? configPath, string invocationDirectory, CancellationToken cancellationToken)
         {
             if (failure is not null)
                 throw failure;

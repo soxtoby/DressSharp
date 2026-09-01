@@ -16,7 +16,7 @@ public sealed class InteractiveApplicationTests
         using var error = new StringWriter();
         var sut = new InteractiveApplication(new StubServerFactory(server), browser, output, error);
 
-        await sut.Run(null, TestContext.Current.CancellationToken);
+        await sut.Run(null, Environment.CurrentDirectory, TestContext.Current.CancellationToken);
 
         browser.Address.ShouldBe(server.Address);
         output.ToString().ShouldContain(server.Address.AbsoluteUri);
@@ -32,7 +32,7 @@ public sealed class InteractiveApplicationTests
         using var output = new StringWriter();
         using var error = new StringWriter();
         var sut = new InteractiveApplication(new StubServerFactory(server), browser, output, error);
-        var run = sut.Run("chosen/.editorconfig", TestContext.Current.CancellationToken);
+        var run = sut.Run("chosen/.editorconfig", Environment.CurrentDirectory, TestContext.Current.CancellationToken);
 
         await browser.Called.Task;
         run.IsCompleted.ShouldBe(false);
@@ -54,7 +54,7 @@ public sealed class InteractiveApplicationTests
             new StubBrowser(),
             TextWriter.Null,
             TextWriter.Null);
-        var run = sut.Run(null, cancellation.Token);
+        var run = sut.Run(null, Environment.CurrentDirectory, cancellation.Token);
 
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
@@ -64,7 +64,7 @@ public sealed class InteractiveApplicationTests
 
     sealed class StubServerFactory(StubServer server) : IInteractiveServerFactory
     {
-        public Task<IInteractiveServer> Start(string? configPath, CancellationToken cancellationToken)
+        public Task<IInteractiveServer> Start(string? configPath, string invocationDirectory, CancellationToken cancellationToken)
         {
             server.ConfigPath = configPath;
             return Task.FromResult<IInteractiveServer>(server);

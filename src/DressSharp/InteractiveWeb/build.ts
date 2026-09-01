@@ -1,6 +1,5 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { copyFile, mkdir } from "node:fs/promises";
 
-await rm("dist", {force: true, recursive: true});
 await mkdir("dist", {recursive: true});
 
 const result = await Bun.build({

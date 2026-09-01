@@ -74,7 +74,7 @@ static class Program
             {
                 try
                 {
-                    await application.Run(parseResult.GetValue(config), cancellationToken);
+                    await application.Run(parseResult.GetValue(config), Environment.CurrentDirectory, cancellationToken);
                     return 0;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

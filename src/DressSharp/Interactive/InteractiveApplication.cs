@@ -4,7 +4,7 @@ namespace DressSharp.Interactive;
 
 interface IInteractiveApplication
 {
-    Task Run(string? configPath, CancellationToken cancellationToken);
+    Task Run(string? configPath, string invocationDirectory, CancellationToken cancellationToken);
 }
 
 sealed class InteractiveApplication(
@@ -14,9 +14,9 @@ sealed class InteractiveApplication(
     TextWriter error
 ) : IInteractiveApplication
 {
-    public async Task Run(string? configPath, CancellationToken cancellationToken)
+    public async Task Run(string? configPath, string invocationDirectory, CancellationToken cancellationToken)
     {
-        await using var server = await serverFactory.Start(configPath, cancellationToken);
+        await using var server = await serverFactory.Start(configPath, invocationDirectory, cancellationToken);
         await output.WriteLineAsync($"DressSharp interactive is running at {server.Address}");
         await output.WriteLineAsync("Press Ctrl+C to stop.");
 

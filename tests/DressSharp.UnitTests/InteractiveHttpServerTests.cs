@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using DressSharp.Interactive;
 using EasyAssertions;
@@ -6,13 +7,21 @@ using Xunit;
 
 namespace DressSharp.UnitTests;
 
-public sealed class InteractiveHttpServerTests
+public sealed class InteractiveHttpServerTests : IDisposable
 {
+    readonly string _directory = Path.Combine(Path.GetTempPath(), "DressSharp.Tests", Guid.NewGuid().ToString("N"));
+
+    public InteractiveHttpServerTests()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(Path.Combine(_directory, ".editorconfig"), "root = true\n[*.cs]\nindent_style = space\n");
+    }
+
     [Fact]
     public async Task Server_uses_random_loopback_addresses()
     {
-        await using var first = await InteractiveHttpServer.Start(null, TestContext.Current.CancellationToken);
-        await using var second = await InteractiveHttpServer.Start(null, TestContext.Current.CancellationToken);
+        await using var first = await Start();
+        await using var second = await Start();
 
         first.Address.Host.ShouldBe("127.0.0.1");
         second.Address.Host.ShouldBe("127.0.0.1");
@@ -23,7 +32,7 @@ public sealed class InteractiveHttpServerTests
     [Fact]
     public async Task Embedded_application_and_catalog_are_public_and_offline()
     {
-        await using var server = await InteractiveHttpServer.Start("nested/.editorconfig", TestContext.Current.CancellationToken);
+        await using var server = await Start();
         using var client = CreateClient(server.Address);
 
         using var index = await client.GetAsync("/", TestContext.Current.CancellationToken);
@@ -40,7 +49,7 @@ public sealed class InteractiveHttpServerTests
         (await styles.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldNotContain("url(");
 
         using var document = JsonDocument.Parse(await bootstrap.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
-        document.RootElement.GetProperty("requestedConfig").GetString().ShouldBe("nested/.editorconfig");
+        document.RootElement.GetProperty("requestedConfig").GetString().ShouldBe(Path.Combine(_directory, ".editorconfig"));
         document.RootElement.GetProperty("catalog").GetProperty("version").GetInt32().ShouldBe(1);
         document.RootElement.GetProperty("catalog").GetProperty("rules").GetArrayLength().ShouldBeGreaterThan(0);
         var token = document.RootElement.GetProperty("csrfToken").GetString()!;
@@ -53,7 +62,7 @@ public sealed class InteractiveHttpServerTests
     [Fact]
     public async Task Write_endpoint_requires_the_per_launch_csrf_header()
     {
-        await using var server = await InteractiveHttpServer.Start(null, TestContext.Current.CancellationToken);
+        await using var server = await Start();
         using var client = CreateClient(server.Address);
         var token = await GetToken(client);
 
@@ -76,7 +85,7 @@ public sealed class InteractiveHttpServerTests
     [Fact]
     public async Task Unknown_routes_and_unsupported_methods_are_rejected_without_cors()
     {
-        await using var server = await InteractiveHttpServer.Start(null, TestContext.Current.CancellationToken);
+        await using var server = await Start();
         using var client = CreateClient(server.Address);
 
         using var missing = await client.GetAsync("/missing", TestContext.Current.CancellationToken);
@@ -87,6 +96,70 @@ public sealed class InteractiveHttpServerTests
         options.Headers.Contains("Access-Control-Allow-Origin").ShouldBe(false);
     }
 
+    [Fact]
+    public async Task Configuration_snapshot_and_save_use_the_latest_file()
+    {
+        await using var server = await Start();
+        using var client = CreateClient(server.Address);
+        var token = await GetToken(client);
+
+        using var first = await client.GetAsync("/api/configuration", TestContext.Current.CancellationToken);
+        using var firstJson = JsonDocument.Parse(await first.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
+        var revision = firstJson.RootElement.GetProperty("revision").GetString();
+        var preference = firstJson.RootElement.GetProperty("preferences").EnumerateArray()
+            .Single(item => item.GetProperty("key").GetString() == "indent_style");
+        preference.GetProperty("local").GetProperty("value").GetString().ShouldBe("space");
+
+        await File.AppendAllTextAsync(Path.Combine(_directory, ".editorconfig"), "# external\n", TestContext.Current.CancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/configuration")
+            {
+                Content = JsonContent.Create(new
+                    {
+                        edits = new[] { new { key = "indent_style", kind = "explicit", value = "tab" } }
+                    })
+            };
+        request.Headers.Add("X-DressSharp-CSRF", token);
+        using var saved = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        using var savedJson = JsonDocument.Parse(await saved.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
+
+        saved.StatusCode.ShouldBe(HttpStatusCode.OK);
+        savedJson.RootElement.GetProperty("revision").GetString().ShouldNotBe(revision);
+        (await File.ReadAllTextAsync(Path.Combine(_directory, ".editorconfig"), TestContext.Current.CancellationToken))
+            .ShouldContain("# external\n")
+            .And.ShouldContain("indent_style = tab");
+    }
+
+    [Fact]
+    public async Task Configuration_write_is_atomic_and_requires_csrf()
+    {
+        await using var server = await Start();
+        using var client = CreateClient(server.Address);
+        var original = await File.ReadAllTextAsync(Path.Combine(_directory, ".editorconfig"), TestContext.Current.CancellationToken);
+        using var missing = await client.PostAsJsonAsync(
+            "/api/configuration",
+            new { edits = Array.Empty<object>() },
+            TestContext.Current.CancellationToken);
+        var token = await GetToken(client);
+        using var invalidRequest = new HttpRequestMessage(HttpMethod.Post, "/api/configuration")
+            {
+                Content = JsonContent.Create(new
+                    {
+                        edits = new[]
+                        {
+                            new { key = "indent_style", kind = "explicit", value = "tab" },
+                            new { key = "indent_size", kind = "explicit", value = "invalid" },
+                        }
+                    })
+            };
+        invalidRequest.Headers.Add("X-DressSharp-CSRF", token);
+        using var invalid = await client.SendAsync(invalidRequest, TestContext.Current.CancellationToken);
+
+        missing.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        invalid.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await invalid.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("invalid_request");
+        (await File.ReadAllTextAsync(Path.Combine(_directory, ".editorconfig"), TestContext.Current.CancellationToken)).ShouldBe(original);
+    }
+
     static HttpClient CreateClient(Uri address) => new(new SocketsHttpHandler { UseProxy = false }) { BaseAddress = address };
 
     static async Task<string> GetToken(HttpClient client)
@@ -95,4 +168,8 @@ public sealed class InteractiveHttpServerTests
         using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
         return document.RootElement.GetProperty("csrfToken").GetString()!;
     }
+
+    Task<InteractiveHttpServer> Start() => InteractiveHttpServer.Start(null, _directory, TestContext.Current.CancellationToken);
+
+    public void Dispose() => Directory.Delete(_directory, true);
 }

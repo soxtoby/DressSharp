@@ -32,6 +32,17 @@ public class RuleCatalogTests
     }
 
     [Fact]
+    public void Friendly_names_omit_configuration_key_prefixes()
+    {
+        foreach (var name in RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata.Name))
+        {
+            name.StartsWith("Csharp ", StringComparison.Ordinal).ShouldBe(false);
+            name.StartsWith("Dotnet ", StringComparison.Ordinal).ShouldBe(false);
+            name.StartsWith("Dress ", StringComparison.Ordinal).ShouldBe(false);
+        }
+    }
+
+    [Fact]
     public void Non_syntax_preferences_are_rules_without_formatting_implementations()
     {
         RuleKey[] expected =

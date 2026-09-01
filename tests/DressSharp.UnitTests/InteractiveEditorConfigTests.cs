@@ -28,11 +28,14 @@ public sealed class InteractiveEditorConfigTests : IDisposable
 
         loaded.TargetPath.ShouldBe(target);
         loaded.InteractiveRoot.ShouldBe(child);
+        loaded.Revision.Length.ShouldBe(64);
         Preference(loaded, RuleKey.MaxLineLength).Local.ShouldBe(PreferenceAssignment.Explicit("120"));
         Preference(loaded, RuleKey.MaxLineLength).Inherited.ShouldBe(PreferenceAssignment.Explicit("90"));
         Preference(loaded, RuleKey.MaxLineLength).EffectiveValue.ShouldBe("120");
+        Preference(loaded, RuleKey.MaxLineLength).EffectiveSourcePath.ShouldBe(target);
         Preference(loaded, RuleKey.IndentSize).Local.ShouldBe(PreferenceAssignment.Absent);
         Preference(loaded, RuleKey.IndentSize).Inherited.ShouldBe(PreferenceAssignment.Unset);
+        Preference(loaded, RuleKey.IndentSize).InheritedSourcePath.ShouldBe(Path.Combine(_directory, ".editorconfig"));
         Preference(loaded, RuleKey.IndentSize).EffectiveValue.ShouldBe("tab");
         Preference(loaded, RuleKey.IndentStyle).EffectiveValue.ShouldBe("tab");
     }

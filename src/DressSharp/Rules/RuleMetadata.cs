@@ -108,6 +108,8 @@ sealed record RuleMetadata
     internal static string Humanize(string value)
     {
         var words = value.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length > 1 && words[0] is "csharp" or "dotnet" or "dress")
+            words = words[1..];
         return string.Join(' ', words.Select((word, index) => index == 0
             ? char.ToUpperInvariant(word[0]) + word[1..]
             : word));

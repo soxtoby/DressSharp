@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Security.Cryptography;
 using System.Text;
 using DressSharp.Architecture;
 using DressSharp.IO;
@@ -24,11 +25,14 @@ sealed record InteractivePreference(
     RuleKey RuleKey,
     PreferenceAssignment Local,
     PreferenceAssignment Inherited,
-    string? EffectiveValue);
+    string? InheritedSourcePath,
+    string? EffectiveValue,
+    string? EffectiveSourcePath);
 
 sealed record InteractiveEditorConfigData(
     string TargetPath,
     string InteractiveRoot,
+    string Revision,
     ImmutableArray<InteractivePreference> Preferences);
 
 sealed record InteractivePreferenceEdit(RuleKey RuleKey, PreferenceAssignment DesiredLocal);
@@ -85,8 +89,10 @@ static class InteractiveEditorConfig
         var target = documents[0];
         var inherited = new Dictionary<RuleKey, PreferenceAssignment>();
         var effective = new Dictionary<RuleKey, string>();
+        var inheritedSources = new Dictionary<RuleKey, string>();
+        var effectiveSources = new Dictionary<RuleKey, string>();
         for (var index = documents.Count - 1; index >= 1; index--)
-            Apply(documents[index].Assignments, inherited, effective);
+            Apply(documents[index].Assignments, documents[index].Path, inherited, inheritedSources, effective, effectiveSources);
 
         var local = target.Assignments;
         foreach (var (key, assignment) in local)
@@ -94,13 +100,13 @@ static class InteractiveEditorConfig
             if (assignment.Kind == PreferenceAssignmentKind.Explicit && !PreferenceCatalog.IsValid(key, assignment.Value!))
                 throw InvalidValue(target.Path, key, assignment.Value!);
         }
-        Apply(local, null, effective);
+        Apply(local, target.Path, null, null, effective, effectiveSources);
         foreach (var (key, value) in effective)
         {
             if (!PreferenceCatalog.IsValid(key, value))
                 throw InvalidValue(target.Path, key, value);
         }
-        ApplyEditorConfigDerivations(effective);
+        ApplyEditorConfigDerivations(effective, effectiveSources);
 
         var preferences = RuleCatalog.BuiltIn.Rules
             .Select(rule =>
@@ -110,12 +116,15 @@ static class InteractiveEditorConfig
                     key,
                     local.GetValueOrDefault(key, PreferenceAssignment.Absent),
                     inherited.GetValueOrDefault(key, PreferenceAssignment.Absent),
-                    effective.GetValueOrDefault(key));
+                    inheritedSources.GetValueOrDefault(key),
+                    effective.GetValueOrDefault(key),
+                    effectiveSources.GetValueOrDefault(key));
             })
             .ToImmutableArray();
         return new InteractiveEditorConfigData(
             target.Path,
             Path.GetDirectoryName(target.Path)!,
+            Revision(documents),
             preferences);
     }
 
@@ -148,31 +157,66 @@ static class InteractiveEditorConfig
 
     static void Apply(
         IReadOnlyDictionary<RuleKey, PreferenceAssignment> assignments,
+        string sourcePath,
         Dictionary<RuleKey, PreferenceAssignment>? states,
-        Dictionary<RuleKey, string> effective)
+        Dictionary<RuleKey, string>? stateSources,
+        Dictionary<RuleKey, string> effective,
+        Dictionary<RuleKey, string> effectiveSources)
     {
         foreach (var (key, assignment) in assignments)
         {
             states?[key] = assignment;
+            if (states is not null)
+                stateSources![key] = sourcePath;
             if (assignment.Kind == PreferenceAssignmentKind.Unset)
+            {
                 effective.Remove(key);
+                effectiveSources.Remove(key);
+            }
             else if (assignment.Kind == PreferenceAssignmentKind.Explicit)
+            {
                 effective[key] = assignment.Value!;
+                effectiveSources[key] = sourcePath;
+            }
         }
     }
 
-    static void ApplyEditorConfigDerivations(Dictionary<RuleKey, string> effective)
+    static void ApplyEditorConfigDerivations(
+        Dictionary<RuleKey, string> effective,
+        Dictionary<RuleKey, string> sources)
     {
         if (effective.TryGetValue(RuleKey.IndentSize, out var indentSize))
         {
             if (indentSize.Equals("tab", StringComparison.OrdinalIgnoreCase)
                 && effective.TryGetValue(RuleKey.TabWidth, out var tabWidth))
+            {
                 effective[RuleKey.IndentSize] = tabWidth;
+                sources[RuleKey.IndentSize] = sources[RuleKey.TabWidth];
+            }
             else if (!effective.ContainsKey(RuleKey.TabWidth))
+            {
                 effective[RuleKey.TabWidth] = indentSize;
+                sources[RuleKey.TabWidth] = sources[RuleKey.IndentSize];
+            }
         }
         else if (effective.GetValueOrDefault(RuleKey.IndentStyle)?.Equals("tab", StringComparison.OrdinalIgnoreCase) is true)
+        {
             effective[RuleKey.IndentSize] = "tab";
+            sources[RuleKey.IndentSize] = sources[RuleKey.IndentStyle];
+        }
+    }
+
+    static string Revision(IEnumerable<EditorConfigDocument> documents)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var document in documents)
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(document.Path));
+            hash.AppendData([0]);
+            hash.AppendData(document.Source.OriginalBytes.Span);
+            hash.AppendData([0]);
+        }
+        return Convert.ToHexString(hash.GetHashAndReset());
     }
 
     static void ValidateEdits(IReadOnlyList<InteractivePreferenceEdit> edits)
