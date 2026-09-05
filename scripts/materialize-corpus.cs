@@ -1,5 +1,5 @@
 #!/usr/bin/env dotnet
-#:package DotNetDo.Core@0.7.0
+#:package DotNetDo.Core@0.8.0
 using DotNetDo;
 
 [assembly: TaskDescription("Materialize and verify the pinned 1,000-file benchmark corpus, optionally updating its lock.")]
