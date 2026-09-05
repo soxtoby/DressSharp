@@ -116,7 +116,7 @@ sealed class SinglePassEmitter
                 EmitGap(pair, index);
             }
 
-            RememberDirectContentIndent(piece.Token);
+            RememberContentIndents(piece.Token);
             EnterOrLeave(piece.Token);
             Append(piece.Token.Text);
         }
@@ -459,7 +459,7 @@ sealed class SinglePassEmitter
         if (token.IsKind(SyntaxKind.OpenBraceToken)
             && _plan.IndentBraces is { } indentBrace)
         {
-            return _contentIndents[^1] + (indentBrace ? _plan.IndentUnit : "");
+            return BraceBaseIndent(token) + (indentBrace ? _plan.IndentUnit : "");
         }
 
         if (EmbeddedStatements.StartsBody(token, out var embeddedStatement)
@@ -491,6 +491,12 @@ sealed class SinglePassEmitter
             ? _braceIndents.Peek()
             : _contentIndents[^1];
     }
+
+    string BraceBaseIndent(SyntaxToken token) =>
+        token.Parent is BlockSyntax { Parent: AnonymousFunctionExpressionSyntax function }
+        && _emittedContentIndents.TryGetValue(function, out var functionIndent)
+            ? functionIndent
+            : _contentIndents[^1];
 
     string SwitchLabelIndent()
     {
@@ -756,10 +762,16 @@ sealed class SinglePassEmitter
             : null;
     }
 
-    void RememberDirectContentIndent(SyntaxToken token)
+    void RememberContentIndents(SyntaxToken token)
     {
         if (DirectContentFor(token) is { } content && content.GetFirstToken() == token)
             _emittedContentIndents[content] = _lineIndent;
+
+        for (var node = token.Parent; node is not null && node.GetFirstToken() == token; node = node.Parent)
+        {
+            if (node is AnonymousFunctionExpressionSyntax)
+                _emittedContentIndents[node] = _lineIndent;
+        }
     }
 
     static SyntaxNode? DirectContentFor(SyntaxToken token)
@@ -855,7 +867,7 @@ sealed class SinglePassEmitter
                 ? _lineIndent
                 : CaseBlockIndent(token)
                 ?? (_plan.IndentBraces is { } indentBraces
-                    ? _contentIndents[^1] + (indentBraces ? _plan.IndentUnit : "")
+                    ? BraceBaseIndent(token) + (indentBraces ? _plan.IndentUnit : "")
                     : _lineIndent);
             _braceIndents.Push(braceIndent);
             _contentIndents.Add(_plan.IndentBlockContents is { } indentBlockContents

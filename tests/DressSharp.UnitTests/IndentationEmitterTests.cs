@@ -1,3 +1,5 @@
+using DressSharp.Architecture;
+using DressSharp.Configuration;
 using Xunit;
 using EasyAssertions;
 using static DressSharp.UnitTests.EmitterTestHarness;
@@ -6,6 +8,62 @@ namespace DressSharp.UnitTests;
 
 public class IndentationEmitterTests
 {
+    [Theory]
+    [InlineData("() =>")]
+    [InlineData("async () =>")]
+    [InlineData("delegate")]
+    [InlineData("(int x,\n        int y) =>")]
+    public void Lambda_block_follows_a_continuation_line(string callback)
+    {
+        var source = $$"""
+            M(
+                {{callback}}
+                {
+                    Work();
+                });
+            """;
+        Format(source, ("csharp_indent_braces", "false")).ShouldBe(source);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Nested_lambda_block_follows_its_containing_argument_indent(bool useDefaults)
+    {
+        const string source = """
+            foreach (var config in resolved.EditorConfigFiles)
+            {
+                var configPath = Path.Combine(config.Directory, config.FileName);
+                _ = _validated.GetOrAdd(
+                    configPath,
+                    key => new Lazy<bool>(() =>
+                    {
+                        EditorConfigSyntaxValidator.DecodeAndValidate(key, File.ReadAllBytes(key));
+                        return true;
+                    })).Value;
+            }
+            """;
+        var preferences = useDefaults
+            ? PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray()
+            : new[] { ("csharp_indent_block_contents", "true"), ("csharp_indent_braces", "false") };
+        const string input = """
+            foreach (var config in resolved.EditorConfigFiles)
+            {
+                var configPath = Path.Combine(config.Directory, config.FileName);
+                _ = _validated.GetOrAdd(
+                    configPath,
+                    key => new Lazy<bool>(() =>
+                        {
+                            EditorConfigSyntaxValidator.DecodeAndValidate(key, File.ReadAllBytes(key));
+                            return true;
+                        })).Value;
+            }
+            """;
+        var result = Format(input, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Fact]
     public void Block_indentation_preserves_continuation_indentation()
     {
