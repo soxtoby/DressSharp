@@ -89,10 +89,14 @@ sealed class SyntaxWrappingSolver
             if (occurrence.Setting.Mode == WrappingMode.Auto && HasLineBreak(occurrence))
                 continue;
 
-            var multi = occurrence.Setting.Mode == WrappingMode.Multi;
+            var multi = occurrence.Setting.Mode == WrappingMode.Multi
+                || occurrence.Setting.Mode == WrappingMode.Auto
+                && occurrence.Node is InitializerExpressionSyntax
+                && _trivia!.HasLineBreak(occurrence.FirstToken);
             var hasLineComment = false;
             var checkedLineComments = false;
-            if (occurrence.Setting is
+            if (!multi
+                && occurrence.Setting is
                     { Mode: WrappingMode.Auto, MaximumLineLength: not int.MaxValue })
             {
                 var measurement = Measure(occurrence);

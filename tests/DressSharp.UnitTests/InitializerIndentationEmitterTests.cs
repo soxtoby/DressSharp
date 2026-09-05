@@ -61,7 +61,15 @@ public sealed class InitializerIndentationEmitterTests
                     var value = new C("git")
                         {
                             ArgumentList =
-                                { "-C", "directory", "ls-files", "--cached", "--others", "--exclude-standard", "-z" },
+                                {
+                                    "-C",
+                                    "directory",
+                                    "ls-files",
+                                    "--cached",
+                                    "--others",
+                                    "--exclude-standard",
+                                    "-z"
+                                },
                             StandardOutputEncoding = Encoding.UTF8,
                             Environment =
                                 {

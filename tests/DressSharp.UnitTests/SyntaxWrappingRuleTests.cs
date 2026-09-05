@@ -207,6 +207,35 @@ public class SyntaxWrappingRuleTests
     }
 
     [Fact]
+    public void Initializer_auto_expands_when_another_rule_makes_the_construction_multiline()
+    {
+        const string source = """
+            class C
+            {
+                static readonly HashSet<string> Values = new(StringComparer.OrdinalIgnoreCase) { ".git", ".hg", ".svn" };
+            }
+            """;
+
+        Format(
+                source,
+                ("dress_initializers_layout", "auto"),
+                ("max_line_length", "500"),
+                ("csharp_new_line_before_open_brace", "object_collection_array_initializers"),
+                ("csharp_indent_block_contents", "true"),
+                ("dress_collection_initializer_indentation", "indented"))
+            .ShouldBe("""
+                class C {
+                    static readonly HashSet<string> Values = new(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ".git",
+                            ".hg",
+                            ".svn"
+                        };
+                }
+                """);
+    }
+
+    [Fact]
     public void Constraint_auto_measures_the_declaration_header_not_its_body()
     {
         const string source =

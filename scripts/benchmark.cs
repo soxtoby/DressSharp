@@ -222,7 +222,7 @@ static JsonObject SummaryNode(SummaryResult value) => new()
 
 static async Task<string> Capture(string command)
 {
-    var result = await Do.Exec(command, new() { Log = (_, _) => { } });
+    var result = await Do.Exec(command, new() { Log = ExecLog.None });
     return string.Join(Environment.NewLine, result.AllOutput.Where(output => output.Type == OutputType.Out).Select(output => output.Message)).Trim();
 }
 
