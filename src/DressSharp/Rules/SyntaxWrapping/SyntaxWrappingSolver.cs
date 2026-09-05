@@ -21,6 +21,8 @@ sealed class SyntaxWrappingSolver
     TriviaLayoutPlan? _trivia;
     SparseGapWidths? _plannedWidths;
     Dictionary<int, int>? _baseGapWidths;
+    readonly Dictionary<int, bool> _chainBoundaryBreaks = [];
+    readonly Dictionary<int, string> _plannedLineBreaks = [];
     int[]? _braceDepths;
     internal SyntaxWrappingSolver(
         string source,
@@ -67,7 +69,7 @@ sealed class SyntaxWrappingSolver
                 gapMap[boundary.RightIndex] = Render(
                     boundary,
                     _trivia!,
-                    occurrence.Multi,
+                    _chainBoundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, occurrence.Multi),
                     indent,
                     baseIndent,
                     _lineEnding);
@@ -99,24 +101,34 @@ sealed class SyntaxWrappingSolver
                 && occurrence.Setting is
                     { Mode: WrappingMode.Auto, MaximumLineLength: not int.MaxValue })
             {
-                var measurement = Measure(occurrence);
-                var width = measurement.Width;
-                hasLineComment = measurement.HasLineComment;
-                checkedLineComments = true;
-                for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+                if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax
+                    && MeasureMultilineChain(occurrence) is { } breaks)
                 {
-                    var boundary = _boundaries[occurrence.BoundaryStart + offset];
-                    width += PlannedWidth(
-                            boundary,
-                            _trivia!,
-                            false,
-                            _lineEnding,
-                            _settings.TabWidth)
-                        - CurrentGapWidth(boundary.RightIndex);
+                    multi = breaks.Any(value => value);
+                    for (var offset = 0; offset < breaks.Length; offset++)
+                        _chainBoundaryBreaks[occurrence.BoundaryStart + offset] = breaks[offset];
                 }
+                else
+                {
+                    var measurement = Measure(occurrence);
+                    var width = measurement.Width;
+                    hasLineComment = measurement.HasLineComment;
+                    checkedLineComments = true;
+                    for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+                    {
+                        var boundary = _boundaries[occurrence.BoundaryStart + offset];
+                        width += PlannedWidth(
+                                boundary,
+                                _trivia!,
+                                false,
+                                _lineEnding,
+                                _settings.TabWidth)
+                            - CurrentGapWidth(boundary.RightIndex);
+                    }
 
-                multi = (long)VisualStartColumn(occurrence) + width
-                    > occurrence.Setting.MaximumLineLength;
+                    multi = (long)VisualStartColumn(occurrence) + width
+                        > occurrence.Setting.MaximumLineLength;
+                }
             }
 
             if (!multi
@@ -130,12 +142,20 @@ sealed class SyntaxWrappingSolver
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
+                var boundaryMulti = _chainBoundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, multi);
+                if (boundaryMulti)
+                {
+                    _plannedLineBreaks[boundary.RightIndex] = Render(
+                        boundary, _trivia!, true, Indent(occurrenceIndex, 1), Indent(occurrenceIndex, 0), _lineEnding);
+                }
+                else
+                    _plannedLineBreaks.Remove(boundary.RightIndex);
                 _plannedWidths.Set(
                     boundary.RightIndex,
                     PlannedWidth(
                         boundary,
                         _trivia!,
-                        multi,
+                        boundaryMulti,
                         _lineEnding,
                         _settings.TabWidth));
             }
@@ -195,6 +215,59 @@ sealed class SyntaxWrappingSolver
         }
 
         return false;
+    }
+
+    // Only a line containing a chain operator can benefit from wrapping that chain.
+    // Argument and lambda-body lines must not contribute to another line's width.
+    bool[]? MeasureMultilineChain(Occurrence occurrence)
+    {
+        var lineWidths = new List<int>();
+        var boundaryLines = new int[occurrence.BoundaryCount];
+        var column = VisualStartColumn(occurrence);
+        var offset = 0;
+        for (var index = occurrence.FirstToken; index <= occurrence.LastToken; index++)
+        {
+            if (index != occurrence.FirstToken)
+            {
+                if (_plannedLineBreaks.TryGetValue(index, out var gap))
+                    Advance(gap);
+                else if (_plannedWidths!.TryGet(index, out var width))
+                    column += width;
+                else if (_trivia!.HasLineBreak(index) || _trivia.HasMeaningfulGap(index))
+                {
+                    foreach (var item in _trivia.Trailing(index - 1))
+                        Advance(item.ToFullString());
+                    foreach (var item in _trivia.Leading(index))
+                        Advance(item.ToFullString());
+                }
+                else
+                    column += BaseGapWidth(index);
+            }
+
+            if (offset < boundaryLines.Length
+                && _boundaries[occurrence.BoundaryStart + offset].RightIndex == index)
+                boundaryLines[offset++] = lineWidths.Count;
+            Advance(_stream.Pieces[index].Token.Text);
+        }
+
+        if (lineWidths.Count == 0)
+            return null;
+        lineWidths.Add(column);
+        return boundaryLines.Select(line => lineWidths[line] > occurrence.Setting.MaximumLineLength).ToArray();
+
+        void Advance(string text)
+        {
+            foreach (var character in text)
+            {
+                if (character is '\r' or '\n')
+                {
+                    lineWidths.Add(column);
+                    column = 0;
+                }
+                else
+                    column += character == '\t' ? _settings.TabWidth - column % _settings.TabWidth : 1;
+            }
+        }
     }
 
     bool HasLineBreak(Occurrence occurrence)

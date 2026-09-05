@@ -657,6 +657,101 @@ public class SyntaxWrappingRuleTests
             """);
     }
 
+    [Theory]
+    [InlineData(160)]
+    [InlineData(60)]
+    public void Auto_member_access_measures_multiline_arguments_on_their_own_lines(int maximum)
+    {
+        const string source = """
+            _ = _validated.GetOrAdd(
+              configPath,
+              key => new Lazy<bool>(() =>
+                  {
+                      EditorConfigSyntaxValidator.DecodeAndValidate(key, File.ReadAllBytes(key));
+                      return true;
+                  })).Value;
+            """;
+        var preferences = new[]
+        {
+            ("dress_member_access_chains_layout", "auto"), ("max_line_length", maximum.ToString())
+        };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_member_access_wraps_only_the_overlong_chain_line()
+    {
+        const string source = """
+            _ = _validated.GetOrAdd(
+                configPath,
+                key => Create(key)).VeryLongPropertyName.MoreProperties;
+            """;
+        const string expected = """
+            _ = _validated.GetOrAdd(
+                configPath,
+                key => Create(key))
+                .VeryLongPropertyName
+                .MoreProperties;
+            """;
+        var preferences = new[]
+        {
+            ("dress_member_access_chains_layout", "auto"), ("max_line_length", "40")
+        };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData(160, false)]
+    [InlineData(161, true)]
+    public void Auto_member_access_still_wraps_an_overlong_call_before_multiline_arguments(int width, bool wraps)
+    {
+        var receiver = new string('x', width - "_ = .GetOrAdd(".Length);
+        var source = $"_ = {receiver}.GetOrAdd(\n    key,\n    value).Value;";
+        var expected = wraps
+            ? $"_ = {receiver}\n    .GetOrAdd(\n    key,\n    value).Value;"
+            : source;
+        var preferences = new[]
+        {
+            ("dress_member_access_chains_layout", "auto"), ("max_line_length", "160")
+        };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_member_access_keeps_multiline_lambda_calls_attached_with_default_preferences()
+    {
+        const string source = """
+            _ = _validated.GetOrAdd(
+              configPath,
+              key => new Lazy<bool>(() =>
+                  {
+                      EditorConfigSyntaxValidator.DecodeAndValidate(key, File.ReadAllBytes(key));
+                      return true;
+                      })).Value;
+            """;
+        var preferences = PreferenceCatalog.Defaults
+            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .ToArray();
+
+        var result = Format(source, preferences);
+
+        result.Contains("_validated.GetOrAdd(").ShouldBe(true);
+        result.Contains("})).Value;").ShouldBe(true);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Fact]
     public void Auto_uses_an_earlier_rewritten_members_effective_width()
     {
