@@ -6,6 +6,21 @@ namespace DressSharp.UnitTests;
 
 public class SinglePassEmitterTests
 {
+    [Theory]
+    [InlineData("    public class Receipt;", "public class Receipt;")]
+    [InlineData("    using System;\n    public class Receipt;", "using System;\npublic class Receipt;")]
+    [InlineData("    extern alias X;\n    public class Receipt;", "extern alias X;\npublic class Receipt;")]
+    [InlineData("    [Obsolete]\n    public class Receipt;", "[Obsolete]\npublic class Receipt;")]
+    [InlineData("    public class Receipt\n    {\n        int value;\n    }\n    public class Other;", "public class Receipt\n{\n    int value;\n}\npublic class Other;")]
+    public void File_scoped_namespace_contents_obey_indentation(string sourceContents, string expectedContents)
+    {
+        var source = $"namespace Example;\n{sourceContents}";
+        var result = Format(source, ("csharp_indent_block_contents", "true"));
+        result.ShouldBe($"namespace Example;\n{expectedContents}");
+        Format(result, ("csharp_indent_block_contents", "true")).ShouldBe(result);
+        Format(source).ShouldBe(source);
+    }
+
     [Fact]
     public void Orders_modifiers_on_the_detached_member_root()
     {

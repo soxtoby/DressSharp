@@ -721,7 +721,6 @@ sealed class SinglePassEmitter
 
         return _plan.IndentBlockContents is null
             || token.IsKind(SyntaxKind.CloseBraceToken)
-            || _contentIndents.Count == 1
             || !StartsBlockContent(token);
     }
 

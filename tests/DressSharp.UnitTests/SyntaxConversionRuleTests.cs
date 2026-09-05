@@ -1,3 +1,5 @@
+using DressSharp.Architecture;
+using DressSharp.Configuration;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using EasyAssertions;
@@ -6,6 +8,20 @@ namespace DressSharp.UnitTests;
 
 public class SyntaxConversionRuleTests
 {
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void File_scoped_namespace_unindents_first_member_with_default_preferences(string newline)
+    {
+        var preferences = PreferenceCatalog.Defaults
+            .Select(preference => (preference.Key.ToName(), preference.Default))
+            .ToArray();
+        var source = $"namespace Example{newline}{{{newline}    public class Receipt;{newline}}}";
+        var result = Transform(source, preferences);
+        result.ShouldBe($"namespace Example;{newline}{newline}public class Receipt;");
+        Transform(result, preferences).ShouldBe(result);
+    }
+
     [Theory]
     [InlineData("dress_method_body", "class C { int M() { return 1; } }", "class C { int M() => 1; }")]
     [InlineData("dress_constructor_body", "class C { C() { Start(); } void Start() {} }", "class C { C() => Start(); void Start() {} }")]
