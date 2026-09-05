@@ -43,7 +43,7 @@ sealed class NamespaceStyleRule : ISyntaxFormattingRule
                 declaration.AttributeLists,
                 declaration.Modifiers,
                 declaration.NamespaceKeyword,
-                declaration.Name,
+                declaration.Name.WithoutTrailingTrivia(),
                 SyntaxRuleSafety.SemicolonFrom(declaration.OpenBraceToken),
                 declaration.Externs,
                 declaration.Usings,

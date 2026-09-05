@@ -17,7 +17,7 @@ public class SyntaxConversionRuleTests
     [InlineData("dress_accessor_body", "class C { int P { get { return 1; } } }", "class C { int P { get => 1; } }")]
     [InlineData("dress_lambda_body", "class C { System.Func<int> F = () => { return 1; }; }", "class C { System.Func<int> F = () => 1; }")]
     public void Converts_block_bodies_to_expressions(string key, string source, string expected) =>
-        AssertEquivalent(expected, Transform(source, (key, "expression")));
+        AssertFormatted(expected, Transform(source, (key, "expression")));
 
     [Theory]
     [InlineData("dress_method_body", "class C { int M() => 1; }", "class C { int M() { return 1; } }")]
@@ -27,13 +27,35 @@ public class SyntaxConversionRuleTests
     [InlineData("dress_indexer_body", "class C { int this[int i] => i; }", "class C { int this[int i] { get { return i; } } }")]
     [InlineData("dress_accessor_body", "class C { int P { get => 1; } }", "class C { int P { get { return 1; } } }")]
     public void Converts_expression_bodies_to_blocks(string key, string source, string expected) =>
-        AssertEquivalent(expected, Transform(source, (key, "block")));
+        AssertFormatted(expected, Transform(source, (key, "block")));
 
     [Fact]
     public void Converts_namespace_forms_both_directions()
     {
-        AssertEquivalent("namespace N; using X; class C {}", Transform("namespace N { using X; class C {} }", ("dress_namespace_style", "file_scoped")));
-        AssertEquivalent("namespace N { using X; class C {} }", Transform("namespace N; using X; class C {}", ("dress_namespace_style", "block_scoped")));
+        AssertFormatted("namespace N; using X; class C {}", Transform("namespace N { using X; class C {} }", ("dress_namespace_style", "file_scoped")));
+        AssertFormatted("namespace N { using X; class C {} }", Transform("namespace N; using X; class C {}", ("dress_namespace_style", "block_scoped")));
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void File_scoped_namespace_semicolon_follows_name(string newline)
+    {
+        var source = $"namespace Foo{newline}{{{newline}}}";
+        var result = Transform(source, ("dress_namespace_style", "file_scoped"));
+        result.ShouldBe("namespace Foo;");
+        Transform(result, ("dress_namespace_style", "file_scoped")).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void File_scoped_namespace_keeps_contents_after_semicolon(string newline)
+    {
+        var source = $"namespace Foo.Bar  {newline}  {{{newline}    using X;{newline}    class C {{ }}{newline}}}";
+        var result = Transform(source, ("dress_namespace_style", "file_scoped"));
+        result.ShouldBe($"namespace Foo.Bar;{newline}    using X;{newline}    class C {{ }}");
+        Transform(result, ("dress_namespace_style", "file_scoped")).ShouldBe(result);
     }
 
     [Theory]
@@ -42,7 +64,7 @@ public class SyntaxConversionRuleTests
     [InlineData("balanced", "if (a) { A(); } else if (b) { B(); C(); } else { D(); }", "if (a) { A(); } else if (b) { B(); C(); } else { D(); }")]
     [InlineData("balanced", "if (a) { A(); } else { B(); }", "if (a) A(); else B();")]
     public void Converts_complete_conditional_chains(string preference, string source, string expected) =>
-        AssertEquivalent(expected, Transform($"class C {{ void M() {{ {source} }} }}", ("dress_embedded_statement_braces", preference)), wrap: true);
+        AssertFormatted(expected, Transform($"class C {{ void M() {{ {source} }} }}", ("dress_embedded_statement_braces", preference)), wrap: true);
 
     [Fact]
     public void Unsafe_occurrences_are_skipped_while_safe_occurrences_continue()
@@ -83,12 +105,11 @@ public class SyntaxConversionRuleTests
     static string Transform(string source, params (string Key, string Value)[] preferences)
         => EmitterTestHarness.Format(source, preferences);
 
-    static void AssertEquivalent(string expected, string actual, bool wrap = false)
+    static void AssertFormatted(string expected, string actual, bool wrap = false)
     {
         if (wrap) expected = $"class C {{ void M() {{ {expected} }} }}";
-        Normalize(actual).ShouldBe(Normalize(expected));
+        actual.ShouldBe(expected);
         CSharpSyntaxTree.ParseText(actual, cancellationToken: TestContext.Current.CancellationToken).GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
     }
 
-    static string Normalize(string source) => Regex.Replace(CSharpSyntaxTree.ParseText(source).GetRoot().NormalizeWhitespace().ToFullString(), @"\s+", " ").Trim();
 }

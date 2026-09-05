@@ -15,7 +15,7 @@ public class EmbeddedStatementRuleTests
     [InlineData("next_line", "\n            ")]
     public void Placement_collapses_existing_body_whitespace(string placement, string expectedGap)
     {
-        var conditional = Root(Lines(Format("""
+        var result = Format("""
                 class C
                 {
                     void M()
@@ -26,25 +26,13 @@ public class EmbeddedStatementRuleTests
                             Run();
                     }
                 }
-                """,
+                """.ReplaceLineEndings("\n"),
                 ("dress_embedded_statement_placement", placement),
-                ("csharp_indent_block_contents", "true"))))
+                ("csharp_indent_block_contents", "true"));
+        var conditional = Root(result)
             .DescendantNodes().OfType<IfStatementSyntax>().Single();
 
-        Gap(Lines(Format("""
-                class C
-                {
-                    void M()
-                    {
-                        if (ready)
-
-
-                            Run();
-                    }
-                }
-                """,
-                ("dress_embedded_statement_placement", placement),
-                ("csharp_indent_block_contents", "true"))),
+        Gap(result,
             conditional.CloseParenToken,
             conditional.Statement.GetFirstToken()).ShouldBe(expectedGap);
     }
@@ -62,11 +50,10 @@ public class EmbeddedStatementRuleTests
                     if (ready)       { Run(); }
                 }
             }
-            """,
+            """.ReplaceLineEndings("\n"),
             ("dress_embedded_statement_placement", placement),
             ("csharp_new_line_before_open_brace", placement == "same_line" ? "all" : "none"),
             ("csharp_indent_block_contents", "true"));
-        result = Lines(result);
         var conditional = Root(result).DescendantNodes().OfType<IfStatementSyntax>().Single();
 
         Gap(result, conditional.CloseParenToken, conditional.Statement.GetFirstToken()).ShouldBe(expectedGap);
@@ -93,7 +80,7 @@ public class EmbeddedStatementRuleTests
             .Single(candidate => candidate.ToString() == "Run();");
 
         var first = run.GetFirstToken();
-        Gap(Lines(result), first.GetPreviousToken(), first).ShouldBe("\n    ");
+        Gap(result, first.GetPreviousToken(), first).ShouldBe("\n    ");
 
         var bracedRun = Root(Format(source, ("dress_embedded_statement_braces", "always")))
             .DescendantNodes().OfType<ExpressionStatementSyntax>()
@@ -203,8 +190,10 @@ public class EmbeddedStatementRuleTests
         loop.Statement.ShouldBeA<BlockSyntax>();
     }
 
-    [Fact]
-    public void Next_line_uses_the_source_line_ending()
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Next_line_uses_the_source_line_ending(string newline)
     {
         var result = Format(
             """
@@ -215,12 +204,12 @@ public class EmbeddedStatementRuleTests
                     if (ready) Run();
                 }
             }
-            """.ReplaceLineEndings("\r\n"),
+            """.ReplaceLineEndings(newline),
             ("dress_embedded_statement_placement", "next_line"),
             ("csharp_indent_block_contents", "true"));
         var conditional = Root(result).DescendantNodes().OfType<IfStatementSyntax>().Single();
 
-        Gap(result, conditional.CloseParenToken, conditional.Statement.GetFirstToken()).ShouldBe("\r\n            ");
+        Gap(result, conditional.CloseParenToken, conditional.Statement.GetFirstToken()).ShouldBe($"{newline}            ");
     }
 
     [Theory]
@@ -317,5 +306,4 @@ public class EmbeddedStatementRuleTests
     static string Gap(string source, Microsoft.CodeAnalysis.SyntaxToken left, Microsoft.CodeAnalysis.SyntaxToken right) =>
         source[left.Span.End..right.SpanStart];
 
-    static string Lines(string source) => source.Replace("\r\n", "\n");
 }
