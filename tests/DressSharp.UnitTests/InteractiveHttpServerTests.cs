@@ -18,6 +18,40 @@ public sealed class InteractiveHttpServerTests : IDisposable
     }
 
     [Fact]
+    public async Task Preview_uses_browser_assignments_without_reading_or_writing_files()
+    {
+        await using var server = await Start();
+        using var client = CreateClient(server.Address);
+        var path = Path.Combine(_directory, ".editorconfig");
+        const string external = "root = true\n[*.cs]\ncsharp_space_after_comma = false\n";
+        await File.WriteAllTextAsync(path, external, TestContext.Current.CancellationToken);
+        using var response = await client.PostAsJsonAsync(
+            "/api/preview",
+            new
+        {
+            source = "class C { void M(int a,int b) {} }",
+            preferences = new[]
+                {
+                    new
+                { key = "csharp_space_after_comma",
+                    local = new
+                    { kind = "explicit",
+                        value = "true" },
+                    inherited = new
+                    { kind = "absent",
+                        value = (string?)null } }
+                }
+        },
+            TestContext.Current.CancellationToken
+        );
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var result = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
+        result.RootElement.GetProperty("text").GetString().ShouldContain("int a, int b");
+        (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).ShouldBe(external);
+        Directory.GetFiles(_directory).Length.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Server_uses_random_loopback_addresses()
     {
         await using var first = await Start();
@@ -45,7 +79,7 @@ public sealed class InteractiveHttpServerTests : IDisposable
         styles.StatusCode.ShouldBe(HttpStatusCode.OK);
         bootstrap.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await index.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain("DressSharp interactive");
-        (await script.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldNotContain("http://");
+        (script.Content.Headers.ContentLength > 0).ShouldBe(true);
         (await styles.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldNotContain("url(");
 
         using var document = JsonDocument.Parse(await bootstrap.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));

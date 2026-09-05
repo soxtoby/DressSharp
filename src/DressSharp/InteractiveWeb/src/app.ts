@@ -1,4 +1,5 @@
 import {desiredAssignment, matchesRule, setEdit, validValue, type Assignment, type ConfigurationSnapshot, type PendingEdits, type PreferenceSnapshot} from "./state";
+import {Preview} from "./preview";
 
 type Rule = {key: string; name: string; group: string; description: string; defaultValue: string; valueKind: string; values: Array<{value: string; label: string}>; minimum: number | null; specialValues: string[]};
 type Bootstrap = {csrfToken: string; catalog: {version: number; rules: Rule[]}};
@@ -7,6 +8,7 @@ const root = document.querySelector<HTMLElement>("#app")!;
 if (!root) throw new Error("Application root is missing.");
 let bootstrap: Bootstrap;
 let snapshot: ConfigurationSnapshot;
+let preview: Preview;
 let edits: PendingEdits = new Map();
 let query = "";
 let saving = false;
@@ -22,6 +24,7 @@ start().catch(fatal);
 async function start() {
     bootstrap = await getJson<Bootstrap>("/api/bootstrap");
     snapshot = await getJson<ConfigurationSnapshot>("/api/configuration");
+    preview = await Preview.create();
     render();
     window.setInterval(poll, 10_000);
     window.addEventListener("focus", poll);
@@ -76,7 +79,7 @@ function render() {
     const stop = el("button", "quiet", ["Stop server"]);
     stop.addEventListener("click", stopServer);
 
-    root.replaceChildren(el("div", "shell", [
+    const shell = el("div", "shell", [
         el("header", "app-header", [
             el("div", "brand", [el("span", "brand-mark", ["D#"]), el("span", "", ["DressSharp ", el("small", "", ["interactive"])])]),
             el("div", "target", [el("span", "status-dot"), el("span", "", [el("small", "", ["Target"]), snapshot.targetPath])]),
@@ -89,17 +92,22 @@ function render() {
                 el("label", "search", [el("span", "", ["⌕"]), search]),
                 list,
             ]),
-            el("section", "canvas", [
-                el("p", "kicker", ["Configuration workbench"]),
-                el("h1", "", ["Shape the code. Keep the file yours."]),
-                el("p", "lede", ["Edits stay in this browser until Save. DressSharp merges only changed preferences into the latest EditorConfig."]),
-                el("div", "preview-frame", [
-                    el("div", "preview-labels", [el("span", "", ["Source"]), el("span", "", ["Formatted output"])]),
-                    el("div", "preview-placeholder", [el("span", "preview-mark", ["{ }"]), el("strong", "", ["Preview arrives in SOX-155"]), el("p", "", ["Preference editing and persistence are active now."])]),
-                ]),
-            ]),
+            el("section", "canvas"),
         ]),
-    ]));
+    ]);
+    if (!root.querySelector(".shell")) {
+        shell.querySelector(".canvas")!.replaceWith(preview.element);
+        root.replaceChildren(shell);
+    } else {
+        for (const selector of [".app-header", ".notices", ".settings-rail"]) {
+            const current = root.querySelector<HTMLElement>(selector)!;
+            const replacement = shell.querySelector<HTMLElement>(selector)!;
+            const scrollTop = current.scrollTop;
+            current.replaceWith(replacement);
+            replacement.scrollTop = scrollTop;
+        }
+    }
+    preview.configure(snapshot, edits);
 }
 
 function ruleRow(rule: Rule, preference: PreferenceSnapshot) {
@@ -178,6 +186,7 @@ function createControl(rule: Rule, preference: PreferenceSnapshot, desired: Assi
 function change(preference: PreferenceSnapshot, assignment: Assignment, rerender = true) {
     saved = false;
     edits = setEdit(edits, preference, assignment);
+    preview.configure(snapshot, edits);
     if (rerender) render(); else updateSaveState();
 }
 

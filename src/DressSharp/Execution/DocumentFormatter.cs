@@ -42,7 +42,7 @@ sealed class DocumentFormatter
     {
         var root = await Parse(document, options, cancellationToken);
         var transformed = Transform(root, document.Text, options, cancellationToken);
-        return new(Encode(document, transformed.Text), transformed.SkippedOccurrences);
+        return new(Encode(document, transformed.Text), transformed.SkippedOccurrences, _representation.Encoding ?? document.SourceEncoding);
     }
 
     internal string FormatSyntax(
@@ -227,4 +227,4 @@ sealed class DocumentFormatter
 sealed record TransformedDocument(string Text, int SkippedOccurrences);
 sealed record EmittedDocument(string Text, int SkippedOccurrences);
 sealed record EmissionStage(string Text, int RewriteSkippedOccurrences, int LayoutSkippedOccurrences);
-sealed record FormattedDocument(ReadOnlyMemory<byte> Content, int SkippedOccurrences);
+sealed record FormattedDocument(ReadOnlyMemory<byte> Content, int SkippedOccurrences, SourceEncoding Encoding);

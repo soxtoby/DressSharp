@@ -49,6 +49,9 @@ The directory containing the target EditorConfig. It anchors inherited preferenc
 Transient C# supplied within an interactive configuration to demonstrate the pending preferences. DressSharp never saves it.
 _Avoid_: Sample file
 
+**Preview parse context**:
+The fixed C# context for preview source: the latest stable language version supported by DressSharp, with no predefined preprocessor symbols. It is independent of any project's parse context.
+
 **Preview diff**:
 The difference between preview source and its formatted output under the pending preferences. It may reveal whitespace explicitly without changing either text.
 

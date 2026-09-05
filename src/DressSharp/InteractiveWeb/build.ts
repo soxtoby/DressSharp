@@ -8,6 +8,11 @@ const result = await Bun.build({
     naming: "app.js",
     target: "browser",
     minify: true,
+    plugins: [{name: "preview-highlighter", setup(build) {
+        build.onResolve({filter: /^shiki$/}, () => ({path: `${import.meta.dir}/src/shiki-preview.ts`}));
+        build.onResolve({filter: /^shiki\/wasm$/}, () => ({path: "unused-wasm", namespace: "preview"}));
+        build.onLoad({filter: /.*/, namespace: "preview"}, () => ({contents: "export default undefined", loader: "js"}));
+    }}],
 });
 
 if (!result.success) {

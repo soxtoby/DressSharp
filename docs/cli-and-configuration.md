@@ -22,6 +22,8 @@ Inside a Git worktree, DressSharp selects tracked files plus nonignored untracke
 
 `interactive` starts the offline browser application on a random loopback port and opens it in the default browser. Press Ctrl+C or use the application's stop button to shut it down. `--config` selects an EditorConfig file or directory; without it, DressSharp discovers the nearest `.editorconfig` from the invocation directory.
 
+Edit the preview sample or paste C# into the left pane, then change preferences to compare real formatted output on the right. Preview updates automatically and never saves source. The Whitespace toggle reveals spaces, tabs, and line endings; output metadata shows encoding and final-newline changes. Pasted source uses LF, and preview uses the bundled formatter's latest stable C# version with no predefined symbols. External configuration changes enter the preview when you choose Reload; pending edits remain applied.
+
 ## Exit codes
 
 | Code | Meaning |

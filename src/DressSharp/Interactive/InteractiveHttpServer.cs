@@ -105,19 +105,28 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
     async Task Listen()
     {
-        while (!_stopping.IsCancellationRequested)
+        var requests = new List<Task>();
+        try
         {
-            HttpListenerContext context;
-            try
+            while (!_stopping.IsCancellationRequested)
             {
-                context = await _listener.GetContextAsync().WaitAsync(_stopping.Token);
-            }
-            catch (Exception exception) when (exception is OperationCanceledException or HttpListenerException or ObjectDisposedException)
-            {
-                return;
-            }
+                HttpListenerContext context;
+                try
+                {
+                    context = await _listener.GetContextAsync().WaitAsync(_stopping.Token);
+                }
+                catch (Exception exception) when (exception is OperationCanceledException or HttpListenerException or ObjectDisposedException)
+                {
+                    return;
+                }
 
-            await Handle(context);
+                requests.RemoveAll(request => request.IsCompleted);
+                requests.Add(Task.Run(() => Handle(context)));
+            }
+        }
+        finally
+        {
+            await Task.WhenAll(requests);
         }
     }
 
@@ -176,6 +185,25 @@ sealed class InteractiveHttpServer : IInteractiveServer
                 return;
             }
 
+            if (context.Request.HttpMethod == "POST" && path == "/api/preview")
+            {
+                var request = await JsonSerializer.DeserializeAsync<PreviewRequest>(
+                    context.Request.InputStream, JsonOptions, _stopping.Token)
+                    ?? throw new JsonException("A request body is required.");
+                if (request.Source is null || request.Preferences is null)
+                    throw new JsonException("Source and preferences are required.");
+                var preferences = request.Preferences.Select(preference =>
+                {
+                    if (preference.Local is null || preference.Inherited is null)
+                        throw new JsonException("Local and inherited assignments are required.");
+                    var local = ToEdit(new SaveEdit(preference.Key, preference.Local.Kind, preference.Local.Value));
+                    var inherited = ToEdit(new SaveEdit(preference.Key, preference.Inherited.Kind, preference.Inherited.Value));
+                    return new InteractivePreference(local.RuleKey, local.DesiredLocal, inherited.DesiredLocal, null, null, null);
+                }).ToArray();
+                await WriteJson(context.Response, 200, await InteractivePreview.Format(request.Source, preferences, _stopping.Token));
+                return;
+            }
+
             if (context.Request.HttpMethod == "POST" && path == "/api/shutdown")
             {
                 if (!TokenMatches(context.Request.Headers[CsrfHeader]))
@@ -190,9 +218,9 @@ sealed class InteractiveHttpServer : IInteractiveServer
                 return;
             }
 
-            if (path is "/" or "/app.js" or "/app.css" or "/api/bootstrap" or "/api/configuration" or "/api/shutdown")
+            if (path is "/" or "/app.js" or "/app.css" or "/api/bootstrap" or "/api/configuration" or "/api/shutdown" or "/api/preview")
             {
-                context.Response.Headers[HttpResponseHeader.Allow] = path is "/api/shutdown" ? "POST" : path is "/api/configuration" ? "GET, POST" : "GET";
+                context.Response.Headers[HttpResponseHeader.Allow] = path is "/api/shutdown" or "/api/preview" ? "POST" : path is "/api/configuration" ? "GET, POST" : "GET";
                 await Write(context.Response, 405, "text/plain; charset=utf-8", "Method not allowed");
                 return;
             }
@@ -301,7 +329,8 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
     static void AddSecurityHeaders(HttpListenerResponse response)
     {
-        response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
+        // Pierre generates shadow-DOM styles; Shiki colors tokens with style attributes.
+        response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
         response.Headers["X-Content-Type-Options"] = "nosniff";
         response.Headers["Referrer-Policy"] = "no-referrer";
         response.Headers["Cache-Control"] = "no-store";
@@ -335,4 +364,8 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
     sealed record SaveRequest(IReadOnlyList<SaveEdit> Edits);
     sealed record SaveEdit(string Key, string Kind, string? Value);
+
+    sealed record PreviewRequest(string Source, IReadOnlyList<PreviewPreference> Preferences);
+    sealed record PreviewPreference(string Key, PreviewAssignment Local, PreviewAssignment Inherited);
+    sealed record PreviewAssignment(string Kind, string? Value);
 }

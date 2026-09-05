@@ -21,6 +21,15 @@ sealed class SourceDocument
     internal string PreferredLineEnding { get; }
     internal ReadOnlyMemory<byte> OriginalBytes => _originalBytes;
 
+    internal static SourceDocument FromText(string path, string text) =>
+        new(path, new UTF8Encoding(false, true).GetBytes(text), text, SourceEncoding.Utf8, FirstLineEnding(text) ?? "\n");
+
+    internal static string Decode(ReadOnlyMemory<byte> content, SourceEncoding encoding)
+    {
+        var decoder = CreateEncoder(encoding);
+        return decoder.GetString(content.Span[decoder.GetPreamble().Length..]);
+    }
+
     internal static async ValueTask<SourceDocument> ReadAsync(string path, CancellationToken cancellationToken = default)
     {
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken);

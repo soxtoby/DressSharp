@@ -1,0 +1,186 @@
+import {FileDiff, parseDiffFromFile, preloadHighlighter, type FileDiffOptions, type FileContents} from "@pierre/diffs";
+import {Editor} from "@pierre/diffs/edit";
+import {DiffsContainerLoaded} from "../node_modules/@pierre/diffs/dist/components/web-components.js";
+import {PreviewRevision, previewPreferences, whitespaceMarkers} from "./preview-state";
+import type {ConfigurationSnapshot, PendingEdits} from "./state";
+
+const sample = `using System;
+
+namespace Example
+{
+    public class Receipt
+    {
+        public decimal Total(decimal subtotal,decimal tax)
+        {
+            if(subtotal>0) { return subtotal+tax; }
+            else { return 0; }
+        }
+    }
+}
+`;
+
+type PreviewResult = {text: string; encoding: string; lineEndings: string; finalNewline: boolean; skippedOccurrences: number; languageVersion: string};
+
+class PreviewDiff extends FileDiff {
+    refresh(source: string, output: string, host: HTMLElement) {
+        // Pierre edits additions. Reverse the comparison and visually place source left.
+        const oldFile: FileContents = {name: "Preview.cs", lang: "csharp", contents: output};
+        const newFile: FileContents = {name: "Preview.cs", lang: "csharp", contents: source};
+        const fileDiff = parseDiffFromFile(oldFile, newFile);
+        // An identical pair has no patch hunks; retain its full editable context.
+        if (source === output && source.length > 0) {
+            const lines = fileDiff.additionLines.length;
+            fileDiff.hunks = [{
+                collapsedBefore: 0, additionStart: 1, deletionStart: 1,
+                additionCount: lines, deletionCount: lines, additionLines: 0, deletionLines: 0,
+                additionLineIndex: 0, deletionLineIndex: 0,
+                hunkContent: [{type: "context", lines, additionLineIndex: 0, deletionLineIndex: 0}],
+                splitLineStart: 0, unifiedLineStart: 0, splitLineCount: lines, unifiedLineCount: lines,
+                noEOFCRAdditions: !source.endsWith("\n"), noEOFCRDeletions: !source.endsWith("\n"),
+            }];
+            fileDiff.splitLineCount = lines;
+            fileDiff.unifiedLineCount = lines;
+        }
+        fileDiff.cacheKey = "preview";
+        this.hunksRenderer.clearRenderCache();
+        if (source.length === 0) {
+            this.hunksRenderer.hydrate(fileDiff);
+            this.hunksRenderer.beginEditSession();
+        }
+        this.render({fileDiff, oldFile, newFile, fileContainer: host, forceRender: true});
+    }
+}
+
+const editorCss = `
+:host { --diffs-light-addition-color: #c93742 !important; --diffs-light-deletion-color: #23864d !important;
+    --diffs-bg: #faf9f3 !important; background-color: #faf9f3 !important; }
+pre[data-diff] { min-height: 100%; font-size: 12px; tab-size: 4; }
+pre[data-diff-type="split"] > [data-additions] { grid-column: 1; grid-row: 1; }
+pre[data-diff-type="split"] > [data-deletions] { grid-column: 2; grid-row: 1; }
+[data-line] { position: relative; }
+:host([data-whitespace]) [data-line]::after { content: var(--preview-whitespace) !important; position: absolute;
+    top: 0; left: 0; color: #718078; pointer-events: none; white-space: pre; font: inherit; }
+@media (max-width: 700px) {
+    pre[data-diff-type="split"] { display: flex; flex-direction: column; }
+    pre[data-diff-type="split"] > [data-additions] { order: 1; width: 100%; }
+    pre[data-diff-type="split"] > [data-deletions] { order: 2; width: 100%; }
+    [data-additions], [data-deletions] { position: relative; padding-top: 30px; }
+    [data-additions]::before, [data-deletions]::before { position: absolute; top: 0; left: 0; padding: 8px; }
+    [data-additions]::before { content: "Source · editable"; color: #a92f38; }
+    [data-deletions]::before { content: "Formatted output · read only"; color: #1f6548; }
+}`;
+
+export class Preview {
+    readonly element = document.createElement("section");
+    private readonly host = document.createElement("diffs-container");
+    private readonly status = document.createElement("span");
+    private readonly facts = document.createElement("span");
+    private readonly revision = new PreviewRevision();
+    private readonly diff: PreviewDiff;
+    private readonly editor: Editor<undefined>;
+    private source = sample;
+    private output = "";
+    private preferences = "";
+    private timer = 0;
+    private controller: AbortController | undefined;
+    private stale = true;
+    private markerFrame = 0;
+
+    static async create() {
+        if (!DiffsContainerLoaded) throw new Error("The preview editor could not load.");
+        await preloadHighlighter({themes: ["github-light"], langs: ["csharp"], preferredHighlighter: "shiki-js"});
+        return new Preview();
+    }
+
+    private constructor() {
+        this.element.className = "canvas preview-canvas";
+        this.element.innerHTML = `<div class="preview-toolbar"><div><h1>Preview</h1><small class="parse-context">Latest stable C# · no predefined symbols</small></div><label><input type="checkbox" class="whitespace-toggle"> Whitespace</label></div><div class="preview-frame"><div class="preview-labels"><span>Source · editable · UTF-8 · LF</span><span>Formatted output · read only</span></div><div class="diff-scroll"></div><div class="preview-note"></div></div>`;
+        this.element.querySelector(".diff-scroll")!.append(this.host);
+        this.status.setAttribute("role", "status");
+        this.element.querySelector(".preview-note")!.append(this.status, this.facts);
+        this.element.querySelector<HTMLInputElement>(".whitespace-toggle")!.addEventListener("change", event => {
+            this.host.toggleAttribute("data-whitespace", (event.target as HTMLInputElement).checked);
+            this.updateMarkers();
+        });
+        this.diff = new PreviewDiff(this.options());
+        this.diff.refresh(this.source, this.output, this.host);
+        this.editor = new Editor({onChange: file => {
+            this.source = file.contents;
+            this.schedule();
+        }});
+        this.editor.edit(this.diff);
+        if (this.host.shadowRoot) new MutationObserver(() => this.queueMarkers()).observe(this.host.shadowRoot, {childList: true, characterData: true, subtree: true});
+    }
+
+    configure(snapshot: ConfigurationSnapshot, edits: PendingEdits) {
+        const preferences = JSON.stringify(previewPreferences(snapshot, edits));
+        if (preferences === this.preferences) return;
+        this.preferences = preferences;
+        this.schedule();
+    }
+
+    private options(): FileDiffOptions<undefined> {
+        return {diffStyle: "split", expandUnchanged: true, disableFileHeader: true, theme: "github-light", themeType: "light",
+            preferredHighlighter: "shiki-js", overflow: "scroll", unsafeCSS: editorCss,
+            disableBackground: this.stale, diffIndicators: "none", lineDiffType: this.stale ? "none" : "char",
+            onPostRender: () => this.queueMarkers()};
+    }
+
+    private schedule() {
+        const revision = this.revision.next();
+        window.clearTimeout(this.timer);
+        this.controller?.abort();
+        this.stale = true;
+        this.status.textContent = "Updating · output outdated";
+        // Editor onChange runs before its own render completes.
+        queueMicrotask(() => {
+            this.diff.setOptions(this.options());
+            this.diff.refresh(this.source, this.output, this.host);
+        });
+        this.timer = window.setTimeout(() => void this.format(revision), 250);
+    }
+
+    private async format(revision: number) {
+        const controller = new AbortController();
+        this.controller = controller;
+        try {
+            const response = await fetch("/api/preview", {method: "POST", headers: {"Content-Type": "application/json"},
+                body: `{"source":${JSON.stringify(this.source)},"preferences":${this.preferences}}`, signal: controller.signal});
+            if (!response.ok) {
+                const error = await response.json() as {message: string};
+                throw new Error(error.message);
+            }
+            const result = await response.json() as PreviewResult;
+            if (!this.revision.isCurrent(revision)) return;
+            this.output = result.text;
+            this.stale = false;
+            this.status.textContent = result.skippedOccurrences > 0 ? `${result.skippedOccurrences} transformations skipped` : "Up to date";
+            this.facts.textContent = `${result.encoding.toUpperCase()} · ${result.lineEndings} · final newline ${result.finalNewline ? "present" : "absent"}`;
+            this.element.querySelector(".parse-context")!.textContent = `C# ${result.languageVersion} · no predefined symbols`;
+            this.diff.setOptions(this.options());
+            this.diff.refresh(this.source, this.output, this.host);
+        } catch (error) {
+            if (!this.revision.isCurrent(revision) || controller.signal.aborted) return;
+            this.status.textContent = `Output outdated · ${error instanceof Error ? error.message : "Preview failed"}`;
+        }
+    }
+
+    private queueMarkers() {
+        if (this.markerFrame) return;
+        this.markerFrame = requestAnimationFrame(() => { this.markerFrame = 0; this.updateMarkers(); });
+    }
+
+    private updateMarkers() {
+        const shadow = this.host.shadowRoot;
+        if (!shadow || !this.host.hasAttribute("data-whitespace")) return;
+        const sourceEndings = [...this.source.matchAll(/[^\r\n]*(\r\n|\r|\n|$)/g)];
+        const outputEndings = [...this.output.matchAll(/[^\r\n]*(\r\n|\r|\n|$)/g)];
+        for (const line of shadow.querySelectorAll<HTMLElement>("[data-line]")) {
+            const text = line.textContent ?? "";
+            const endings = line.closest("[data-additions]") ? sourceEndings : outputEndings;
+            const ending = endings[Number(line.dataset["line"]) - 1]?.[1];
+            const markers = whitespaceMarkers(text) + (ending === "\r\n" ? "␍↵" : ending === "\n" ? "↵" : ending === "\r" ? "␍" : "");
+            line.style.setProperty("--preview-whitespace", JSON.stringify(markers));
+        }
+    }
+}

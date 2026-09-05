@@ -41,6 +41,28 @@ static class InteractiveEditorConfig
 {
     const int MaximumWriteAttempts = 3;
 
+    internal static FormattingConfiguration ResolvePending(IReadOnlyList<InteractivePreference> preferences)
+    {
+        ValidateEdits(preferences.Select(preference => new InteractivePreferenceEdit(preference.RuleKey, preference.Local)).ToArray());
+        var effective = new Dictionary<RuleKey, string>();
+        var sources = new Dictionary<RuleKey, string>();
+        foreach (var preference in preferences)
+        {
+            var assignment = preference.Local.Kind == PreferenceAssignmentKind.Absent ? preference.Inherited : preference.Local;
+            if (assignment.Kind != PreferenceAssignmentKind.Explicit)
+                continue;
+            if (!PreferenceCatalog.IsValid(preference.RuleKey, assignment.Value!))
+                throw new ArgumentException($"Invalid value for '{preference.RuleKey.ToName()}'.");
+            var value = PreferenceCatalog.Normalize(preference.RuleKey, assignment.Value!);
+            if (value == "unset")
+                continue;
+            effective.Add(preference.RuleKey, value);
+            sources.Add(preference.RuleKey, "preview");
+        }
+        ApplyEditorConfigDerivations(effective, sources);
+        return new FormattingConfiguration(effective);
+    }
+
     internal static async ValueTask<InteractiveEditorConfigData> LoadAsync(
         string? target,
         string invocationDirectory,

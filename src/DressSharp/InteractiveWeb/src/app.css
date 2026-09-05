@@ -72,13 +72,21 @@ details[open] > .group-heading::before { content: "−"; }
 .default-value { justify-self: stretch; overflow: hidden; padding: 6px 8px; color: #48534b; background: #f4f3ed; border: 1px solid var(--line); border-radius: 6px; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .canvas { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 26px 30px 22px; background: var(--paper); }
 .canvas-heading { flex: none; }
+.preview-canvas { padding: 16px; }
+.preview-toolbar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.preview-toolbar h1 { font-size: 23px; letter-spacing: -.03em; }
+.preview-toolbar small { color: var(--muted); font-size: 11px; }
+.preview-toolbar label { white-space: nowrap; font-size: 12px; }
+.diff-scroll { flex: 1; min-height: 0; overflow: auto; }
+.diff-scroll diffs-container { display: block; min-height: 100%; }
+.preview-note { flex-wrap: wrap; line-height: 1.6; }
 .kicker { margin: 0 0 7px; color: var(--green); font-size: 10px; text-transform: uppercase; letter-spacing: .11em; }
 .canvas h1 { margin: 0; font-size: clamp(27px, 3vw, 42px); letter-spacing: -.055em; }
 .lede { max-width: 720px; margin: 8px 0 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
-.preview-frame { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; color: #e7ece8; background: #0f1411; border: 1px solid #303632; border-radius: 12px; box-shadow: 0 20px 60px rgba(24, 33, 28, .14); }
-.preview-labels { flex: none; display: grid; grid-template-columns: 1fr 1fr; color: #b5beb7; background: #1b211d; border-bottom: 1px solid #313834; font: 10px "Cascadia Code", monospace; text-transform: uppercase; letter-spacing: .1em; }
+.preview-frame { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(24, 33, 28, .06); }
+.preview-labels { flex: none; display: grid; grid-template-columns: 1fr 1fr; color: var(--muted); background: #eeeee6; border-bottom: 1px solid var(--line); font: 10px "Cascadia Code", monospace; text-transform: uppercase; letter-spacing: .1em; }
 .preview-labels span { padding: 11px 16px; }
-.preview-labels span + span { border-left: 1px solid #313834; }
+.preview-labels span + span { border-left: 1px solid var(--line); }
 .preview-placeholder { flex: 1; display: grid; place-content: center; justify-items: center; color: #aab5ad; text-align: center; background: radial-gradient(circle at 50% 45%, rgba(214,243,111,.08), transparent 36%), repeating-linear-gradient(0deg, transparent 0 22px, rgba(255,255,255,.025) 22px 23px); }
 .preview-placeholder strong { color: #e7ece8; }
 .preview-placeholder p { margin: 7px 0 0; font-size: 11px; }
@@ -90,8 +98,8 @@ details[open] > .group-heading::before { content: "−"; }
 .preview-columns { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; overflow: auto; }
 .code-pane { min-width: 420px; min-height: 100%; margin: 0; padding: 20px; color: #eca7aa; background: repeating-linear-gradient(0deg, transparent 0 22px, rgba(255,255,255,.025) 22px 23px); font-size: 12px; line-height: 23px; }
 .code-pane + .code-pane { color: var(--lime); border-left: 1px solid #313834; }
-.preview-note { flex: none; display: flex; justify-content: space-between; gap: 12px; padding: 9px 13px; color: #87938a; border-top: 1px solid #313834; font: 9px "Cascadia Code", monospace; }
-.preview-note span { color: var(--lime); }
+.preview-note { flex: none; display: flex; justify-content: space-between; gap: 12px; padding: 9px 13px; color: var(--muted); background: #eeeee6; border-top: 1px solid var(--line); font: 9px "Cascadia Code", monospace; }
+.preview-note span { color: var(--green); }
 .stopped .status-dot { background: #8f9891; box-shadow: none; }
 .stopped-banner { position: fixed; z-index: 30; top: 76px; left: 0; right: 0; padding: 10px 20px; color: #eff7dd; background: var(--green); text-align: center; font-size: 12px; }
 
