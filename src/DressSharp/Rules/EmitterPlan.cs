@@ -23,6 +23,7 @@ sealed class EmitterPlan
         ulong laterElementRules,
         RuleSettings settings,
         bool? indentBraces,
+        bool? indentLambdaBlock,
         bool? indentBlockContents,
         bool? indentSwitchLabels,
         bool? indentCaseContents,
@@ -43,6 +44,7 @@ sealed class EmitterPlan
         MaximumLineLength = settings.MaximumLineLength;
         IndentUnit = settings.IndentUnit;
         IndentBraces = indentBraces;
+        IndentLambdaBlock = indentLambdaBlock;
         IndentBlockContents = indentBlockContents;
         IndentSwitchLabels = indentSwitchLabels;
         IndentCaseContents = indentCaseContents;
@@ -60,6 +62,7 @@ sealed class EmitterPlan
     internal int MaximumLineLength { get; }
     internal string IndentUnit { get; }
     internal bool? IndentBraces { get; }
+    internal bool? IndentLambdaBlock { get; }
     internal bool? IndentBlockContents { get; }
     internal bool? IndentSwitchLabels { get; }
     internal bool? IndentCaseContents { get; }
@@ -149,7 +152,7 @@ sealed class EmitterPlan
         var initializerIndentations = new bool?[Enum.GetValues<InitializerKind>().Length];
         foreach (var rule in catalog.InitializerIndentationRules)
         {
-            initializerIndentations[(int)rule.Kind] = InitializerIndentation(configuration.Preferences.GetValueOrDefault(rule.Metadata.RuleKey));
+            initializerIndentations[(int)rule.Kind] = OptionalIndentation(configuration.Preferences.GetValueOrDefault(rule.Metadata.RuleKey));
         }
 
         return new(
@@ -161,6 +164,7 @@ sealed class EmitterPlan
             laterElementRules,
             RuleSettings.From(configuration),
             OptionalBoolean(configuration, RuleKey.CSharpIndentBraces),
+            OptionalIndentation(configuration.Preferences.GetValueOrDefault(RuleKey.DressLambdaBlockIndentation)),
             OptionalBoolean(configuration, RuleKey.CSharpIndentBlockContents),
             OptionalBoolean(configuration, RuleKey.CSharpIndentSwitchLabels),
             OptionalBoolean(configuration, RuleKey.CSharpIndentCaseContents),
@@ -179,7 +183,7 @@ sealed class EmitterPlan
             ? parsed
             : null;
 
-    static bool? InitializerIndentation(string? value) =>
+    static bool? OptionalIndentation(string? value) =>
         value?.Equals("indented", StringComparison.OrdinalIgnoreCase) == true
             ? true
             : value?.Equals("not_indented", StringComparison.OrdinalIgnoreCase) == true

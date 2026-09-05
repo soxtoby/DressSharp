@@ -86,6 +86,7 @@ enum RuleKey
     DressArrayInitializerIndentation,
     DressWithInitializerIndentation,
     DressCollectionExpressionIndentation,
+    DressLambdaBlockIndentation,
     DressMethodBody,
     DressConstructorBody,
     DressOperatorBody,

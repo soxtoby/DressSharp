@@ -161,6 +161,7 @@ sealed class RuleCatalog
             .Concat(syntaxWrappingRules)
             .Concat(newLineRules)
             .Concat(indentationRules)
+            .Append(new LambdaBlockIndentationRule())
             .ToImmutableArray();
         IRule[] metadataOnlyRules =
         [

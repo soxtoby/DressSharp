@@ -422,6 +422,9 @@ sealed class SinglePassEmitter
 
     string IndentFor(SyntaxToken token)
     {
+        if (LambdaBlockIndentFor(token) is { } lambdaIndent)
+            return lambdaIndent;
+
         if (InitializerIndentFor(token) is { } initializerIndent)
             return initializerIndent;
 
@@ -490,6 +493,21 @@ sealed class SinglePassEmitter
         return token.IsKind(SyntaxKind.CloseBraceToken) && _braceIndents.Count != 0
             ? _braceIndents.Peek()
             : _contentIndents[^1];
+    }
+
+    string? LambdaBlockIndentFor(SyntaxToken token)
+    {
+        if (_plan.IndentLambdaBlock is not { } indented
+            || token.Parent is not BlockSyntax { Parent: LambdaExpressionSyntax lambda } block
+            || token != block.OpenBraceToken && token != block.CloseBraceToken
+            || block.ContainsDirectives
+            || _checkMalformedRegions && IsUnsafeOriginal(lambda)
+            || !_emittedContentIndents.TryGetValue(lambda, out var lambdaIndent))
+        {
+            return null;
+        }
+
+        return lambdaIndent + (indented ? _plan.IndentUnit : "");
     }
 
     string BraceBaseIndent(SyntaxToken token) =>
@@ -685,6 +703,9 @@ sealed class SinglePassEmitter
 
     bool PreservesSourceIndent(SyntaxToken token)
     {
+        if (LambdaBlockIndentFor(token) is not null)
+            return false;
+
         if (InitializerIndentFor(token) is not null)
             return false;
 
@@ -863,7 +884,8 @@ sealed class SinglePassEmitter
 
         if (token.IsKind(SyntaxKind.OpenBraceToken))
         {
-            var braceIndent = token.Parent is SwitchExpressionSyntax
+            var braceIndent = LambdaBlockIndentFor(token);
+            braceIndent ??= token.Parent is SwitchExpressionSyntax
                 ? _lineIndent
                 : CaseBlockIndent(token)
                 ?? (_plan.IndentBraces is { } indentBraces

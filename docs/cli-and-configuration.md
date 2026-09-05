@@ -40,6 +40,20 @@ Known invalid effective values and malformed EditorConfig fail preflight before 
 
 `dotnet dress init` writes every supported key with its Default value. The versioned rule catalog is the authoritative source for supported values and interactive documentation.
 
+### Lambda block indentation
+
+Use `dress_lambda_block_indentation = indented` to place multiline lambda braces one indentation level below the lambda's starting line:
+
+```csharp
+var callback = () =>
+    {
+        Work();
+        return true;
+    };
+```
+
+`not_indented` (Default) aligns the braces with the lambda's starting line. Both values override `csharp_indent_braces` for lambda blocks; `csharp_indent_block_contents` still controls indentation inside the braces. Indentation uses `indent_style` and `indent_size`. Missing or `unset` leaves existing indentation rules in control. This preference does not introduce line breaks or change expression lambdas or anonymous `delegate` blocks.
+
 ## Safety and file handling
 
 DressSharp uses syntax only—never symbols, types, or semantic models. It derives language version, preprocessor symbols, source kind, and documentation mode from MSBuild. Unsupported project language versions fail before writes. Unsafe individual occurrences intersecting malformed syntax, directives, or disabled text are skipped; safe occurrences continue.
