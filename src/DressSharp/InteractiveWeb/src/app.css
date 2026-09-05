@@ -100,6 +100,8 @@ details[open] > .group-heading::before { content: "−"; }
 .code-pane + .code-pane { color: var(--lime); border-left: 1px solid #313834; }
 .preview-note { flex: none; display: flex; justify-content: space-between; gap: 12px; padding: 9px 13px; color: var(--muted); background: #eeeee6; border-top: 1px solid var(--line); font: 9px "Cascadia Code", monospace; }
 .preview-note span { color: var(--green); }
+.preview-details { display: flex; gap: 14px; }
+.cursor-position { min-width: 78px; text-align: right; }
 .stopped .status-dot { background: #8f9891; box-shadow: none; }
 .stopped-banner { position: fixed; z-index: 30; top: 76px; left: 0; right: 0; padding: 10px 20px; color: #eff7dd; background: var(--green); text-align: center; font-size: 12px; }
 
@@ -121,7 +123,8 @@ details[open] > .group-heading::before { content: "−"; }
   .preview-columns { grid-template-columns: 1fr; }
   .code-pane + .code-pane { border-top: 1px solid #313834; border-left: 0; }
   .preview-note { display: block; }
-  .preview-note span { display: block; margin-bottom: 4px; }
+  .preview-note > span { display: block; margin-bottom: 4px; }
+  .preview-details { justify-content: space-between; }
 }
 
 @media (prefers-reduced-motion: reduce) {

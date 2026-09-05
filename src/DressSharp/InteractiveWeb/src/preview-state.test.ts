@@ -1,5 +1,5 @@
 import {expect, test} from "bun:test";
-import {PreviewRevision, previewPreferences, whitespaceMarkers} from "./preview-state";
+import {cursorPosition, PreviewRevision, previewPreferences, whitespaceMarkers} from "./preview-state";
 
 test("pending assignments retain the loaded inheritance instead of stale effective values", () => {
     const inherited = {kind: "explicit", value: "8"} as const;
@@ -19,4 +19,10 @@ test("editing during debounce invalidates an in-flight result", () => {
 
 test("whitespace decorations preserve tab alignment without copying source text", () => {
     expect(whitespaceMarkers("a \tb\n")).toBe("\u00a0·→\u00a0\u00a0");
+});
+
+test("cursor position reports the active end using one-based coordinates", () => {
+    expect(cursorPosition([{start: {line: 1, character: 2}, end: {line: 3, character: 4}, direction: 1}])).toBe("Ln 4, Col 5");
+    expect(cursorPosition([{start: {line: 1, character: 2}, end: {line: 3, character: 4}, direction: -1}])).toBe("Ln 2, Col 3");
+    expect(cursorPosition([])).toBeNull();
 });

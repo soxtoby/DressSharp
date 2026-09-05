@@ -1,7 +1,7 @@
 import {FileDiff, parseDiffFromFile, preloadHighlighter, type FileDiffOptions, type FileContents} from "@pierre/diffs";
 import {Editor} from "@pierre/diffs/edit";
 import {DiffsContainerLoaded} from "../node_modules/@pierre/diffs/dist/components/web-components.js";
-import {PreviewRevision, previewPreferences, whitespaceMarkers} from "./preview-state";
+import {cursorPosition, PreviewRevision, previewPreferences, whitespaceMarkers} from "./preview-state";
 import type {ConfigurationSnapshot, PendingEdits} from "./state";
 
 const sample = `using System;
@@ -58,6 +58,8 @@ pre[data-diff] { min-height: 100%; font-size: 12px; tab-size: 4; }
 pre[data-diff-type="split"] > [data-additions] { grid-column: 1; grid-row: 1; }
 pre[data-diff-type="split"] > [data-deletions] { grid-column: 2; grid-row: 1; }
 [data-line] { position: relative; }
+[data-deletions], [data-deletions] [data-line] { cursor: text; user-select: text; }
+[data-deletions] ::selection { color: inherit; background: var(--diffs-editor-selection-bg) !important; }
 :host([data-whitespace]) [data-line]::after { content: var(--preview-whitespace) !important; position: absolute;
     top: 0; left: 0; color: #718078; pointer-events: none; white-space: pre; font: inherit; }
 @media (max-width: 700px) {
@@ -74,6 +76,7 @@ export class Preview {
     readonly element = document.createElement("section");
     private readonly host = document.createElement("diffs-container");
     private readonly status = document.createElement("span");
+    private readonly cursor = document.createElement("span");
     private readonly facts = document.createElement("span");
     private readonly revision = new PreviewRevision();
     private readonly diff: PreviewDiff;
@@ -94,10 +97,15 @@ export class Preview {
 
     private constructor() {
         this.element.className = "canvas preview-canvas";
-        this.element.innerHTML = `<div class="preview-toolbar"><div><h1>Preview</h1><small class="parse-context">Latest stable C# · no predefined symbols</small></div><label><input type="checkbox" class="whitespace-toggle"> Whitespace</label></div><div class="preview-frame"><div class="preview-labels"><span>Source · editable · UTF-8 · LF</span><span>Formatted output · read only</span></div><div class="diff-scroll"></div><div class="preview-note"></div></div>`;
+        this.element.innerHTML = `<div class="preview-toolbar"><div><h1>Preview</h1><small class="parse-context">Latest stable C# · no predefined symbols</small></div><label><input type="checkbox" class="whitespace-toggle"> Whitespace</label></div><div class="preview-frame"><div class="preview-labels"><span>Source · editable · UTF-8 · LF</span><span>Formatted output · read only · select to copy</span></div><div class="diff-scroll"></div><div class="preview-note"></div></div>`;
         this.element.querySelector(".diff-scroll")!.append(this.host);
         this.status.setAttribute("role", "status");
-        this.element.querySelector(".preview-note")!.append(this.status, this.facts);
+        this.cursor.className = "cursor-position";
+        this.cursor.textContent = "Ln 1, Col 1";
+        const details = document.createElement("span");
+        details.className = "preview-details";
+        details.append(this.cursor, this.facts);
+        this.element.querySelector(".preview-note")!.append(this.status, details);
         this.element.querySelector<HTMLInputElement>(".whitespace-toggle")!.addEventListener("change", event => {
             this.host.toggleAttribute("data-whitespace", (event.target as HTMLInputElement).checked);
             this.updateMarkers();
@@ -106,9 +114,12 @@ export class Preview {
         this.diff.refresh(this.source, this.output, this.host);
         this.editor = new Editor({onChange: file => {
             this.source = file.contents;
+            queueMicrotask(() => this.updateCursor());
             this.schedule();
-        }});
+        }, onFocus: () => queueMicrotask(() => this.updateCursor())});
         this.editor.edit(this.diff);
+        document.addEventListener("selectionchange", () => this.updateCursor());
+        this.updateCursor();
         if (this.host.shadowRoot) new MutationObserver(() => this.queueMarkers()).observe(this.host.shadowRoot, {childList: true, characterData: true, subtree: true});
     }
 
@@ -168,6 +179,11 @@ export class Preview {
     private queueMarkers() {
         if (this.markerFrame) return;
         this.markerFrame = requestAnimationFrame(() => { this.markerFrame = 0; this.updateMarkers(); });
+    }
+
+    private updateCursor() {
+        const position = cursorPosition(this.editor.getState().selections);
+        if (position) this.cursor.textContent = position;
     }
 
     private updateMarkers() {
