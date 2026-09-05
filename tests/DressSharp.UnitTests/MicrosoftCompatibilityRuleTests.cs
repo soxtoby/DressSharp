@@ -970,8 +970,10 @@ public class MicrosoftCompatibilityRuleTests
                 """);
     }
 
-    [Fact]
-    public void Compatibility_rules_compose_with_spacing_newlines_indentation_and_using_order()
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Compatibility_rules_compose_with_spacing_newlines_indentation_and_using_order(string newline)
     {
         (string, string)[] preferences =
         [
@@ -990,8 +992,8 @@ public class MicrosoftCompatibilityRuleTests
             using System.Text;
             using Alpha;
             class C { void M() { int[] x; int y = 1; } }
-            """,
-            preferences).ReplaceLineEndings("\n");
+            """.ReplaceLineEndings(newline),
+            preferences);
         first.ShouldBe("""
             using System.Text;
 
@@ -1005,12 +1007,14 @@ public class MicrosoftCompatibilityRuleTests
                     int y = 1;
                 }
             }
-            """);
-        Format(first, preferences).ReplaceLineEndings("\n").ShouldBe(first);
+            """.ReplaceLineEndings(newline));
+        Format(first, preferences).ShouldBe(first);
     }
 
-    [Fact]
-    public void Single_line_rules_skip_comments_directives_and_malformed_blocks_but_format_safe_blocks()
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Single_line_rules_skip_comments_directives_and_malformed_blocks_but_format_safe_blocks(string newline)
     {
         Format(
                 """
@@ -1022,11 +1026,10 @@ public class MicrosoftCompatibilityRuleTests
                 }
                 void Broken() { int a = ; int b = 2; }
                 void Safe() { int a = 1; int b = 2; } }
-                """,
+                """.ReplaceLineEndings(newline),
                 ("csharp_preserve_single_line_blocks", "false"),
                 ("csharp_preserve_single_line_blocks", "false"),
                 ("csharp_preserve_single_line_statements", "false"))
-            .ReplaceLineEndings("\n")
             .ShouldBe("""
                 class C { void Commented() { int a = 1; /* keep */ int b = 2; }
                 void Directed() {
@@ -1039,7 +1042,7 @@ public class MicrosoftCompatibilityRuleTests
                 int a = 1;
                 int b = 2;
                 } }
-                """);
+                """.ReplaceLineEndings(newline));
     }
 
     [Fact]
