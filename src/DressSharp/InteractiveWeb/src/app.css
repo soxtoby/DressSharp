@@ -46,19 +46,19 @@ button:disabled { cursor: default; opacity: .65; }
 .rule-count { color: var(--muted); font-size: 10px; }
 .search { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 10px; margin-bottom: 7px; background: var(--paper); border: 1px solid var(--line); border-radius: 7px; }
 .search input { width: 100%; border: 0; outline: 0; background: transparent; }
+.group-list { margin-right: -8px; }
 .group-list details { border-top: 1px solid #cbccc4; }
 .group-heading { display: flex; justify-content: space-between; padding: 10px 6px 8px; cursor: pointer; font-size: 12px; font-weight: 750; list-style: none; }
 .group-heading::before { content: "+"; width: 15px; color: var(--green); font: 700 13px "Cascadia Code", monospace; }
 details[open] > .group-heading::before { content: "−"; }
 .group-heading > span:first-child { margin-right: auto; }
 .group-count { color: var(--muted); font: 11px "Cascadia Code", monospace; }
-.rule-row { position: relative; min-height: 84px; display: grid; grid-template-columns: minmax(0, 1fr) 154px; align-items: center; gap: 12px; padding: 10px 8px 10px 11px; margin: 3px 0; border: 1px solid transparent; border-radius: 9px; transition: background .12s, border-color .12s; }
-.rule-row:hover, .rule-row:focus-within { background: var(--paper); border-color: var(--line); }
-.rule-row.changed { border-left: 4px solid var(--orange); padding-left: 8px; background: #fff8ef; }
+.subgroup-heading { margin: 8px 0 4px; color: var(--muted); font-size: 11px; font-weight: 650; }
+.rule-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 154px; align-items: center; gap: 12px; padding: 2px 0 2px 8px; border-left: 4px solid transparent; }
+.rule-row.changed { border-left-color: var(--orange); background: #fff8ef; }
 .rule-copy { min-width: 0; }
 .rule-title { display: flex; align-items: center; gap: 6px; }
-.rule-copy strong { font-size: 13px; line-height: 1.25; }
-.rule-copy p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.35; }
+.rule-name { font-size: 13px; line-height: 1.25; }
 .rule-control { display: grid; grid-template-columns: minmax(0, 1fr) 26px 26px; align-items: center; gap: 5px; }
 .rule-control.enum-control { grid-template-columns: minmax(0, 1fr) 26px; }
 .rule-control select, .rule-control input { min-width: 0; width: 100%; padding: 7px 8px; color: var(--ink); background: #fdfcf7; border: 1px solid var(--line); border-radius: 6px; font-size: 11px; }

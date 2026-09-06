@@ -12,6 +12,17 @@ public class RuleCatalogTests
     public void Catalog_version_is_explicit() => RuleCatalog.BuiltIn.Version.ShouldBe(1);
 
     [Fact]
+    public void Expanded_caption_defaults_to_caption_unless_specified()
+    {
+        var metadata = new NamespaceStyleRule().Metadata with { Caption = "Namespaces" };
+        metadata.ExpandedCaption.ShouldBe("Namespaces");
+
+        var expanded = metadata with { ExpandedCaption = "Namespace declaration style" };
+        expanded.Caption.ShouldBe("Namespaces");
+        expanded.ExpandedCaption.ShouldBe("Namespace declaration style");
+    }
+
+    [Fact]
     public void Every_supported_preference_has_exactly_one_rule()
     {
         RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata.RuleKey).Order().ToArray()
@@ -23,7 +34,8 @@ public class RuleCatalogTests
     {
         foreach (var metadata in RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata))
         {
-            string.IsNullOrWhiteSpace(metadata.Name).ShouldBe(false);
+            string.IsNullOrWhiteSpace(metadata.ExpandedCaption).ShouldBe(false);
+            string.IsNullOrWhiteSpace(metadata.Caption).ShouldBe(false);
             string.IsNullOrWhiteSpace(metadata.GroupName).ShouldBe(false);
             string.IsNullOrWhiteSpace(metadata.Description).ShouldBe(false);
             string.IsNullOrWhiteSpace(metadata.Example).ShouldBe(false);
@@ -32,13 +44,13 @@ public class RuleCatalogTests
     }
 
     [Fact]
-    public void Friendly_names_omit_configuration_key_prefixes()
+    public void Expanded_captions_omit_configuration_key_prefixes()
     {
-        foreach (var name in RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata.Name))
+        foreach (var caption in RuleCatalog.BuiltIn.Rules.Select(rule => rule.Metadata.ExpandedCaption))
         {
-            name.StartsWith("Csharp ", StringComparison.Ordinal).ShouldBe(false);
-            name.StartsWith("Dotnet ", StringComparison.Ordinal).ShouldBe(false);
-            name.StartsWith("Dress ", StringComparison.Ordinal).ShouldBe(false);
+            caption.StartsWith("Csharp ", StringComparison.Ordinal).ShouldBe(false);
+            caption.StartsWith("Dotnet ", StringComparison.Ordinal).ShouldBe(false);
+            caption.StartsWith("Dress ", StringComparison.Ordinal).ShouldBe(false);
         }
     }
 

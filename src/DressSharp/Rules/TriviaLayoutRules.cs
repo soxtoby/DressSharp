@@ -3,13 +3,15 @@ using DressSharp.Architecture;
 
 namespace DressSharp.Rules;
 
-sealed class BlankLineRule(RuleKey key, BlankLineKind kind, string defaultValue) : IFormattingRule
+sealed class BlankLineRule(RuleKey key, string caption, string? subgroupName, BlankLineKind kind, string defaultValue) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = key,
-        Name = RuleMetadata.Humanize(key.ToName()),
+        Caption = caption,
+        ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
         GroupName = "Blank lines",
+        SubgroupName = subgroupName,
         Description = "Controls line breaks at structural boundaries. Only whitespace trivia changes.",
         Values = RuleValues.Integer(0),
         DefaultValue = defaultValue,
@@ -27,13 +29,15 @@ sealed class BlankLineRule(RuleKey key, BlankLineKind kind, string defaultValue)
     internal BlankLineKind Kind { get; } = kind;
 }
 
-sealed class CommentRule(RuleKey key, CommentKind kind, ImmutableArray<string> values, string defaultValue) : IFormattingRule
+sealed class CommentRule(RuleKey key, string caption, string? subgroupName, CommentKind kind, ImmutableArray<string> values, string defaultValue) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = key,
-        Name = RuleMetadata.Humanize(key.ToName()),
+        Caption = caption,
+        ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
         GroupName = "Comments",
+        SubgroupName = subgroupName,
         Description = "Controls comment-adjacent trivia. Comment text remains unchanged except for configured delimiter spacing.",
         Values = RuleValues.From(values),
         DefaultValue = defaultValue,

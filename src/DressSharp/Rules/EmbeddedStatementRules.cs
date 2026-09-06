@@ -33,7 +33,7 @@ sealed record EmbeddedStatementSettings(
 }
 
 sealed class EmbeddedStatementPreferenceRule(
-    RuleKey key,
+    RuleKey key, string caption, string? subgroupName,
     ImmutableArray<string> values,
     string defaultValue,
     string ownedSyntax,
@@ -43,8 +43,10 @@ sealed class EmbeddedStatementPreferenceRule(
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = key,
-        Name = RuleMetadata.Humanize(key.ToName()),
+        Caption = caption,
+        ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
         GroupName = "Braces and bodies",
+        SubgroupName = subgroupName,
         Description = $"Controls {ownedSyntax}. {invariant}.",
         Values = RuleValues.From(values),
         DefaultValue = defaultValue,

@@ -40,11 +40,11 @@ export function sameAssignment(left: Assignment, right: Assignment) {
 
 export function matchesRule(
     query: string,
-    rule: {name: string; key: string; description: string; values: Array<{value: string}>; specialValues: string[]},
+    rule: {expandedCaption: string; key: string; description: string; values: Array<{value: string}>; specialValues: string[]},
 ) {
     const term = query.trim().toLocaleLowerCase();
     if (!term) return true;
-    return [rule.name, rule.key, rule.description, ...rule.values.map(value => value.value), ...rule.specialValues]
+    return [rule.expandedCaption, rule.key, rule.description, ...rule.values.map(value => value.value), ...rule.specialValues]
         .some(value => value.toLocaleLowerCase().includes(term));
 }
 

@@ -90,9 +90,13 @@ static class RuleValues
 
 sealed record RuleMetadata
 {
+    string? _expandedCaption;
+
     public required RuleKey RuleKey { get; init; }
-    public required string Name { get; init; }
+    public required string Caption { get; init; }
+    public string ExpandedCaption { get => _expandedCaption ?? Caption; init => _expandedCaption = value; }
     public required string GroupName { get; init; }
+    public string? SubgroupName { get; init; }
     public required string Description { get; init; }
     public required RuleValueDefinition Values { get; init; }
     public required string DefaultValue { get; init; }

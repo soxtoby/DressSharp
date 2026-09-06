@@ -14,7 +14,7 @@ sealed class UsingOrderRule(RuleKey ruleKey, RuleValueDefinition values, string 
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = ruleKey,
-        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        Caption = RuleMetadata.Humanize(ruleKey.ToName()),
         GroupName = "Using directives",
         Description = "Controls contiguous using directive runs. Directives and comments remain boundaries.",
         Values = values,
@@ -87,7 +87,7 @@ sealed class ModifierOrderRule : ISyntaxFormattingRule
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = RuleKey.CSharpPreferredModifierOrder,
-        Name = RuleMetadata.Humanize(RuleKey.CSharpPreferredModifierOrder.ToName()),
+        Caption = RuleMetadata.Humanize(RuleKey.CSharpPreferredModifierOrder.ToName()),
         GroupName = "Braces and bodies",
         Description = "Controls member modifier lists. Only modifier token order changes.",
         Values = RuleValues.Permutation("public", "protected", "internal", "private", "file", "new", "static", "abstract", "virtual", "sealed", "override", "readonly", "unsafe", "required", "volatile", "async"),

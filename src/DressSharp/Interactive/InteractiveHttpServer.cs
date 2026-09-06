@@ -250,8 +250,10 @@ sealed class InteractiveHttpServer : IInteractiveServer
         var rules = RuleCatalog.BuiltIn.Rules.Select(rule => new
             {
                 key = rule.Metadata.RuleKey.ToName(),
-                name = rule.Metadata.Name,
+                expandedCaption = rule.Metadata.ExpandedCaption,
                 group = rule.Metadata.GroupName,
+                subgroup = rule.Metadata.SubgroupName,
+                caption = rule.Metadata.Caption,
                 description = rule.Metadata.Description,
                 defaultValue = rule.Metadata.DefaultValue,
                 valueKind = rule.Metadata.Values.Kind.ToString().ToLowerInvariant(),

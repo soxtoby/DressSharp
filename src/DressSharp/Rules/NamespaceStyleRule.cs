@@ -10,7 +10,7 @@ sealed class NamespaceStyleRule : ISyntaxFormattingRule
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = RuleKey.DressNamespaceStyle,
-        Name = RuleMetadata.Humanize(RuleKey.DressNamespaceStyle.ToName()),
+        Caption = RuleMetadata.Humanize(RuleKey.DressNamespaceStyle.ToName()),
         GroupName = "Braces and bodies",
         Description =
             "Controls compilation-unit namespace declaration. The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.",

@@ -3,13 +3,15 @@ using DressSharp.Architecture;
 
 namespace DressSharp.Rules;
 
-sealed class IndentationRule(RuleKey key, ImmutableArray<string> values, string defaultValue) : IFormattingRule
+sealed class IndentationRule(RuleKey key, string caption, string? subgroupName, ImmutableArray<string> values, string defaultValue) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = key,
-        Name = RuleMetadata.Humanize(key.ToName()),
+        Caption = caption,
+        ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
         GroupName = "Indentation",
+        SubgroupName = subgroupName,
         Description = "Controls syntax indentation. Only indentation whitespace changes.",
         Values = RuleValues.From(values),
         DefaultValue = defaultValue,

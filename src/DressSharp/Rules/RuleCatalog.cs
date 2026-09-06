@@ -25,31 +25,31 @@ sealed class RuleCatalog
         ];
         ISyntaxFormattingRule[] memberRules =
         [
-                new MemberBodyRule(RuleKey.DressMethodBody, MemberBodyKind.Method, "expression"),
-                new MemberBodyRule(RuleKey.DressConstructorBody, MemberBodyKind.Constructor, "expression"),
-                new MemberBodyRule(RuleKey.DressOperatorBody, MemberBodyKind.Operator, "expression"),
-                new MemberBodyRule(RuleKey.DressPropertyBody, MemberBodyKind.Property, "expression"),
-                new MemberBodyRule(RuleKey.DressIndexerBody, MemberBodyKind.Indexer, "expression"),
-                new MemberBodyRule(RuleKey.DressAccessorBody, MemberBodyKind.Accessor, "expression"),
+                new MemberBodyRule(RuleKey.DressMethodBody, "Method", "Body styles", MemberBodyKind.Method, "expression"),
+                new MemberBodyRule(RuleKey.DressConstructorBody, "Constructor", "Body styles", MemberBodyKind.Constructor, "expression"),
+                new MemberBodyRule(RuleKey.DressOperatorBody, "Operator", "Body styles", MemberBodyKind.Operator, "expression"),
+                new MemberBodyRule(RuleKey.DressPropertyBody, "Property", "Body styles", MemberBodyKind.Property, "expression"),
+                new MemberBodyRule(RuleKey.DressIndexerBody, "Indexer", "Body styles", MemberBodyKind.Indexer, "expression"),
+                new MemberBodyRule(RuleKey.DressAccessorBody, "Accessor", "Body styles", MemberBodyKind.Accessor, "expression"),
             new LambdaBodyRule(),
             new ModifierOrderRule()
         ];
         IFormattingRule[] embeddedStatementRules =
         [
             new EmbeddedStatementPreferenceRule(
-                    RuleKey.DressEmbeddedStatementPlacement,
+                    RuleKey.DressEmbeddedStatementPlacement, "Placement", "Embedded statements",
                     ["same_line", "next_line"],
                     "next_line",
                 "the boundary before brace-optional embedded statements",
                 "Only boundary whitespace changes"),
             new EmbeddedStatementPreferenceRule(
-                    RuleKey.DressEmbeddedStatementBraces,
+                    RuleKey.DressEmbeddedStatementBraces, "Braces", "Embedded statements",
                     ["compact", "balanced", "always"],
                     "balanced",
                 "brace-optional embedded statements",
                 "Brace changes preserve control flow and use planned body layout"),
             new EmbeddedStatementPreferenceRule(
-                    RuleKey.DressBracesForMultilineStatementHeader,
+                    RuleKey.DressBracesForMultilineStatementHeader, "Braces for multiline statement header", "Embedded statements",
                     ["true", "false"],
                     "true",
                 "multiline statement headers owning brace-optional embedded statements",
@@ -60,93 +60,103 @@ sealed class RuleCatalog
             new CastSpacingRule(),
             new ControlFlowKeywordSpacingRule(),
             new ParenthesisSpacingRule(),
-            new BaseListColonSpacingRule(SpacingSide.Before),
-            new BaseListColonSpacingRule(SpacingSide.After),
+            new BaseListColonSpacingRule(RuleKey.CSharpSpaceBeforeColonInInheritanceClause, "Before colon in inheritance clause", null, SpacingSide.Before),
+            new BaseListColonSpacingRule(RuleKey.CSharpSpaceAfterColonInInheritanceClause, "After colon in inheritance clause", null, SpacingSide.After),
             new BinaryOperatorSpacingRule(),
-            new MethodDeclarationSpacingRule(ParenthesisSpacingKind.Contents),
-            new MethodDeclarationSpacingRule(ParenthesisSpacingKind.EmptyContents),
-            new MethodDeclarationSpacingRule(ParenthesisSpacingKind.BeforeOpening),
-            new MethodCallSpacingRule(ParenthesisSpacingKind.Contents),
-            new MethodCallSpacingRule(ParenthesisSpacingKind.EmptyContents),
-            new MethodCallSpacingRule(ParenthesisSpacingKind.BeforeOpening),
-            new CommaSpacingRule(SpacingSide.After),
-            new CommaSpacingRule(SpacingSide.Before),
-            new DotSpacingRule(SpacingSide.After),
-            new DotSpacingRule(SpacingSide.Before),
-            new ForSemicolonSpacingRule(SpacingSide.After),
-            new ForSemicolonSpacingRule(SpacingSide.Before),
+            new MethodDeclarationSpacingRule(RuleKey.CSharpSpaceBetweenMethodDeclarationParameterListParentheses, "Inside parentheses", "Method declarations",
+                ParenthesisSpacingKind.Contents),
+            new MethodDeclarationSpacingRule(RuleKey.CSharpSpaceBetweenMethodDeclarationEmptyParameterListParentheses, "Inside empty parentheses", "Method declarations",
+                ParenthesisSpacingKind.EmptyContents),
+            new MethodDeclarationSpacingRule(RuleKey.CSharpSpaceBetweenMethodDeclarationNameAndOpenParenthesis, "Before opening parenthesis", "Method declarations",
+                ParenthesisSpacingKind.BeforeOpening),
+            new MethodCallSpacingRule(RuleKey.CSharpSpaceBetweenMethodCallParameterListParentheses, "Inside parentheses", "Method calls", ParenthesisSpacingKind.Contents),
+            new MethodCallSpacingRule(RuleKey.CSharpSpaceBetweenMethodCallEmptyParameterListParentheses, "Inside empty parentheses", "Method calls",
+                ParenthesisSpacingKind.EmptyContents),
+            new MethodCallSpacingRule(RuleKey.CSharpSpaceBetweenMethodCallNameAndOpeningParenthesis, "Before opening parenthesis", "Method calls",
+                ParenthesisSpacingKind.BeforeOpening),
+            new CommaSpacingRule(RuleKey.CSharpSpaceAfterComma, "After comma", null, SpacingSide.After),
+            new CommaSpacingRule(RuleKey.CSharpSpaceBeforeComma, "Before comma", null, SpacingSide.Before),
+            new DotSpacingRule(RuleKey.CSharpSpaceAfterDot, "After dot", null, SpacingSide.After),
+            new DotSpacingRule(RuleKey.CSharpSpaceBeforeDot, "Before dot", null, SpacingSide.Before),
+            new ForSemicolonSpacingRule(RuleKey.CSharpSpaceAfterSemicolonInForStatement, "After semicolon in for statement", null, SpacingSide.After),
+            new ForSemicolonSpacingRule(RuleKey.CSharpSpaceBeforeSemicolonInForStatement, "Before semicolon in for statement", null, SpacingSide.Before),
             new DeclarationSpacingRule(),
-            new BracketSpacingRule(BracketSpacingKind.BeforeOpening),
-            new BracketSpacingRule(BracketSpacingKind.EmptyContents),
-            new BracketSpacingRule(BracketSpacingKind.Contents)
+            new BracketSpacingRule(RuleKey.CSharpSpaceBeforeOpenSquareBrackets, "Before open square brackets", null, BracketSpacingKind.BeforeOpening),
+            new BracketSpacingRule(RuleKey.CSharpSpaceBetweenEmptySquareBrackets, "Between empty square brackets", null, BracketSpacingKind.EmptyContents),
+            new BracketSpacingRule(RuleKey.CSharpSpaceBetweenSquareBrackets, "Between square brackets", null, BracketSpacingKind.Contents)
         ];
         NewLineRule[] newLineRules =
         [
-            new NewLineRule(RuleKey.CSharpNewLineBeforeOpenBrace,
+            new NewLineRule(RuleKey.CSharpNewLineBeforeOpenBrace, "Before open brace", "Newlines",
                 NewLineKind.OpenBrace,
                 RuleValues.MultipleChoice([
                     "accessors", "anonymous_methods", "anonymous_types", "control_blocks", "events", "indexers", "lambdas", "local_functions", "methods",
                     "object_collection_array_initializers", "properties", "types"
                 ], "all", "none"), "all"),
-            new NewLineRule(RuleKey.CSharpNewLineBeforeElse, NewLineKind.Else, RuleValues.Boolean(), "true"),
-            new NewLineRule(RuleKey.CSharpNewLineBeforeCatch, NewLineKind.Catch, RuleValues.Boolean(), "true"),
-            new NewLineRule(RuleKey.CSharpNewLineBeforeFinally, NewLineKind.Finally, RuleValues.Boolean(), "true"),
-            new NewLineRule(RuleKey.CSharpNewLineBeforeMembersInObjectInitializers, NewLineKind.ObjectInitializerMembers, RuleValues.Boolean(), "true"),
-            new NewLineRule(RuleKey.CSharpNewLineBeforeMembersInAnonymousTypes, NewLineKind.AnonymousTypeMembers, RuleValues.Boolean(), "true"),
-            new NewLineRule(RuleKey.CSharpNewLineBetweenQueryExpressionClauses, NewLineKind.QueryClauses, RuleValues.Boolean(), "true")
+            new NewLineRule(RuleKey.CSharpNewLineBeforeElse, "Before else", "Newlines", NewLineKind.Else, RuleValues.Boolean(), "true"),
+            new NewLineRule(RuleKey.CSharpNewLineBeforeCatch, "Before catch", "Newlines", NewLineKind.Catch, RuleValues.Boolean(), "true"),
+            new NewLineRule(RuleKey.CSharpNewLineBeforeFinally, "Before finally", "Newlines", NewLineKind.Finally, RuleValues.Boolean(), "true"),
+            new NewLineRule(RuleKey.CSharpNewLineBeforeMembersInObjectInitializers, "Before members in object initializers", "Newlines",
+                NewLineKind.ObjectInitializerMembers, RuleValues.Boolean(), "true"),
+            new NewLineRule(RuleKey.CSharpNewLineBeforeMembersInAnonymousTypes, "Before members in anonymous types", "Newlines",
+                NewLineKind.AnonymousTypeMembers, RuleValues.Boolean(), "true"),
+            new NewLineRule(RuleKey.CSharpNewLineBetweenQueryExpressionClauses, "Between query expression clauses", "Newlines",
+                NewLineKind.QueryClauses, RuleValues.Boolean(), "true")
         ];
         IndentationRule[] indentationRules =
         [
-            new IndentationRule(RuleKey.CSharpIndentSwitchLabels, ["true", "false"], "true"),
-            new IndentationRule(RuleKey.CSharpIndentCaseContents, ["true", "false"], "true"),
-            new IndentationRule(RuleKey.CSharpIndentLabels, ["flush_left", "no_change", "one_less_than_current"], "one_less_than_current"),
-            new IndentationRule(RuleKey.CSharpIndentBlockContents, ["true", "false"], "true"),
-            new IndentationRule(RuleKey.CSharpIndentBraces, ["true", "false"], "false"),
-            new IndentationRule(RuleKey.CSharpIndentCaseContentsWhenBlock, ["true", "false"], "true")
+            new IndentationRule(RuleKey.CSharpIndentSwitchLabels, "Switch labels", "Switch statements", ["true", "false"], "true"),
+            new IndentationRule(RuleKey.CSharpIndentCaseContents, "Case contents", "Switch statements", ["true", "false"], "true"),
+            new IndentationRule(RuleKey.CSharpIndentLabels, "Labels", null, ["flush_left", "no_change", "one_less_than_current"], "one_less_than_current"),
+            new IndentationRule(RuleKey.CSharpIndentBlockContents, "Block contents", null, ["true", "false"], "true"),
+            new IndentationRule(RuleKey.CSharpIndentBraces, "Braces", null, ["true", "false"], "false"),
+            new IndentationRule(RuleKey.CSharpIndentCaseContentsWhenBlock, "Case contents when block", "Switch statements", ["true", "false"], "true")
         ];
         SingleLinePreservationRule[] preservationRules =
         [
-            new SingleLinePreservationRule(SingleLinePreservationKind.Blocks),
-            new SingleLinePreservationRule(SingleLinePreservationKind.Statements)
+            new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineBlocks, "Blocks", "Preserve single line", SingleLinePreservationKind.Blocks),
+            new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineStatements, "Statements", "Preserve single line", SingleLinePreservationKind.Statements)
         ];
         InitializerIndentationRule[] initializerIndentationRules =
         [
-            new InitializerIndentationRule(RuleKey.DressObjectInitializerIndentation, InitializerKind.Object, "indented"),
-            new InitializerIndentationRule(RuleKey.DressCollectionInitializerIndentation, InitializerKind.Collection, "indented"),
-            new InitializerIndentationRule(RuleKey.DressArrayInitializerIndentation, InitializerKind.Array, "indented"),
-            new InitializerIndentationRule(RuleKey.DressWithInitializerIndentation, InitializerKind.With, "indented"),
-            new InitializerIndentationRule(RuleKey.DressCollectionExpressionIndentation, InitializerKind.CollectionExpression, "not_indented")
+            new InitializerIndentationRule(RuleKey.DressObjectInitializerIndentation, "Object initializer", "Initializers and collections", InitializerKind.Object, "indented"),
+            new InitializerIndentationRule(RuleKey.DressCollectionInitializerIndentation, "Collection initializer", "Initializers and collections",
+                InitializerKind.Collection, "indented"),
+            new InitializerIndentationRule(RuleKey.DressArrayInitializerIndentation, "Array initializer", "Initializers and collections", InitializerKind.Array, "indented"),
+            new InitializerIndentationRule(RuleKey.DressWithInitializerIndentation, "With initializer", "Initializers and collections", InitializerKind.With, "indented"),
+            new InitializerIndentationRule(RuleKey.DressCollectionExpressionIndentation, "Collection expression", "Initializers and collections",
+                InitializerKind.CollectionExpression, "not_indented")
         ];
         SyntaxWrappingRule[] syntaxWrappingRules =
         [
-            new SyntaxWrappingRule(RuleKey.DressArgumentsLayout, SyntaxWrappingKind.Arguments, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressParametersLayout, SyntaxWrappingKind.Parameters, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressInitializersLayout, SyntaxWrappingKind.Initializers, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressCollectionExpressionsLayout, SyntaxWrappingKind.CollectionExpressions, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressBaseTypeListsLayout, SyntaxWrappingKind.BaseTypeLists, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressConstraintClausesLayout, SyntaxWrappingKind.ConstraintClauses, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressMemberAccessChainsLayout, SyntaxWrappingKind.MemberAccessChains, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressBinaryExpressionsLayout, SyntaxWrappingKind.BinaryExpressions, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressConditionalExpressionsLayout, SyntaxWrappingKind.ConditionalExpressions, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressQueryClausesLayout, SyntaxWrappingKind.QueryClauses, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressAttributesLayout, SyntaxWrappingKind.Attributes, "auto")
+            new SyntaxWrappingRule(RuleKey.DressArgumentsLayout, "Arguments", "Lists", SyntaxWrappingKind.Arguments, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressParametersLayout, "Parameters", "Lists", SyntaxWrappingKind.Parameters, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressInitializersLayout, "Initializers", "Lists", SyntaxWrappingKind.Initializers, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressCollectionExpressionsLayout, "Collection expressions", "Lists", SyntaxWrappingKind.CollectionExpressions, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressBaseTypeListsLayout, "Base type lists", "Lists", SyntaxWrappingKind.BaseTypeLists, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressConstraintClausesLayout, "Constraint clauses", "Lists", SyntaxWrappingKind.ConstraintClauses, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressMemberAccessChainsLayout, "Member access chains", "Expressions", SyntaxWrappingKind.MemberAccessChains, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressBinaryExpressionsLayout, "Binary expressions", "Expressions", SyntaxWrappingKind.BinaryExpressions, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressConditionalExpressionsLayout, "Conditional expressions", "Expressions", SyntaxWrappingKind.ConditionalExpressions, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressQueryClausesLayout, "Query clauses", "Expressions", SyntaxWrappingKind.QueryClauses, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressAttributesLayout, "Attributes", "Lists", SyntaxWrappingKind.Attributes, "auto")
         ];
         BlankLineRule[] blankLineRules =
         [
-            new BlankLineRule(RuleKey.DressBlankLinesAroundNamespaces, BlankLineKind.AroundNamespaces, "1"),
-            new BlankLineRule(RuleKey.DressBlankLinesAroundTypes, BlankLineKind.AroundTypes, "1"),
-            new BlankLineRule(RuleKey.DressBlankLinesBetweenMembers, BlankLineKind.BetweenMembers, "1"),
-            new BlankLineRule(RuleKey.DressBlankLinesBetweenUsingGroups, BlankLineKind.BetweenUsingGroups, "1"),
-            new BlankLineRule(RuleKey.DressBlankLinesBetweenMemberCategories, BlankLineKind.BetweenMemberCategories, "1"),
-            new BlankLineRule(RuleKey.DressMaxConsecutiveBlankLines, BlankLineKind.Maximum, "1")
+            new BlankLineRule(RuleKey.DressBlankLinesAroundNamespaces, "Around namespaces", null, BlankLineKind.AroundNamespaces, "1"),
+            new BlankLineRule(RuleKey.DressBlankLinesAroundTypes, "Around types", null, BlankLineKind.AroundTypes, "1"),
+            new BlankLineRule(RuleKey.DressBlankLinesBetweenMembers, "Between members", null, BlankLineKind.BetweenMembers, "1"),
+            new BlankLineRule(RuleKey.DressBlankLinesBetweenUsingGroups, "Between using groups", null, BlankLineKind.BetweenUsingGroups, "1"),
+            new BlankLineRule(RuleKey.DressBlankLinesBetweenMemberCategories, "Between member categories", null, BlankLineKind.BetweenMemberCategories, "1"),
+            new BlankLineRule(RuleKey.DressMaxConsecutiveBlankLines, "Max consecutive blank lines", null, BlankLineKind.Maximum, "1")
         ];
         CommentRule[] commentRules =
         [
-            new CommentRule(RuleKey.DressLineCommentSpacing, CommentKind.LineSpacing, ["none", "single"], "single"),
-            new CommentRule(RuleKey.DressBlockCommentSpacing, CommentKind.BlockSpacing, ["none", "single"], "single"),
-            new CommentRule(RuleKey.DressAttachedCommentPlacement, CommentKind.AttachedPlacement, ["same_line", "own_line", "auto"], "auto"),
-            new CommentRule(RuleKey.DressXmlCommentPlacement, CommentKind.XmlPlacement, ["attached", "separated"], "attached"),
-            new CommentRule(RuleKey.DressXmlElementLayout, CommentKind.XmlElementLayout, ["single_line", "multi_line"], "single_line")
+            new CommentRule(RuleKey.DressLineCommentSpacing, "Spacing", "Line comments", CommentKind.LineSpacing, ["none", "single"], "single"),
+            new CommentRule(RuleKey.DressBlockCommentSpacing, "Spacing", "Block comments", CommentKind.BlockSpacing, ["none", "single"], "single"),
+            new CommentRule(RuleKey.DressAttachedCommentPlacement, "Attached comment placement", null, CommentKind.AttachedPlacement, ["same_line", "own_line", "auto"], "auto"),
+            new CommentRule(RuleKey.DressXmlCommentPlacement, "Placement", "XML documentation", CommentKind.XmlPlacement, ["attached", "separated"], "attached"),
+            new CommentRule(RuleKey.DressXmlElementLayout, "Element layout", "XML documentation", CommentKind.XmlElementLayout, ["single_line", "multi_line"], "single_line")
         ];
 
         var formattingRules = fileRules.Cast<IFormattingRule>()
@@ -173,10 +183,10 @@ sealed class RuleCatalog
                 RuleValues.Boolean(), "true"),
             Metadata(RuleKey.TrimTrailingWhitespace, "Trim trailing whitespace", "File", "Controls whether trailing line whitespace is removed.",
                 RuleValues.Boolean(), "true"),
-            Metadata(RuleKey.IndentStyle, "Indent style", "Indentation", "Selects tabs or spaces for indentation written by layout rules.",
-                RuleValues.Choice("space", "tab"), "space"),
-            Metadata(RuleKey.IndentSize, "Indent size", "Indentation", "Sets indentation width, or follows tab_width when set to tab.",
-                RuleValues.Integer(1, "tab"), "4"),
+            Metadata(RuleKey.IndentStyle, "Style", "Indentation", "Selects tabs or spaces for indentation written by layout rules.",
+                RuleValues.Choice("space", "tab"), "space", expandedCaption: "Indent style"),
+            Metadata(RuleKey.IndentSize, "Size", "Indentation", "Sets indentation width, or follows tab_width when set to tab.",
+                RuleValues.Integer(1, "tab"), "4", expandedCaption: "Indent size"),
             Metadata(RuleKey.TabWidth, "Tab width", "Indentation", "Sets the display width used for tab indentation.",
                 RuleValues.Integer(1), "4"),
             Metadata(RuleKey.MaxLineLength, "Maximum line length", "Wrapping", "Sets the target line width used by auto layout preferences.",
@@ -203,14 +213,16 @@ sealed class RuleCatalog
 
         static IRule Metadata(
             RuleKey key,
-            string name,
+            string caption,
             string group,
             string description,
             RuleValueDefinition values,
-            string defaultValue) => new MetadataRule(new()
+            string defaultValue,
+            string? expandedCaption = null) => new MetadataRule(new()
             {
                 RuleKey = key,
-                Name = name,
+                Caption = caption,
+                ExpandedCaption = expandedCaption ?? caption,
                 GroupName = group,
                 Description = description,
                 Values = values,
@@ -246,7 +258,9 @@ sealed class RuleCatalog
     static void Validate(ImmutableArray<IRule> rules)
     {
         if (rules.Any(rule => rule.Metadata.AcceptedValueForms.IsDefaultOrEmpty ||
-            string.IsNullOrWhiteSpace(rule.Metadata.Name) ||
+            string.IsNullOrWhiteSpace(rule.Metadata.ExpandedCaption) ||
+            string.IsNullOrWhiteSpace(rule.Metadata.Caption) ||
+            (rule.Metadata.SubgroupName is not null && string.IsNullOrWhiteSpace(rule.Metadata.SubgroupName)) ||
             string.IsNullOrWhiteSpace(rule.Metadata.GroupName) ||
             string.IsNullOrWhiteSpace(rule.Metadata.Description) ||
             string.IsNullOrWhiteSpace(rule.Metadata.DefaultValue) ||

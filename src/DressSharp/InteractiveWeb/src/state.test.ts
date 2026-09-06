@@ -19,7 +19,7 @@ describe("interactive state", () => {
 
     test("search includes hidden keys, descriptions, and values", () => {
         const rule = {
-            name: "Indent style",
+            expandedCaption: "Indent style",
             key: "indent_style",
             description: "Controls indentation",
             values: [{value: "space"}, {value: "tab"}],

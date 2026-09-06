@@ -8,6 +8,8 @@ namespace DressSharp.Rules;
 
 abstract class TokenSpacingRule(
     RuleKey ruleKey,
+    string caption,
+    string? subgroupName,
     RuleValueDefinition values,
     string defaultValue,
     string ownedSyntax
@@ -16,8 +18,10 @@ abstract class TokenSpacingRule(
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = ruleKey,
-        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        Caption = caption,
+        ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
         GroupName = "Spacing",
+        SubgroupName = subgroupName,
         Description = $"Controls {ownedSyntax}. Only same-line whitespace changes.",
         Values = values,
         DefaultValue = defaultValue,
@@ -42,10 +46,12 @@ abstract class TokenSpacingRule(
 
     protected TokenSpacingRule(
         RuleKey ruleKey,
+        string caption,
+        string? subgroupName,
         ImmutableArray<string> acceptedValues,
         string defaultValue,
         string ownedSyntax)
-        : this(ruleKey, RuleValues.From(acceptedValues), defaultValue, ownedSyntax)
+        : this(ruleKey, caption, subgroupName, RuleValues.From(acceptedValues), defaultValue, ownedSyntax)
     {
     }
 }
@@ -66,7 +72,7 @@ sealed class TokenPair
 }
 
 sealed class CastSpacingRule() : TokenSpacingRule(
-    RuleKey.CSharpSpaceAfterCast,
+    RuleKey.CSharpSpaceAfterCast, "After cast", null,
     ["true", "false"],
     "false",
     "cast expressions")
@@ -80,7 +86,7 @@ sealed class CastSpacingRule() : TokenSpacingRule(
 }
 
 sealed class ControlFlowKeywordSpacingRule() : TokenSpacingRule(
-    RuleKey.CSharpSpaceAfterKeywordsInControlFlowStatements,
+    RuleKey.CSharpSpaceAfterKeywordsInControlFlowStatements, "After keywords in control flow statements", null,
     ["true", "false"],
     "true",
     "control-flow keywords")
@@ -104,7 +110,7 @@ sealed class ControlFlowKeywordSpacingRule() : TokenSpacingRule(
 }
 
 sealed class ParenthesisSpacingRule() : TokenSpacingRule(
-    RuleKey.CSharpSpaceBetweenParentheses,
+    RuleKey.CSharpSpaceBetweenParentheses, "Between parentheses", null,
     RuleValues.MultipleChoice(["control_flow_statements", "expressions", "type_casts"], "false"),
     "false",
     "parenthesized syntax")
@@ -181,8 +187,8 @@ enum SpacingSide
     After
 }
 
-sealed class BaseListColonSpacingRule(SpacingSide side) : TokenSpacingRule(
-    side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeColonInInheritanceClause : RuleKey.CSharpSpaceAfterColonInInheritanceClause,
+sealed class BaseListColonSpacingRule(RuleKey ruleKey, string caption, string? subgroupName, SpacingSide side) : TokenSpacingRule(
+    ruleKey, caption, subgroupName,
     ["true", "false"],
     "true",
     "base-list colons")
@@ -199,7 +205,7 @@ sealed class BaseListColonSpacingRule(SpacingSide side) : TokenSpacingRule(
 }
 
 sealed class BinaryOperatorSpacingRule() : TokenSpacingRule(
-    RuleKey.CSharpSpaceAroundBinaryOperators,
+    RuleKey.CSharpSpaceAroundBinaryOperators, "Around binary operators", null,
     ["before_and_after", "ignore", "none"],
     "before_and_after",
     "binary and assignment operators")
@@ -228,13 +234,8 @@ sealed class BinaryOperatorSpacingRule() : TokenSpacingRule(
         };
 }
 
-sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind) : TokenSpacingRule(
-    kind switch
-        {
-            ParenthesisSpacingKind.Contents => RuleKey.CSharpSpaceBetweenMethodDeclarationParameterListParentheses,
-            ParenthesisSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenMethodDeclarationEmptyParameterListParentheses,
-            _ => RuleKey.CSharpSpaceBetweenMethodDeclarationNameAndOpenParenthesis
-        },
+sealed class MethodDeclarationSpacingRule(RuleKey ruleKey, string caption, string? subgroupName, ParenthesisSpacingKind kind) : TokenSpacingRule(
+    ruleKey, caption, subgroupName,
     ["true", "false"],
     "false",
     "method declaration parameter lists")
@@ -260,13 +261,8 @@ sealed class MethodDeclarationSpacingRule(ParenthesisSpacingKind kind) : TokenSp
         : null;
 }
 
-sealed class MethodCallSpacingRule(ParenthesisSpacingKind kind) : TokenSpacingRule(
-    kind switch
-        {
-            ParenthesisSpacingKind.Contents => RuleKey.CSharpSpaceBetweenMethodCallParameterListParentheses,
-            ParenthesisSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenMethodCallEmptyParameterListParentheses,
-            _ => RuleKey.CSharpSpaceBetweenMethodCallNameAndOpeningParenthesis
-        },
+sealed class MethodCallSpacingRule(RuleKey ruleKey, string caption, string? subgroupName, ParenthesisSpacingKind kind) : TokenSpacingRule(
+    ruleKey, caption, subgroupName,
     ["true", "false"],
     "false",
     "invocation argument lists")
@@ -297,8 +293,8 @@ enum ParenthesisSpacingKind
     BeforeOpening
 }
 
-abstract class PunctuationSpacingRule(RuleKey ruleKey, SyntaxKind tokenKind, SpacingSide side, string defaultValue, string ownedSyntax)
-    : TokenSpacingRule(ruleKey, ["true", "false"], defaultValue, ownedSyntax)
+abstract class PunctuationSpacingRule(RuleKey ruleKey, string caption, string? subgroupName, SyntaxKind tokenKind, SpacingSide side, string defaultValue, string ownedSyntax)
+    : TokenSpacingRule(ruleKey, caption, subgroupName, ["true", "false"], defaultValue, ownedSyntax)
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [tokenKind];
 
@@ -311,22 +307,22 @@ abstract class PunctuationSpacingRule(RuleKey ruleKey, SyntaxKind tokenKind, Spa
     protected virtual bool IsOwned(SyntaxToken token) => true;
 }
 
-sealed class CommaSpacingRule(SpacingSide side) : PunctuationSpacingRule(
-    side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeComma : RuleKey.CSharpSpaceAfterComma,
+sealed class CommaSpacingRule(RuleKey ruleKey, string caption, string? subgroupName, SpacingSide side) : PunctuationSpacingRule(
+    ruleKey, caption, subgroupName,
     SyntaxKind.CommaToken,
     side,
     side == SpacingSide.After ? "true" : "false",
     "comma separators");
 
-sealed class DotSpacingRule(SpacingSide side) : PunctuationSpacingRule(
-    side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeDot : RuleKey.CSharpSpaceAfterDot,
+sealed class DotSpacingRule(RuleKey ruleKey, string caption, string? subgroupName, SpacingSide side) : PunctuationSpacingRule(
+    ruleKey, caption, subgroupName,
     SyntaxKind.DotToken,
     side,
     "false",
     "member-access dots");
 
-sealed class ForSemicolonSpacingRule(SpacingSide side) : PunctuationSpacingRule(
-    side == SpacingSide.Before ? RuleKey.CSharpSpaceBeforeSemicolonInForStatement : RuleKey.CSharpSpaceAfterSemicolonInForStatement,
+sealed class ForSemicolonSpacingRule(RuleKey ruleKey, string caption, string? subgroupName, SpacingSide side) : PunctuationSpacingRule(
+    ruleKey, caption, subgroupName,
     SyntaxKind.SemicolonToken,
     side,
     side == SpacingSide.After ? "true" : "false",
@@ -336,7 +332,7 @@ sealed class ForSemicolonSpacingRule(SpacingSide side) : PunctuationSpacingRule(
 }
 
 sealed class DeclarationSpacingRule() : TokenSpacingRule(
-    RuleKey.CSharpSpaceAroundDeclarationStatements,
+    RuleKey.CSharpSpaceAroundDeclarationStatements, "Around declaration statements", null,
     ["false", "ignore"],
     "false",
     "declaration equals tokens")
@@ -364,13 +360,8 @@ enum BracketSpacingKind
     Contents
 }
 
-sealed class BracketSpacingRule(BracketSpacingKind kind) : TokenSpacingRule(
-    kind switch
-        {
-            BracketSpacingKind.BeforeOpening => RuleKey.CSharpSpaceBeforeOpenSquareBrackets,
-            BracketSpacingKind.EmptyContents => RuleKey.CSharpSpaceBetweenEmptySquareBrackets,
-            _ => RuleKey.CSharpSpaceBetweenSquareBrackets
-        },
+sealed class BracketSpacingRule(RuleKey ruleKey, string caption, string? subgroupName, BracketSpacingKind kind) : TokenSpacingRule(
+    ruleKey, caption, subgroupName,
     ["true", "false"],
     "false",
     "array and element-access brackets")
@@ -430,17 +421,15 @@ enum SingleLinePreservationKind
     Statements
 }
 
-sealed class SingleLinePreservationRule(SingleLinePreservationKind kind) : IFormattingRule
+sealed class SingleLinePreservationRule(RuleKey ruleKey, string caption, string? subgroupName, SingleLinePreservationKind kind) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
     {
-        RuleKey = kind == SingleLinePreservationKind.Blocks
-            ? RuleKey.CSharpPreserveSingleLineBlocks
-            : RuleKey.CSharpPreserveSingleLineStatements,
-        Name = RuleMetadata.Humanize((kind == SingleLinePreservationKind.Blocks
-            ? RuleKey.CSharpPreserveSingleLineBlocks
-            : RuleKey.CSharpPreserveSingleLineStatements).ToName()),
+        RuleKey = ruleKey,
+        Caption = caption,
+        ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
         GroupName = "Braces and bodies",
+        SubgroupName = subgroupName,
         Description = $"Controls {(kind == SingleLinePreservationKind.Blocks ? "existing single-line blocks and accessor lists" : "adjacent statements and member declarations")}. {(kind == SingleLinePreservationKind.Blocks ? "False expands safe single-line blocks and accessor lists" : "False separates safe adjacent statements and members")}.",
         Values = RuleValues.From(["true", "false"]),
         DefaultValue = "true",
@@ -463,7 +452,7 @@ abstract class UsingDirectiveRule(
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = ruleKey,
-        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        Caption = RuleMetadata.Humanize(ruleKey.ToName()),
         GroupName = "Using directives",
         Description = $"Controls using directive groups. {invariant}.",
         Values = RuleValues.Boolean(),

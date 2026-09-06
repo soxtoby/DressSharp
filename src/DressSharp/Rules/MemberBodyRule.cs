@@ -6,13 +6,15 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class MemberBodyRule(RuleKey ruleKey, MemberBodyKind kind, string defaultValue) : ISyntaxFormattingRule
+sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupName, MemberBodyKind kind, string defaultValue) : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = ruleKey,
-        Name = RuleMetadata.Humanize(ruleKey.ToName()),
+        Caption = caption,
+        ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
         GroupName = "Braces and bodies",
+        SubgroupName = subgroupName,
         Description = $"Controls {kind.ToString().ToLowerInvariant()} bodies. The selected body form preserves the represented statement or returned expression.",
         Values = RuleValues.From(["block", "expression"]),
         DefaultValue = defaultValue,

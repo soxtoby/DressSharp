@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DressSharp.Interactive;
+using DressSharp.Architecture;
+using DressSharp.Rules;
 using EasyAssertions;
 using Xunit;
 
@@ -86,6 +88,14 @@ public sealed class InteractiveHttpServerTests : IDisposable
         document.RootElement.GetProperty("requestedConfig").GetString().ShouldBe(Path.Combine(_directory, ".editorconfig"));
         document.RootElement.GetProperty("catalog").GetProperty("version").GetInt32().ShouldBe(1);
         document.RootElement.GetProperty("catalog").GetProperty("rules").GetArrayLength().ShouldBeGreaterThan(0);
+        var catalog = RuleCatalog.BuiltIn.Rules.ToDictionary(rule => rule.Metadata.RuleKey.ToName(), rule => rule.Metadata);
+        foreach (var rule in document.RootElement.GetProperty("catalog").GetProperty("rules").EnumerateArray())
+        {
+            var metadata = catalog[rule.GetProperty("key").GetString()!];
+            rule.GetProperty("caption").GetString().ShouldBe(metadata.Caption);
+            rule.GetProperty("expandedCaption").GetString().ShouldBe(metadata.ExpandedCaption);
+            rule.GetProperty("subgroup").GetString().ShouldBe(metadata.SubgroupName);
+        }
         var token = document.RootElement.GetProperty("csrfToken").GetString()!;
         token.Length.ShouldBe(64);
         server.Address.AbsoluteUri.ShouldNotContain(token);

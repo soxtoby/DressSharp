@@ -2,13 +2,15 @@ using DressSharp.Architecture;
 
 namespace DressSharp.Rules;
 
-sealed class SyntaxWrappingRule(RuleKey key, SyntaxWrappingKind kind, string defaultValue) : IFormattingRule
+sealed class SyntaxWrappingRule(RuleKey key, string caption, string? subgroupName, SyntaxWrappingKind kind, string defaultValue) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = key,
-        Name = RuleMetadata.Humanize(key.ToName()),
+        Caption = caption,
+        ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
         GroupName = "Wrapping",
+        SubgroupName = subgroupName,
         Description = $"Controls {kind}. Only whitespace owned by syntax wrapping changes.",
         Values = RuleValues.From(["always_single", "auto", "always_multi"]),
         DefaultValue = defaultValue,

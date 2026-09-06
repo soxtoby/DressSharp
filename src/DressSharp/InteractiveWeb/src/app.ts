@@ -1,7 +1,7 @@
 import {desiredAssignment, matchesRule, setEdit, validValue, type Assignment, type ConfigurationSnapshot, type PendingEdits, type PreferenceSnapshot} from "./state";
 import {Preview} from "./preview";
 
-type Rule = {key: string; name: string; group: string; description: string; defaultValue: string; valueKind: string; values: Array<{value: string; label: string}>; minimum: number | null; specialValues: string[]};
+type Rule = {key: string; expandedCaption: string; group: string; subgroup: string | null; caption: string; description: string; defaultValue: string; valueKind: string; values: Array<{value: string; label: string}>; minimum: number | null; specialValues: string[]};
 type Bootstrap = {csrfToken: string; catalog: {version: number; rules: Rule[]}};
 
 const root = document.querySelector<HTMLElement>("#app")!;
@@ -43,7 +43,8 @@ async function poll() {
 
 function render() {
     const preferences = new Map(snapshot.preferences.map(preference => [preference.key, preference]));
-    const matching = bootstrap.catalog.rules.filter(rule => matchesRule(query, rule));
+    const matching = bootstrap.catalog.rules.filter(rule =>
+        matchesRule(query, rule) || matchesRule(query, {...rule, expandedCaption: `${rule.subgroup ?? ""} ${rule.caption}`}));
     const search = input("search", "Find a preference");
     search.value = query;
     search.addEventListener("input", () => {
@@ -60,7 +61,18 @@ function render() {
             if (details.open) expanded.add(groupName); else expanded.delete(groupName);
         });
         details.append(el("summary", "group-heading", [el("span", "", [groupName]), el("span", "group-count", [String(rules.length)])]));
-        for (const rule of rules) details.append(ruleRow(rule, preferences.get(rule.key)!));
+        const subgroups = new Map<string, Rule[]>([["", []]]);
+        for (const rule of rules) {
+            const subgroup = rule.subgroup ?? "";
+            if (!subgroups.has(subgroup)) subgroups.set(subgroup, []);
+            subgroups.get(subgroup)!.push(rule);
+        }
+        for (const [subgroup, subgroupRules] of subgroups) {
+            if (!subgroupRules.length) continue;
+            const section = subgroup ? el("section", "rule-subgroup", [el("h2", "subgroup-heading", [subgroup])]) : details;
+            for (const rule of subgroupRules) section.append(ruleRow(rule, preferences.get(rule.key)!));
+            if (subgroup) details.append(section);
+        }
         list.append(details);
     }
     if (!matching.length) list.append(el("p", "empty", ["No preferences match."]));
@@ -115,13 +127,16 @@ function ruleRow(rule: Rule, preference: PreferenceSnapshot) {
     const changed = edits.has(rule.key);
     const origin = originText(preference);
     const control = createControl(rule, preference, desired, origin);
+    control.setAttribute("aria-description", rule.description);
+    const name = el("span", "rule-name", [rule.caption]);
+    name.title = rule.description;
     const remove = el("button", "icon remove", ["×"]);
-    remove.title = `Remove local assignment for ${rule.name}`;
+    remove.title = `Remove local assignment for ${rule.expandedCaption}`;
     remove.setAttribute("aria-label", remove.title);
     setDisabled(remove, desired.kind === "absent" || saving);
     remove.addEventListener("click", () => change(preference, {kind: "absent", value: null}));
     const unset = el("button", "icon unset", ["∅"]);
-    unset.title = `Set ${rule.name} to unset`;
+    unset.title = `Set ${rule.expandedCaption} to unset`;
     unset.setAttribute("aria-label", unset.title);
     setDisabled(unset, desired.kind === "unset" || saving);
     unset.addEventListener("click", () => change(preference, {kind: "unset", value: null}));
@@ -138,7 +153,7 @@ function ruleRow(rule: Rule, preference: PreferenceSnapshot) {
     });
     const invalid = desired.kind === "explicit" && touched.has(rule.key) && !validValue(desired.value ?? "", rule);
     return el("article", `rule-row${changed ? " changed" : ""}`, [
-        el("div", "rule-copy", [el("div", "rule-title", [el("strong", "", [rule.name]), copy]), el("p", "", [rule.description])]),
+        el("div", "rule-copy", [el("div", "rule-title", [name, copy])]),
         el("div", `rule-control${["boolean", "choice"].includes(rule.valueKind) ? " enum-control" : ""}`, [
             control,
             ...(["boolean", "choice"].includes(rule.valueKind) ? [] : [unset]),
@@ -156,7 +171,7 @@ function createControl(rule: Rule, preference: PreferenceSnapshot, desired: Assi
         for (const value of rule.values) select.append(option(`explicit:${value.value}`, value.label));
         select.value = desired.kind === "explicit" ? `explicit:${desired.value}` : desired.kind;
         select.title = origin;
-        select.setAttribute("aria-label", `${rule.name}. ${origin}`);
+        select.setAttribute("aria-label", `${rule.expandedCaption}. ${origin}`);
         setDisabled(select, saving);
         select.addEventListener("change", () => change(preference, parseSelection(select.value)));
         return select;
@@ -167,7 +182,7 @@ function createControl(rule: Rule, preference: PreferenceSnapshot, desired: Assi
     field.value = desired.kind === "explicit" ? desired.value ?? "" : "";
     field.placeholder = preference.inherited.kind === "explicit" ? preference.inherited.value ?? "" : "unset";
     field.title = origin;
-    field.setAttribute("aria-label", `${rule.name}. ${origin}`);
+    field.setAttribute("aria-label", `${rule.expandedCaption}. ${origin}`);
     field.setAttribute("aria-invalid", String(desired.kind === "explicit" && touched.has(rule.key) && !validValue(desired.value ?? "", rule)));
     setDisabled(field, saving);
     field.addEventListener("input", () => {
