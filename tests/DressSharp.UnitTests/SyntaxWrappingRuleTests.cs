@@ -658,6 +658,73 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Auto_arguments_keep_a_multiline_lambda_attached(bool useDefaults)
+    {
+        const string source = """
+            class C
+            {
+                void M()
+                {
+                    var preferences = RuleCatalog.BuiltIn.Rules
+                        .Select(rule =>
+                        {
+                            var key = rule.Metadata.RuleKey;
+                            return new InteractivePreference(
+                                key,
+                                local.GetValueOrDefault(key, PreferenceAssignment.Absent),
+                                inherited.GetValueOrDefault(key, PreferenceAssignment.Absent),
+                                inheritedSources.GetValueOrDefault(key),
+                                effective.GetValueOrDefault(key),
+                                effectiveSources.GetValueOrDefault(key));
+                        })
+                        .ToImmutableArray();
+                }
+            }
+            """;
+        var preferences = useDefaults
+            ? PreferenceCatalog.Defaults
+                .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+                .ToArray()
+            : [("dress_arguments_layout", "auto"), ("max_line_length", "160")];
+
+        var result = Format(source, preferences);
+
+        result.Contains(".Select(rule =>").ShouldBe(true);
+        if (!useDefaults)
+            result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData(160, false)]
+    [InlineData(161, true)]
+    public void Auto_arguments_measure_the_lambda_header_line(int width, bool wraps)
+    {
+        var parameter = new string('x', width - "Select( =>".Length);
+        var source = $"Select({parameter} =>\n{{\n    return value;\n}});";
+        var preferences = new[] { ("dress_arguments_layout", "auto"), ("max_line_length", "160") };
+
+        var result = Format(source, preferences);
+
+        result.Contains("Select(\n").ShouldBe(wraps);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_arguments_ignore_overlong_lines_inside_a_lambda_body()
+    {
+        var source = $"Select(rule =>\n{{\n    return {new string('x', 200)};\n}});";
+        var preferences = new[] { ("dress_arguments_layout", "auto"), ("max_line_length", "160") };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData(160)]
     [InlineData(60)]
     public void Auto_member_access_measures_multiline_arguments_on_their_own_lines(int maximum)

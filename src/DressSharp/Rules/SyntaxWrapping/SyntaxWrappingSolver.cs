@@ -101,12 +101,15 @@ sealed class SyntaxWrappingSolver
                 && occurrence.Setting is
                     { Mode: WrappingMode.Auto, MaximumLineLength: not int.MaxValue })
             {
-                if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax
-                    && MeasureMultilineChain(occurrence) is { } breaks)
+                if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax or BaseArgumentListSyntax
+                    && MeasureMultilineBoundaries(occurrence) is { } breaks)
                 {
                     multi = breaks.Any(value => value);
-                    for (var offset = 0; offset < breaks.Length; offset++)
-                        _chainBoundaryBreaks[occurrence.BoundaryStart + offset] = breaks[offset];
+                    if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax)
+                    {
+                        for (var offset = 0; offset < breaks.Length; offset++)
+                            _chainBoundaryBreaks[occurrence.BoundaryStart + offset] = breaks[offset];
+                    }
                 }
                 else
                 {
@@ -217,9 +220,9 @@ sealed class SyntaxWrappingSolver
         return false;
     }
 
-    // Only a line containing a chain operator can benefit from wrapping that chain.
-    // Argument and lambda-body lines must not contribute to another line's width.
-    bool[]? MeasureMultilineChain(Occurrence occurrence)
+    // Only lines containing this occurrence's wrapping boundaries can benefit from wrapping it.
+    // Nested argument and lambda-body lines must not contribute to another line's width.
+    bool[]? MeasureMultilineBoundaries(Occurrence occurrence)
     {
         var lineWidths = new List<int>();
         var boundaryLines = new int[occurrence.BoundaryCount];
