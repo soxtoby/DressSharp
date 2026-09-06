@@ -239,10 +239,14 @@ sealed class TriviaLayoutPlan
                 if (_context.IsUnsafe(node))
                     return;
                 var first = node.GetFirstToken();
-                if (first.GetPreviousToken().RawKind != 0)
+                var previous = first.GetPreviousToken();
+                var isType = node is BaseTypeDeclarationSyntax;
+                if (previous.RawKind != 0
+                    && !(isType && previous.IsKind(SyntaxKind.OpenBraceToken) && previous.Parent == node.Parent))
                     SetTarget(first, count, priority);
                 var next = node.GetLastToken().GetNextToken();
-                if (next.RawKind != 0 && !next.IsKind(SyntaxKind.EndOfFileToken))
+                if (next.RawKind != 0 && !next.IsKind(SyntaxKind.EndOfFileToken)
+                    && !(isType && next.IsKind(SyntaxKind.CloseBraceToken) && next.Parent == node.Parent))
                     SetTarget(next, count, priority);
             }
 

@@ -27,11 +27,9 @@ public sealed class TriviaLayoutRuleTests
         """
         namespace N
         {
-
             class A { }
 
             class B { }
-
         }
         """)]
     [InlineData("dress_blank_lines_between_members", "0",
@@ -150,6 +148,21 @@ public sealed class TriviaLayoutRuleTests
 
             class B { }
             """);
+    }
+
+    [Theory]
+    [InlineData("class Outer")]
+    [InlineData("namespace Outer")]
+    public void Around_types_does_not_pad_containing_braces(string container)
+    {
+        var source = $$"""
+            {{container}}
+            {
+                class Inner { }
+            }
+            """;
+
+        FormatTwice(source, ("dress_blank_lines_around_types", "1")).ShouldBe(source);
     }
 
     [Fact]
