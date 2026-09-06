@@ -86,6 +86,8 @@ details[open] > .group-heading::before { content: "−"; }
 .preview-toolbar label { white-space: nowrap; font-size: 12px; }
 .diff-scroll { flex: 1; min-height: 0; overflow: auto; }
 .diff-scroll diffs-container { display: block; min-height: 100%; }
+.diff-horizontal-scroll { flex: none; overflow-x: scroll; overflow-y: hidden; border-top: 1px solid var(--line); }
+.diff-horizontal-scroll > div { height: 1px; }
 .preview-note { flex-wrap: wrap; line-height: 1.6; }
 .kicker { margin: 0 0 7px; color: var(--green); font-size: 10px; text-transform: uppercase; letter-spacing: .11em; }
 .canvas h1 { margin: 0; font-size: clamp(27px, 3vw, 42px); letter-spacing: -.055em; }

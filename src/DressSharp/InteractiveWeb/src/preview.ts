@@ -61,7 +61,7 @@ pre[data-diff-type="split"] > [data-deletions] { grid-column: 2; grid-row: 1; }
 [data-deletions], [data-deletions] [data-line] { cursor: text; user-select: text; }
 [data-deletions] ::selection { color: inherit; background: var(--diffs-editor-selection-bg) !important; }
 :host([data-whitespace]) [data-line]::after { content: var(--preview-whitespace) !important; position: absolute;
-    top: 0; left: 0; color: #718078; pointer-events: none; white-space: pre; font: inherit; }
+    top: 0; left: 0; padding-inline: inherit; color: #718078; pointer-events: none; white-space: pre; font: inherit; }
 @media (max-width: 700px) {
     pre[data-diff-type="split"] { display: flex; flex-direction: column; }
     pre[data-diff-type="split"] > [data-additions] { order: 1; width: 100%; }
@@ -75,6 +75,8 @@ pre[data-diff-type="split"] > [data-deletions] { grid-column: 2; grid-row: 1; }
 export class Preview {
     readonly element = document.createElement("section");
     private readonly host = document.createElement("diffs-container");
+    private readonly horizontalScroll = document.createElement("div");
+    private readonly horizontalTrack = document.createElement("div");
     private readonly status = document.createElement("span");
     private readonly cursor = document.createElement("span");
     private readonly facts = document.createElement("span");
@@ -99,6 +101,17 @@ export class Preview {
         this.element.className = "canvas preview-canvas";
         this.element.innerHTML = `<div class="preview-toolbar"><div><h1>Preview</h1><small class="parse-context">Latest stable C# · no predefined symbols</small></div><label><input type="checkbox" class="whitespace-toggle"> Whitespace</label></div><div class="preview-frame"><div class="preview-labels"><span>Source · editable · UTF-8 · LF</span><span>Formatted output · read only · select to copy</span></div><div class="diff-scroll"></div><div class="preview-note"></div></div>`;
         this.element.querySelector(".diff-scroll")!.append(this.host);
+        this.horizontalScroll.className = "diff-horizontal-scroll";
+        this.horizontalScroll.tabIndex = 0;
+        this.horizontalScroll.setAttribute("role", "region");
+        this.horizontalScroll.setAttribute("aria-label", "Scroll source and formatted output horizontally");
+        this.horizontalScroll.append(this.horizontalTrack);
+        this.element.querySelector(".preview-note")!.before(this.horizontalScroll);
+        this.horizontalScroll.addEventListener("scroll", () => {
+            if (this.horizontalScroll.scrollLeft !== this.diff.getCodeScrollLeft()) {
+                this.diff.setCodeScrollLeft(this.horizontalScroll.scrollLeft);
+            }
+        });
         this.status.setAttribute("role", "status");
         this.cursor.className = "cursor-position";
         this.cursor.textContent = "Ln 1, Col 1";
@@ -118,6 +131,13 @@ export class Preview {
             this.schedule();
         }, onFocus: () => queueMicrotask(() => this.updateCursor())});
         this.editor.edit(this.diff);
+        this.host.shadowRoot?.addEventListener("scroll", event => {
+            const pane = event.target;
+            if (pane instanceof HTMLElement && pane.matches("code[data-additions], code[data-deletions]")) {
+                this.horizontalScroll.scrollLeft = this.diff.getCodeScrollLeft();
+            }
+        }, true);
+        new ResizeObserver(() => this.queueMarkers()).observe(this.host);
         document.addEventListener("selectionchange", () => this.updateCursor());
         this.updateCursor();
         if (this.host.shadowRoot) new MutationObserver(() => this.queueMarkers()).observe(this.host.shadowRoot, {childList: true, characterData: true, subtree: true});
@@ -178,7 +198,19 @@ export class Preview {
 
     private queueMarkers() {
         if (this.markerFrame) return;
-        this.markerFrame = requestAnimationFrame(() => { this.markerFrame = 0; this.updateMarkers(); });
+        this.markerFrame = requestAnimationFrame(() => {
+            this.markerFrame = 0;
+            this.updateHorizontalScroll();
+            this.updateMarkers();
+        });
+    }
+
+    private updateHorizontalScroll() {
+        const panes = this.host.shadowRoot?.querySelectorAll<HTMLElement>("code[data-additions], code[data-deletions]");
+        if (!panes?.length) return;
+        const overflow = Math.max(...Array.from(panes, pane => pane.scrollWidth - pane.clientWidth));
+        this.horizontalTrack.style.width = `${this.horizontalScroll.clientWidth + overflow}px`;
+        this.horizontalScroll.scrollLeft = this.diff.getCodeScrollLeft();
     }
 
     private updateCursor() {
@@ -195,7 +227,7 @@ export class Preview {
             const text = line.textContent ?? "";
             const endings = line.closest("[data-additions]") ? sourceEndings : outputEndings;
             const ending = endings[Number(line.dataset["line"]) - 1]?.[1];
-            const markers = whitespaceMarkers(text) + (ending === "\r\n" ? "␍↵" : ending === "\n" ? "↵" : ending === "\r" ? "␍" : "");
+            const markers = whitespaceMarkers(text) + (ending === "\r\n" ? "↵" : ending === "\n" ? "↓" : ending === "\r" ? "←" : "");
             line.style.setProperty("--preview-whitespace", JSON.stringify(markers));
         }
     }
