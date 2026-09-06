@@ -1,6 +1,7 @@
 using DressSharp.Architecture;
 using DressSharp.Configuration;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 using EasyAssertions;
 
@@ -104,6 +105,59 @@ public class SyntaxConversionRuleTests
             #endif
             } if (d) D(); } }
             """);
+    }
+
+    [Theory]
+    [InlineData("compact")]
+    [InlineData("balanced")]
+    [InlineData("always")]
+    public void Outer_else_stays_with_outer_if_after_nested_else_if(string mode)
+    {
+        const string source = """
+            if (true) {
+                if (true) {
+                    Console.WriteLine();
+                } else if (false) {
+                    Console.WriteLine();
+                }
+            } else {
+                Console.WriteLine();
+            }
+            """;
+        var preferences = new[] { ("dress_embedded_statement_braces", mode) };
+        var result = Transform(source, preferences);
+        var root = CSharpSyntaxTree.ParseText(result, cancellationToken: TestContext.Current.CancellationToken).GetRoot(TestContext.Current.CancellationToken);
+        var outer = root.DescendantNodes().OfType<IfStatementSyntax>().First();
+        Assert.NotNull(outer.Else);
+        Transform(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("if (b) B(); else if (c) C(); else if (d) D();", true)]
+    [InlineData("while (b) { if (c) C(); }", true)]
+    [InlineData("for (;;) { if (c) C(); }", true)]
+    [InlineData("foreach (var item in items) { if (c) C(); }", true)]
+    [InlineData("foreach (var (x, y) in items) { if (c) C(); }", true)]
+    [InlineData("using (resource) { if (c) C(); }", true)]
+    [InlineData("lock (gate) { if (c) C(); }", true)]
+    [InlineData("fixed (int* p = values) { if (c) C(); }", true)]
+    [InlineData("if (b) B(); else while (c) { if (d) D(); }", true)]
+    [InlineData("if (b) B(); else C();", false)]
+    [InlineData("while (b) { if (c) C(); D(); }", false)]
+    [InlineData("do { if (c) C(); } while (b);", false)]
+    public void Brace_removal_preserves_else_binding_through_embedded_statements(string body, bool needsBraces)
+    {
+        foreach (var mode in new[] { "compact", "balanced" })
+        {
+            var preferences = new[] { ("dress_embedded_statement_braces", mode) };
+            var result = Transform($"if (a) {{ {body} }} else E();", preferences);
+            var tree = CSharpSyntaxTree.ParseText(result, cancellationToken: TestContext.Current.CancellationToken);
+            tree.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
+            var outer = tree.GetRoot(TestContext.Current.CancellationToken).DescendantNodes().OfType<IfStatementSyntax>().First();
+            Assert.NotNull(outer.Else);
+            (outer.Statement is BlockSyntax).ShouldBe(needsBraces);
+            Transform(result, preferences).ShouldBe(result);
+        }
     }
 
     [Fact]

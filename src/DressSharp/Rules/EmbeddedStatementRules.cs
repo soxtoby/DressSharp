@@ -151,7 +151,7 @@ static class EmbeddedStatementBraces
                 return node;
             var current = (IfStatementSyntax)base.VisitIfStatement(node)!;
             var danglingElse = current.Else is not null
-                && Unwrapped(current.Statement) is IfStatementSyntax { Else: null };
+                && HasUnmatchedIf(Unwrapped(current.Statement));
             var statement = Unbrace(current.Statement, !danglingElse, context);
             var alternative = current.Else is { Statement: not IfStatementSyntax } clause
                 ? clause.WithStatement(Unbrace(clause.Statement, true, context))
@@ -207,7 +207,7 @@ static class EmbeddedStatementBraces
             }
 
             var danglingElse = current.Else is not null
-                && Unwrapped(current.Statement) is IfStatementSyntax { Else: null };
+                && HasUnmatchedIf(Unwrapped(current.Statement));
             var statement = CanonicalBody(current, current.Statement, !danglingElse);
             var alternative = current.Else is { Statement: not IfStatementSyntax } clause
                 ? clause.WithStatement(CanonicalBody(clause, clause.Statement, true))
@@ -382,6 +382,20 @@ static class EmbeddedStatementBraces
 
     static StatementSyntax Unwrapped(StatementSyntax statement) =>
         statement is BlockSyntax { Statements: [var only] } ? only : statement;
+
+    // A following else can bind through an else branch or an unbraced loop/scope body.
+    // Blocks and do/while statements close that path.
+    static bool HasUnmatchedIf(StatementSyntax statement) => statement switch
+        {
+            IfStatementSyntax conditional => conditional.Else is null || HasUnmatchedIf(conditional.Else.Statement),
+            WhileStatementSyntax loop => HasUnmatchedIf(loop.Statement),
+            ForStatementSyntax loop => HasUnmatchedIf(loop.Statement),
+            CommonForEachStatementSyntax loop => HasUnmatchedIf(loop.Statement),
+            UsingStatementSyntax scope => HasUnmatchedIf(scope.Statement),
+            LockStatementSyntax scope => HasUnmatchedIf(scope.Statement),
+            FixedStatementSyntax scope => HasUnmatchedIf(scope.Statement),
+            _ => false
+        };
 
     static StatementSyntax Body(SyntaxNode owner) => owner switch
         {
