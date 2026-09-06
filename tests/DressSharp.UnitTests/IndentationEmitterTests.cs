@@ -9,6 +9,57 @@ namespace DressSharp.UnitTests;
 public class IndentationEmitterTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Else_if_body_has_the_same_indent_as_the_if_body(bool useDefaults)
+    {
+        const string source = """
+            static void RestoreFinalNewline(List<EditorConfigLine> lines, bool hadFinalNewline)
+            {
+                if (!hadFinalNewline)
+                    lines[^1].Ending = string.Empty;
+                else if (lines[^1].Ending.Length == 0)
+                    lines[^1].Ending = PreferredNewline(lines, lines.Count - 1);
+            }
+            """;
+        var preferences = useDefaults
+            ? PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray()
+            : new[] { ("csharp_indent_block_contents", "true"), ("dress_embedded_statement_placement", "next_line") };
+        var result = Format(source, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Else_if_chains_retain_surrounding_unbraced_nesting()
+    {
+        const string source = """
+            void M()
+            {
+                while (ready)
+                    if (a)
+                        A();
+                    else if (b)
+                        if (c)
+                            B();
+                        else
+                            C();
+                    else if (d)
+                        D();
+                    else
+                    {
+                        E();
+                        F();
+                    }
+            }
+            """;
+        var preferences = new[] { ("csharp_indent_block_contents", "true"), ("dress_embedded_statement_placement", "next_line") };
+        var result = Format(source, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData("() =>")]
     [InlineData("async () =>")]
     [InlineData("delegate")]

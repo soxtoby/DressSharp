@@ -90,16 +90,20 @@ static class EmbeddedStatements
         var depth = 0;
         StatementSyntax? current = statement;
         if (current is BlockSyntax)
-            current = OwnerOf(current) as StatementSyntax;
+            current = ContainingStatement(OwnerOf(current));
 
         while (current is not null && OwnerOf(current) is { } owner)
         {
-            depth++;
-            current = owner as StatementSyntax;
+            if (current is not IfStatementSyntax || owner is not ElseClauseSyntax)
+                depth++;
+            current = ContainingStatement(owner);
         }
 
         return depth;
     }
+
+    static StatementSyntax? ContainingStatement(SyntaxNode? owner) =>
+        (owner is ElseClauseSyntax alternative ? alternative.Parent : owner) as StatementSyntax;
 
     static SyntaxNode? OwnerOf(StatementSyntax statement) => statement.Parent switch
         {
