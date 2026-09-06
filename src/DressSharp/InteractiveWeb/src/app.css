@@ -62,6 +62,13 @@ details[open] > .group-heading::before { content: "−"; }
 .rule-control { display: grid; grid-template-columns: minmax(0, 1fr) 26px 26px; align-items: center; gap: 5px; }
 .rule-control.enum-control { grid-template-columns: minmax(0, 1fr) 26px; }
 .rule-control select, .rule-control input { min-width: 0; width: 100%; padding: 7px 8px; color: var(--ink); background: #fdfcf7; border: 1px solid var(--line); border-radius: 6px; font-size: 11px; }
+.multi-control { min-width: 0; }
+.multi-select { display: flex; align-items: center; justify-content: space-between; gap: 5px; width: 100%; padding: 7px 8px; color: var(--ink); background: #fdfcf7; border: 1px solid var(--line); border-radius: 6px; font-size: 11px; text-align: left; }
+.multi-select > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi-options { position: fixed; margin: 0; padding: 8px; overflow: auto; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(24,33,28,.2); }
+.multi-option { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.multi-option:hover, .multi-option:focus-within { background: #e8e8e0; }
+.rule-control .multi-option input { flex: none; width: 15px; height: 15px; margin: 0; padding: 0; accent-color: var(--green); }
 .icon { width: 26px; height: 26px; display: grid; place-items: center; color: var(--muted); background: transparent; border-radius: 5px; font-size: 15px; }
 .icon:hover:not(:disabled) { color: var(--ink); background: #e4e5dc; }
 .copy { width: 22px; height: 22px; opacity: 0; font-size: 12px; transition: opacity .12s; }

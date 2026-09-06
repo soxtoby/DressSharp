@@ -42,6 +42,9 @@ async function poll() {
 }
 
 function render() {
+    const openChoices = root.querySelector<HTMLElement>(".multi-options:popover-open");
+    const focusedChoice = openChoices?.contains(document.activeElement) ? document.activeElement?.id : null;
+    const choicesScroll = openChoices?.scrollTop ?? 0;
     const preferences = new Map(snapshot.preferences.map(preference => [preference.key, preference]));
     const matching = bootstrap.catalog.rules.filter(rule =>
         matchesRule(query, rule) || matchesRule(query, {...rule, expandedCaption: `${rule.subgroup ?? ""} ${rule.caption}`}));
@@ -119,6 +122,12 @@ function render() {
             replacement.scrollTop = scrollTop;
         }
     }
+    if (openChoices) {
+        const replacement = document.getElementById(openChoices.id);
+        replacement?.showPopover();
+        if (replacement) replacement.scrollTop = choicesScroll;
+        if (focusedChoice) document.getElementById(focusedChoice)?.focus({preventScroll: true});
+    }
     preview.configure(snapshot, edits);
 }
 
@@ -127,9 +136,12 @@ function ruleRow(rule: Rule, preference: PreferenceSnapshot) {
     const changed = edits.has(rule.key);
     const origin = originText(preference);
     const control = createControl(rule, preference, desired, origin);
-    control.setAttribute("aria-description", rule.description);
+    const description = rule.valueKind === "multiplechoice"
+        ? `${rule.description} ${rule.specialValues.length ? `${rule.specialValues.map(value => `“${value}”`).join(" and ")} must each be used alone. ` : ""}Clearing every option sets this preference to unset.`
+        : rule.description;
+    control.setAttribute("aria-description", description);
     const name = el("span", "rule-name", [rule.caption]);
-    name.title = rule.description;
+    name.title = description;
     const remove = el("button", "icon remove", ["×"]);
     remove.title = `Remove local assignment for ${rule.expandedCaption}`;
     remove.setAttribute("aria-label", remove.title);
@@ -165,6 +177,7 @@ function ruleRow(rule: Rule, preference: PreferenceSnapshot) {
 }
 
 function createControl(rule: Rule, preference: PreferenceSnapshot, desired: Assignment, origin: string) {
+    if (rule.valueKind === "multiplechoice") return multipleChoiceControl(rule, preference, desired, origin);
     if (["boolean", "choice"].includes(rule.valueKind)) {
         const select = document.createElement("select");
         select.append(option("absent", "Inherited / absent"), option("unset", "Unset"));
@@ -196,6 +209,49 @@ function createControl(rule: Rule, preference: PreferenceSnapshot, desired: Assi
     });
     field.addEventListener("blur", () => { touched.add(rule.key); render(); });
     return field;
+}
+
+function multipleChoiceControl(rule: Rule, preference: PreferenceSnapshot, desired: Assignment, origin: string) {
+    const selected = new Set((desired.kind === "explicit" ? desired.value ?? "" : "").split(",").map(value => value.trim().toLowerCase()).filter(Boolean));
+    const choices = [...rule.specialValues.map(value => ({value, label: value.charAt(0).toUpperCase() + value.slice(1)})), ...rule.values];
+    const labels = choices.filter(choice => selected.has(choice.value)).map(choice => choice.label);
+    const caption = desired.kind === "explicit" ? labels.join(", ") || "Select options" : desired.kind === "unset" ? "Unset" : "Inherited / absent";
+    const trigger = el("button", "multi-select", [el("span", "", [caption]), el("span", "", ["▾"])]);
+    trigger.title = `${caption}. ${origin}`;
+    trigger.setAttribute("aria-label", `${rule.expandedCaption}. ${caption}. ${origin}`);
+    setDisabled(trigger, saving);
+    const panel = el("div", "multi-options");
+    panel.id = `choices-${rule.key}`;
+    panel.popover = "auto";
+    panel.setAttribute("role", "group");
+    panel.setAttribute("aria-label", rule.expandedCaption);
+    trigger.popoverTargetElement = panel;
+    for (const choice of choices) {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.id = `${panel.id}-${choice.value}`;
+        checkbox.checked = selected.has(choice.value);
+        checkbox.disabled = saving;
+        checkbox.addEventListener("change", () => {
+            if (checkbox.checked) selected.add(choice.value); else selected.delete(choice.value);
+            touched.add(rule.key);
+            change(preference, selected.size ? {kind: "explicit", value: [...selected].join(",")} : {kind: "unset", value: null});
+        });
+        panel.append(el("label", "multi-option", [checkbox, choice.label]));
+    }
+    panel.addEventListener("beforetoggle", event => {
+        if ((event as ToggleEvent).newState !== "open") return;
+        const bounds = trigger.getBoundingClientRect();
+        const width = Math.min(320, window.innerWidth - 16);
+        panel.style.width = `${width}px`;
+        panel.style.left = `${Math.max(8, Math.min(bounds.right - width, window.innerWidth - width - 8))}px`;
+        const below = window.innerHeight - bounds.bottom - 12;
+        const above = bounds.top - 12;
+        panel.style.maxHeight = `${Math.min(420, Math.max(below, above))}px`;
+        panel.style.top = below >= above ? `${bounds.bottom + 4}px` : "auto";
+        panel.style.bottom = below >= above ? "auto" : `${window.innerHeight - bounds.top + 4}px`;
+    });
+    return el("div", "multi-control", [trigger, panel]);
 }
 
 function change(preference: PreferenceSnapshot, assignment: Assignment, rerender = true) {
