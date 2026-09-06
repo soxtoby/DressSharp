@@ -923,6 +923,8 @@ sealed class SinglePassEmitter
 
     static bool StartsDirectInitializerItem(SyntaxNode initializer, SyntaxToken token) => initializer switch
     {
+        AnonymousObjectCreationExpressionSyntax anonymousObject =>
+            anonymousObject.Initializers.Any(item => item.GetFirstToken() == token),
         InitializerExpressionSyntax expression =>
             expression.Expressions.Any(item => item.GetFirstToken() == token),
         CollectionExpressionSyntax collection =>

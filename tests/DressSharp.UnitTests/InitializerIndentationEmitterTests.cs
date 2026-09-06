@@ -149,6 +149,46 @@ public sealed class InitializerIndentationEmitterTests
     }
 
     [Fact]
+    public void Configures_nested_anonymous_object_initializer_indentation()
+    {
+        (string, string)[] preferences =
+        [
+            ("csharp_indent_block_contents", "true"),
+            ("dress_object_initializer_indentation", "indented")
+        ];
+
+        var result = Format("""
+            class C
+            {
+                object M() => new
+                {
+                    Value = 1,
+                    Nested = new
+                    {
+                        Value = 2
+                    }
+                };
+            }
+            """,
+            preferences);
+
+        result.ShouldBe("""
+            class C
+            {
+                object M() => new
+                    {
+                        Value = 1,
+                        Nested = new
+                            {
+                                Value = 2
+                            }
+                    };
+            }
+            """);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
     public void Configures_collection_initializer_indentation()
     {
         const string key = "dress_collection_initializer_indentation";

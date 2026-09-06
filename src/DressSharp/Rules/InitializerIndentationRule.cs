@@ -35,6 +35,12 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
 
     internal static Delimiter? FindDelimiter(SyntaxToken token)
     {
+        if (token.Parent is AnonymousObjectCreationExpressionSyntax { Initializers.Count: > 0 } anonymousObject
+            && (token == anonymousObject.OpenBraceToken || token == anonymousObject.CloseBraceToken))
+        {
+            return new(anonymousObject, InitializerKind.Object, token == anonymousObject.OpenBraceToken);
+        }
+
         if (token.Parent is InitializerExpressionSyntax { Expressions.Count: > 0 } initializer
             && (token == initializer.OpenBraceToken || token == initializer.CloseBraceToken))
         {
