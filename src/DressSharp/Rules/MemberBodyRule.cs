@@ -257,11 +257,11 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
             switch (statementBody)
             {
                 case false when body.Statements[0] is ReturnStatementSyntax { Expression: { } returned }:
-                    expression = returned;
+                    expression = returned.WithoutLeadingTrivia();
                     break;
                 
                 case true when body.Statements[0] is ExpressionStatementSyntax statement:
-                    expression = statement.Expression;
+                    expression = statement.Expression.WithoutLeadingTrivia();
                     break;
             }
             

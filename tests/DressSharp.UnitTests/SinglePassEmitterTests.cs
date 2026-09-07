@@ -62,6 +62,33 @@ public class SinglePassEmitterTests
     }
 
     [Fact]
+    public void Generated_void_expression_body_discards_statement_indentation()
+    {
+        Format("""
+            sealed class SystemInteractiveBrowser : IInteractiveBrowser
+            {
+                public void Open(Uri address)
+                {
+                    Process.Start(new ProcessStartInfo(address.AbsoluteUri)
+                    {
+                        UseShellExecute = true
+                    });
+                }
+            }
+            """,
+            ("dress_method_body", "expression"))
+            .ShouldBe("""
+            sealed class SystemInteractiveBrowser : IInteractiveBrowser
+            {
+                public void Open(Uri address) => Process.Start(new ProcessStartInfo(address.AbsoluteUri)
+                    {
+                        UseShellExecute = true
+                    });
+            }
+            """);
+    }
+
+    [Fact]
     public void Adds_newlines_before_open_braces()
     {
         AssertNewlineRule(
