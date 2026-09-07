@@ -45,7 +45,7 @@ sealed class SyntaxWrappingSolver
         foreach (var setting in byKind)
         {
             _needsWidths |= setting is
-                        { Mode: WrappingMode.Auto, MaximumLineLength: not int.MaxValue };
+                        { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue };
         }
     }
     internal SyntaxWrappingPlan Finish(TriviaLayoutPlan trivia)
@@ -88,18 +88,26 @@ sealed class SyntaxWrappingSolver
         for (var occurrenceIndex = 0; occurrenceIndex < _occurrences.Length; occurrenceIndex++)
         {
             var occurrence = _occurrences[occurrenceIndex];
-            if (occurrence.Setting.Mode == WrappingMode.Auto && HasLineBreak(occurrence))
+            var initializerLayout = SyntaxWrappingRule.InitializerKindFor(occurrence.Kind) is not null;
+            var hasLineBreak = HasLineBreak(occurrence);
+            var hasNestedLineBreak = initializerLayout && HasUnownedLineBreak(occurrence);
+            if (occurrence.Setting.Mode == WrappingMode.Auto
+                && (hasLineBreak || hasNestedLineBreak)
+                && !initializerLayout)
                 continue;
 
             var multi = occurrence.Setting.Mode == WrappingMode.Multi
                 || occurrence.Setting.Mode == WrappingMode.Auto
-                && occurrence.Node is InitializerExpressionSyntax
-                && _trivia!.HasLineBreak(occurrence.FirstToken);
+                && initializerLayout
+                && (hasLineBreak || hasNestedLineBreak)
+                || occurrence.Setting.Mode == WrappingMode.Compact
+                && initializerLayout
+                && hasNestedLineBreak;
             var hasLineComment = false;
             var checkedLineComments = false;
             if (!multi
                 && occurrence.Setting is
-                    { Mode: WrappingMode.Auto, MaximumLineLength: not int.MaxValue })
+                    { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue })
             {
                 if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax or BaseArgumentListSyntax
                     && MeasureMultilineBoundaries(occurrence) is { } breaks)
@@ -136,7 +144,12 @@ sealed class SyntaxWrappingSolver
 
             if (!multi
                 && (hasLineComment || !checkedLineComments && HasLineComment(occurrence)))
-                continue;
+            {
+                if (initializerLayout && occurrence.Setting.Mode == WrappingMode.Compact)
+                    multi = true;
+                else
+                    continue;
+            }
 
             occurrence = occurrence with { Applies = true, Multi = multi };
             _occurrences[occurrenceIndex] = occurrence;
@@ -285,16 +298,53 @@ sealed class SyntaxWrappingSolver
         return false;
     }
 
+    bool HasUnownedLineBreak(Occurrence occurrence)
+    {
+        for (var index = occurrence.FirstToken; index <= occurrence.LastToken; index++)
+        {
+            if (!_trivia!.HasLineBreak(index))
+                continue;
+
+            var owned = false;
+            for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+            {
+                if (_boundaries[occurrence.BoundaryStart + offset].RightIndex != index)
+                    continue;
+                owned = true;
+                break;
+            }
+
+            if (!owned)
+                return true;
+        }
+
+        return false;
+    }
+
     int VisualStartColumn(Occurrence occurrence)
     {
+        if (SyntaxWrappingRule.InitializerKindFor(occurrence.Kind) is not null
+            && occurrence.FirstToken > 0)
+        {
+            var previous = occurrence.FirstToken - 1;
+            return VisualStartColumn(previous)
+                + VisualWidth(_stream.Pieces[previous].Token.Text, _settings.TabWidth)
+                + 1;
+        }
+
+        return VisualStartColumn(occurrence.FirstToken);
+    }
+
+    int VisualStartColumn(int firstToken)
+    {
         var pieces = _stream.Pieces;
-        var piece = pieces[occurrence.FirstToken];
+        var piece = pieces[firstToken];
         var localLineStart = LastLineStart(piece.Source, piece.Token.SpanStart);
         int first;
         int column;
         if (!piece.IsOriginal && localLineStart != 0)
         {
-            first = occurrence.FirstToken;
+            first = firstToken;
             while (first > 0
                 && pieces[first - 1].SegmentIndex == piece.SegmentIndex
                 && pieces[first - 1].Token.SpanStart >= localLineStart)
@@ -312,7 +362,7 @@ sealed class SyntaxWrappingSolver
         else
         {
             var originalLineStart = LastLineStart(_source, piece.OriginalPosition);
-            first = occurrence.FirstToken;
+            first = firstToken;
             while (first > 0 && pieces[first - 1].OriginalPosition >= originalLineStart)
                 first--;
 
@@ -350,7 +400,7 @@ sealed class SyntaxWrappingSolver
             }
         }
 
-        for (var index = first; index < occurrence.FirstToken; index++)
+        for (var index = first; index < firstToken; index++)
         {
             column = AdvanceColumn(pieces[index].Token.Text, column, _settings.TabWidth);
             column = AdvancePrefixGap(index + 1, column);
@@ -361,6 +411,9 @@ sealed class SyntaxWrappingSolver
 
     int AdvancePrefixGap(int rightIndex, int column)
     {
+        if (_plannedLineBreaks.TryGetValue(rightIndex, out var plannedBreak))
+            return AdvanceColumn(plannedBreak, column, _settings.TabWidth);
+
         if (_plannedWidths?.TryGet(rightIndex, out var planned) == true)
             return column + planned;
 

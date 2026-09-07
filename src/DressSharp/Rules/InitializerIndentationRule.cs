@@ -44,14 +44,7 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
         if (token.Parent is InitializerExpressionSyntax { Expressions.Count: > 0 } initializer
             && (token == initializer.OpenBraceToken || token == initializer.CloseBraceToken))
         {
-            var kind = initializer.Kind() switch
-            {
-                SyntaxKind.ObjectInitializerExpression => InitializerKind.Object,
-                SyntaxKind.CollectionInitializerExpression => InitializerKind.Collection,
-                SyntaxKind.ArrayInitializerExpression => InitializerKind.Array,
-                SyntaxKind.WithInitializerExpression => InitializerKind.With,
-                _ => (InitializerKind?)null
-            };
+            var kind = KindOf(initializer);
             return kind is { } value
                 ? new(initializer, value, token == initializer.OpenBraceToken)
                 : null;
@@ -65,6 +58,15 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
 
         return null;
     }
+
+    internal static InitializerKind? KindOf(InitializerExpressionSyntax initializer) => initializer.Kind() switch
+    {
+        SyntaxKind.ObjectInitializerExpression => InitializerKind.Object,
+        SyntaxKind.CollectionInitializerExpression => InitializerKind.Collection,
+        SyntaxKind.ArrayInitializerExpression => InitializerKind.Array,
+        SyntaxKind.WithInitializerExpression => InitializerKind.With,
+        _ => null
+    };
 
     internal readonly record struct Delimiter(SyntaxNode Initializer, InitializerKind Kind, bool IsOpening);
 }

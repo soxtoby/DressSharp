@@ -25,7 +25,10 @@ readonly record struct SyntaxWrappingTriggerMask(
             || parameters
             || Enabled(SyntaxWrappingKind.CollectionExpressions)
             || Enabled(SyntaxWrappingKind.Attributes),
-            Enabled(SyntaxWrappingKind.Initializers),
+            Enabled(SyntaxWrappingKind.ObjectInitializers)
+            || Enabled(SyntaxWrappingKind.CollectionInitializers)
+            || Enabled(SyntaxWrappingKind.ArrayInitializers)
+            || Enabled(SyntaxWrappingKind.WithInitializers),
             Enabled(SyntaxWrappingKind.BaseTypeLists),
             Enabled(SyntaxWrappingKind.ConstraintClauses),
             Enabled(SyntaxWrappingKind.QueryClauses),

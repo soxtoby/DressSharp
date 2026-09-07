@@ -35,7 +35,8 @@ public sealed class InitializerIndentationEmitterTests
         (string, string)[] preferences =
         [
             ("max_line_length", "180"),
-            ("dress_initializers_layout", "auto"),
+            ("dress_object_initializer_layout", "auto"),
+            ("dress_collection_initializer_layout", "auto"),
             ("csharp_new_line_before_open_brace", "all"),
             ("csharp_indent_block_contents", "true"),
             ("dress_object_initializer_indentation", "indented"),
@@ -60,22 +61,9 @@ public sealed class InitializerIndentationEmitterTests
                 {
                     var value = new C("git")
                         {
-                            ArgumentList =
-                                {
-                                    "-C",
-                                    "directory",
-                                    "ls-files",
-                                    "--cached",
-                                    "--others",
-                                    "--exclude-standard",
-                                    "-z"
-                                },
+                            ArgumentList = { "-C", "directory", "ls-files", "--cached", "--others", "--exclude-standard", "-z" },
                             StandardOutputEncoding = Encoding.UTF8,
-                            Environment =
-                                {
-                                    ["LANG"] = "C",
-                                    ["LC_ALL"] = "C"
-                                }
+                            Environment = { ["LANG"] = "C", ["LC_ALL"] = "C" }
                         };
                 }
             }
@@ -494,7 +482,7 @@ public sealed class InitializerIndentationEmitterTests
     {
         var result = Format(
             "class C { C M() => new C { X = 1, Y = 2 }; int X; int Y; }",
-            ("dress_initializers_layout", "always_multi"),
+            ("dress_object_initializer_layout", "expanded"),
             ("csharp_new_line_before_open_brace", "object_collection_array_initializers"),
             ("dress_object_initializer_indentation", "indented"));
 
@@ -507,7 +495,7 @@ public sealed class InitializerIndentationEmitterTests
             """);
         Format(
             result,
-            ("dress_initializers_layout", "always_multi"),
+            ("dress_object_initializer_layout", "expanded"),
             ("csharp_new_line_before_open_brace", "object_collection_array_initializers"),
             ("dress_object_initializer_indentation", "indented")).ShouldBe(result);
     }
@@ -517,7 +505,7 @@ public sealed class InitializerIndentationEmitterTests
     {
         (string, string)[] preferences =
         [
-            ("dress_initializers_layout", "always_multi"),
+            ("dress_object_initializer_layout", "expanded"),
             ("dress_object_initializer_indentation", "indented")
         ];
 

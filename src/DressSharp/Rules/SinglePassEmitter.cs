@@ -386,6 +386,15 @@ sealed class SinglePassEmitter
         var laterElement = (candidates & _plan.LaterElementRules) != 0
             ? NewLineRule.StartsLaterElement(token)
             : null;
+        var initializer = token.Parent as InitializerExpressionSyntax
+            ?? laterElement as InitializerExpressionSyntax;
+        if (initializer is not null
+            && InitializerIndentationRule.KindOf(initializer) is { } initializerKind
+            && _plan.HasInitializerLayout(initializerKind))
+        {
+            return null;
+        }
+
         var rules = _plan.NewLines;
         for (var index = 0; index < rules.Length; index++)
         {
@@ -422,6 +431,9 @@ sealed class SinglePassEmitter
 
     string IndentFor(SyntaxToken token)
     {
+        if (SwitchExpressionIndentFor(token) is { } switchExpressionIndent)
+            return switchExpressionIndent;
+
         if (LambdaBlockIndentFor(token) is { } lambdaIndent)
             return lambdaIndent;
 
@@ -494,6 +506,27 @@ sealed class SinglePassEmitter
             ? _braceIndents.Peek()
             : _contentIndents[^1];
     }
+
+    string? SwitchExpressionIndentFor(SyntaxToken token)
+    {
+        if (_plan.IndentSwitchExpression is not { } indented
+            || SwitchExpressionFor(token) is not { } expression
+            || expression.ContainsDirectives
+            || _checkMalformedRegions && IsUnsafeOriginal(expression))
+        {
+            return null;
+        }
+
+        return token == expression.OpenBraceToken
+            ? _previousLineIndent + (indented ? _plan.IndentUnit : "")
+            : _braceIndents.TryPeek(out var braceIndent) ? braceIndent : null;
+    }
+
+    static SwitchExpressionSyntax? SwitchExpressionFor(SyntaxToken token) =>
+        token.Parent is SwitchExpressionSyntax expression
+        && (token == expression.OpenBraceToken || token == expression.CloseBraceToken)
+            ? expression
+            : null;
 
     string? LambdaBlockIndentFor(SyntaxToken token)
     {
@@ -703,6 +736,13 @@ sealed class SinglePassEmitter
 
     bool PreservesSourceIndent(SyntaxToken token)
     {
+        if (_plan.IndentSwitchExpression is not null
+            && SwitchExpressionFor(token) is { } switchExpression)
+        {
+            return switchExpression.ContainsDirectives
+                || _checkMalformedRegions && IsUnsafeOriginal(switchExpression);
+        }
+
         if (LambdaBlockIndentFor(token) is not null)
             return false;
 

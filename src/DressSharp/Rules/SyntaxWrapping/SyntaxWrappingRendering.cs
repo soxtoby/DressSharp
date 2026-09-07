@@ -21,6 +21,7 @@ static class SyntaxWrappingRendering
         DelimitedLater,
         DelimitedClose,
         DelimitedSpacedClose,
+        InitializerOpen,
         SeparatedFirst,
         SeparatedLater,
         Item,
@@ -29,6 +30,7 @@ static class SyntaxWrappingRendering
 
     internal readonly record struct Occurrence(
         SyntaxNode Node,
+        SyntaxWrappingKind Kind,
         SyntaxWrappingSettings.Setting Setting,
         int BoundaryStart,
         int BoundaryCount,
@@ -73,7 +75,14 @@ static class SyntaxWrappingRendering
             && !HasSignificantTrivia(rightLeading))
         {
             if (multi)
-                return lineEnding + (boundary.Style == GapStyle.DelimitedClose ? baseIndent : indent);
+            {
+                return lineEnding + (boundary.Style is
+                    GapStyle.DelimitedClose
+                    or GapStyle.DelimitedSpacedClose
+                    or GapStyle.InitializerOpen
+                        ? baseIndent
+                        : indent);
+            }
             return WantsSingleSpace(boundary.Style) ? " " : "";
         }
 
@@ -107,6 +116,10 @@ static class SyntaxWrappingRendering
             case GapStyle.DelimitedSpacedClose:
                 left = WithoutWhitespace(leftTrailing);
                 right = Leading(rightLeading, multi ? baseLine : space);
+                break;
+            case GapStyle.InitializerOpen:
+                left = Trailing(leftTrailing, multi ? baseLine : space);
+                right = Leading(rightLeading, default);
                 break;
             case GapStyle.SeparatedFirst:
                 left = WithoutWhitespace(leftTrailing);
@@ -149,6 +162,7 @@ static class SyntaxWrappingRendering
 
     static bool WantsSingleSpace(GapStyle style) => style is
         GapStyle.DelimitedSpacedFirst
+        or GapStyle.InitializerOpen
         or GapStyle.DelimitedLater
         or GapStyle.DelimitedSpacedClose
         or GapStyle.SeparatedFirst

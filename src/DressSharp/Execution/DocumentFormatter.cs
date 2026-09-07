@@ -17,7 +17,7 @@ sealed class DocumentFormatter
     readonly RuleSettings _settings;
     readonly RepresentationPreferences _representation;
     readonly EmbeddedStatementSettings _embeddedStatements;
-    readonly bool _stabilizeAutoWrapping;
+    readonly bool _stabilizeWrapping;
 
     internal DocumentFormatter(FormattingConfiguration configuration, BenchmarkTiming timing)
     {
@@ -33,9 +33,11 @@ sealed class DocumentFormatter
             _settings,
             _emitterPlan);
         _representation = Representation(configuration);
-        _stabilizeAutoWrapping = _settings.MaximumLineLength != int.MaxValue
+        _stabilizeWrapping = _settings.MaximumLineLength != int.MaxValue
             && RuleCatalog.BuiltIn.SyntaxWrappingRules.Any(rule =>
-                configuration.Preferences.GetValueOrDefault(rule.Metadata.RuleKey) == "auto");
+                configuration.Preferences.GetValueOrDefault(rule.Metadata.RuleKey) is { } value
+                && (value.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                    || value.Equals("compact", StringComparison.OrdinalIgnoreCase)));
     }
 
     internal async ValueTask<FormattedDocument> Format(SourceDocument document, CSharpParseOptions options, CancellationToken cancellationToken)
@@ -72,7 +74,7 @@ sealed class DocumentFormatter
     {
         var transformStart = Stopwatch.GetTimestamp();
         var transformed = TransformOnce(root, source, options, cancellationToken);
-        if (_stabilizeAutoWrapping && transformed.Text != source)
+        if (_stabilizeWrapping && transformed.Text != source)
         {
             var stabilizedRoot = ParseCandidate(transformed.Text, options, cancellationToken);
             transformed = TransformOnce(

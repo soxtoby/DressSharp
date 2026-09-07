@@ -13,6 +13,7 @@ sealed class EmitterPlan
     readonly Dictionary<int, ulong> _newLineTriggers;
     readonly ulong _newLineWildcards;
     readonly bool?[] _initializerIndentations;
+    readonly bool[] _initializerLayouts;
 
     EmitterPlan(
         (TokenSpacingRule Rule, string Preference)[] spacing,
@@ -23,6 +24,7 @@ sealed class EmitterPlan
         ulong laterElementRules,
         RuleSettings settings,
         bool? indentBraces,
+        bool? indentSwitchExpression,
         bool? indentLambdaBlock,
         bool? indentBlockContents,
         bool? indentSwitchLabels,
@@ -33,6 +35,7 @@ sealed class EmitterPlan
         bool expandSingleLineBlocks,
         bool separateSingleLineStatements,
         bool?[] initializerIndentations,
+        bool[] initializerLayouts,
         EmbeddedStatementSettings embeddedStatements)
     {
         Spacing = spacing;
@@ -44,6 +47,7 @@ sealed class EmitterPlan
         MaximumLineLength = settings.MaximumLineLength;
         IndentUnit = settings.IndentUnit;
         IndentBraces = indentBraces;
+        IndentSwitchExpression = indentSwitchExpression;
         IndentLambdaBlock = indentLambdaBlock;
         IndentBlockContents = indentBlockContents;
         IndentSwitchLabels = indentSwitchLabels;
@@ -54,6 +58,7 @@ sealed class EmitterPlan
         ExpandSingleLineBlocks = expandSingleLineBlocks;
         SeparateSingleLineStatements = separateSingleLineStatements;
         _initializerIndentations = initializerIndentations;
+        _initializerLayouts = initializerLayouts;
         EmbeddedStatements = embeddedStatements;
     }
 
@@ -62,6 +67,7 @@ sealed class EmitterPlan
     internal int MaximumLineLength { get; }
     internal string IndentUnit { get; }
     internal bool? IndentBraces { get; }
+    internal bool? IndentSwitchExpression { get; }
     internal bool? IndentLambdaBlock { get; }
     internal bool? IndentBlockContents { get; }
     internal bool? IndentSwitchLabels { get; }
@@ -79,6 +85,7 @@ sealed class EmitterPlan
     internal ulong Trigger(int rawKind) => _triggers.GetValueOrDefault(rawKind);
     internal ulong NewLineTrigger(int rawKind) => _newLineWildcards | _newLineTriggers.GetValueOrDefault(rawKind);
     internal bool? InitializerIndentation(InitializerKind kind) => _initializerIndentations[(int)kind];
+    internal bool HasInitializerLayout(InitializerKind kind) => _initializerLayouts[(int)kind];
 
     internal bool? DesiredSpace(SyntaxToken left, SyntaxToken right)
     {
@@ -155,6 +162,19 @@ sealed class EmitterPlan
             initializerIndentations[(int)rule.Kind] = OptionalIndentation(configuration.Preferences.GetValueOrDefault(rule.Metadata.RuleKey));
         }
 
+        var initializerLayouts = new bool[Enum.GetValues<InitializerKind>().Length];
+        foreach (var rule in catalog.SyntaxWrappingRules)
+        {
+            if (!rule.IsInitializerLayout
+                || SyntaxWrappingRule.InitializerKindFor(rule.Kind) is not { } kind)
+            {
+                continue;
+            }
+
+            initializerLayouts[(int)kind] = configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
+                && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase);
+        }
+
         return new(
             [.. spacing],
             [.. newLines],
@@ -164,6 +184,7 @@ sealed class EmitterPlan
             laterElementRules,
             RuleSettings.From(configuration),
             OptionalBoolean(configuration, RuleKey.CSharpIndentBraces),
+            OptionalIndentation(configuration.Preferences.GetValueOrDefault(RuleKey.DressSwitchExpressionIndentation)),
             OptionalIndentation(configuration.Preferences.GetValueOrDefault(RuleKey.DressLambdaBlockIndentation)),
             OptionalBoolean(configuration, RuleKey.CSharpIndentBlockContents),
             OptionalBoolean(configuration, RuleKey.CSharpIndentSwitchLabels),
@@ -174,6 +195,7 @@ sealed class EmitterPlan
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == false,
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineStatements) == false,
             initializerIndentations,
+            initializerLayouts,
             EmbeddedStatementSettings.From(configuration));
     }
 

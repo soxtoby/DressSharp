@@ -94,4 +94,23 @@ public class RuleCatalogTests
         rules[RuleKey.DressUsingKindOrder].Metadata.Accepts("alias,ordinary,static").ShouldBe(true);
         rules[RuleKey.DressUsingKindOrder].Metadata.Accepts("ordinary,ordinary,static").ShouldBe(false);
     }
+
+    [Fact]
+    public void Initializer_layout_rules_expose_their_distinct_modes()
+    {
+        RuleKey[] keys =
+        [
+            RuleKey.DressObjectInitializerLayout,
+            RuleKey.DressCollectionInitializerLayout,
+            RuleKey.DressArrayInitializerLayout,
+            RuleKey.DressWithInitializerLayout
+        ];
+
+        var rules = RuleCatalog.BuiltIn.Rules.ToDictionary(rule => rule.Metadata.RuleKey);
+        keys.AllItemsSatisfy(key =>
+        {
+            rules[key].Metadata.AcceptedValueForms.ShouldMatch(["compact", "auto", "expanded"]);
+            rules[key].Metadata.DefaultValue.ShouldBe("auto");
+        });
+    }
 }

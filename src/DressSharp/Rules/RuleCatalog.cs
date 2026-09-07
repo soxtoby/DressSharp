@@ -131,7 +131,10 @@ sealed class RuleCatalog
         [
             new SyntaxWrappingRule(RuleKey.DressArgumentsLayout, "Arguments", "Lists", SyntaxWrappingKind.Arguments, "auto"),
             new SyntaxWrappingRule(RuleKey.DressParametersLayout, "Parameters", "Lists", SyntaxWrappingKind.Parameters, "auto"),
-            new SyntaxWrappingRule(RuleKey.DressInitializersLayout, "Initializers", "Lists", SyntaxWrappingKind.Initializers, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressObjectInitializerLayout, "Object initializer", "Initializers", SyntaxWrappingKind.ObjectInitializers, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressCollectionInitializerLayout, "Collection initializer", "Initializers", SyntaxWrappingKind.CollectionInitializers, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressArrayInitializerLayout, "Array initializer", "Initializers", SyntaxWrappingKind.ArrayInitializers, "auto"),
+            new SyntaxWrappingRule(RuleKey.DressWithInitializerLayout, "With initializer", "Initializers", SyntaxWrappingKind.WithInitializers, "auto"),
             new SyntaxWrappingRule(RuleKey.DressCollectionExpressionsLayout, "Collection expressions", "Lists", SyntaxWrappingKind.CollectionExpressions, "auto"),
             new SyntaxWrappingRule(RuleKey.DressBaseTypeListsLayout, "Base type lists", "Lists", SyntaxWrappingKind.BaseTypeLists, "auto"),
             new SyntaxWrappingRule(RuleKey.DressConstraintClausesLayout, "Constraint clauses", "Lists", SyntaxWrappingKind.ConstraintClauses, "auto"),
@@ -171,6 +174,7 @@ sealed class RuleCatalog
             .Concat(syntaxWrappingRules)
             .Concat(newLineRules)
             .Concat(indentationRules)
+            .Append(new SwitchExpressionIndentationRule())
             .Append(new LambdaBlockIndentationRule())
             .ToImmutableArray();
         IRule[] metadataOnlyRules =

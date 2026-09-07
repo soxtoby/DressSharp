@@ -44,12 +44,16 @@ sealed class SyntaxWrappingSettings
     internal readonly record struct Setting(WrappingMode Mode, int MaximumLineLength)
     {
         internal static Setting For(string preference, int maximumLineLength) => new(
-            preference.Equals("auto", StringComparison.OrdinalIgnoreCase)
-                ? WrappingMode.Auto
-                : preference.Equals("always_multi", StringComparison.OrdinalIgnoreCase)
-                    ? WrappingMode.Multi
-                    : WrappingMode.Single,
-            preference.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            preference.Equals("compact", StringComparison.OrdinalIgnoreCase)
+                ? WrappingMode.Compact
+                : preference.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                    ? WrappingMode.Auto
+                    : preference.Equals("always_multi", StringComparison.OrdinalIgnoreCase)
+                        || preference.Equals("expanded", StringComparison.OrdinalIgnoreCase)
+                        ? WrappingMode.Multi
+                        : WrappingMode.Single,
+            preference.Equals("compact", StringComparison.OrdinalIgnoreCase)
+            || preference.Equals("auto", StringComparison.OrdinalIgnoreCase)
                 ? maximumLineLength
                 : int.MaxValue);
     }
@@ -57,6 +61,7 @@ sealed class SyntaxWrappingSettings
     internal enum WrappingMode
     {
         Single,
+        Compact,
         Auto,
         Multi
     }

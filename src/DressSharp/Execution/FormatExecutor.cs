@@ -1,9 +1,9 @@
+using System.Diagnostics;
 using DressSharp.Architecture;
 using DressSharp.CommandLine;
 using DressSharp.Configuration;
 using DressSharp.IO;
 using DressSharp.Parsing;
-using System.Diagnostics;
 
 namespace DressSharp.Execution;
 

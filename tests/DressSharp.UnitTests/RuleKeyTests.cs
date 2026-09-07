@@ -21,6 +21,11 @@ public sealed class RuleKeyTests
     [InlineData(RuleKey.CSharpNewLineBeforeMembersInObjectInitializers, "csharp_new_line_before_members_in_object_initializers")]
     [InlineData(RuleKey.DotnetSortSystemDirectivesFirst, "dotnet_sort_system_directives_first")]
     [InlineData(RuleKey.DressMaxConsecutiveBlankLines, "dress_max_consecutive_blank_lines")]
+    [InlineData(RuleKey.DressObjectInitializerLayout, "dress_object_initializer_layout")]
+    [InlineData(RuleKey.DressCollectionInitializerLayout, "dress_collection_initializer_layout")]
+    [InlineData(RuleKey.DressArrayInitializerLayout, "dress_array_initializer_layout")]
+    [InlineData(RuleKey.DressWithInitializerLayout, "dress_with_initializer_layout")]
+    [InlineData(RuleKey.DressSwitchExpressionIndentation, "dress_switch_expression_indentation")]
     [InlineData(RuleKey.InsertFinalNewline, "insert_final_newline")]
     internal void Names_convert_to_the_expected_editorconfig_spelling(RuleKey key, string expected) =>
         key.ToName().ShouldBe(expected);

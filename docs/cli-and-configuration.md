@@ -40,6 +40,35 @@ Known invalid effective values and malformed EditorConfig fail preflight before 
 
 `dotnet dress init` writes every supported key with its Default value. The versioned rule catalog is the authoritative source for supported values and interactive documentation.
 
+### Initializer layout
+
+Object, collection, array, and `with` initializers have independent layout preferences:
+
+```editorconfig
+dress_object_initializer_layout = auto
+dress_collection_initializer_layout = auto
+dress_array_initializer_layout = auto
+dress_with_initializer_layout = auto
+```
+
+Each accepts `compact`, `auto` (Default), or `expanded`. `compact` uses one line when the result does not exceed `max_line_length`, otherwise it expands. `auto` keeps a fitting single-line initializer on one line and normalizes any multiline or oversized initializer to expanded form. `expanded` always puts the opening brace, every item, and the closing brace on separate lines. Empty initializers have no items but follow the configured brace layout.
+
+These preferences own the complete layout of their initializer kind. When configured, they override `csharp_new_line_before_open_brace` and `csharp_new_line_before_members_in_object_initializers` at the same boundaries. The corresponding `dress_*_initializer_indentation` preference controls indentation after a multiline layout is selected. Missing or `unset` leaves the standard newline preferences in control.
+
+### Switch expression indentation
+
+Use `dress_switch_expression_indentation = indented` (Default) to place multiline switch expression braces one indentation level below the line containing `switch`:
+
+```csharp
+var result = value switch
+    {
+        true => 1,
+        false => 0
+    };
+```
+
+`not_indented` aligns the braces with the line containing `switch`. Both values override `csharp_indent_braces` for switch expressions; `csharp_indent_block_contents` controls the arms. Missing or `unset` leaves existing indentation rules in control. This preference does not introduce line breaks or change switch statements.
+
 ### Lambda block indentation
 
 Use `dress_lambda_block_indentation = indented` to place multiline lambda braces one indentation level below the lambda's starting line:

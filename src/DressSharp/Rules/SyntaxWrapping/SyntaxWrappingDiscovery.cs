@@ -76,11 +76,13 @@ sealed class SyntaxWrappingDiscovery
                 DiscoverOpenBracket(token);
                 break;
             case SyntaxKind.OpenBraceToken:
-                if (Enabled(SyntaxWrappingKind.Initializers) is not null
-                    && token.Parent is InitializerExpressionSyntax { Expressions.Count: > 0 } initializer
-                    && token == initializer.OpenBraceToken)
+                if (token.Parent is InitializerExpressionSyntax initializer
+                    && token == initializer.OpenBraceToken
+                    && InitializerIndentationRule.KindOf(initializer) is { } initializerKind
+                    && SyntaxWrappingRule.KindFor(initializerKind) is { } wrappingKind
+                    && Enabled(wrappingKind) is not null)
                 {
-                    AddOccurrence(initializer, SyntaxWrappingKind.Initializers);
+                    AddOccurrence(initializer, wrappingKind);
                 }
 
                 break;
@@ -262,6 +264,7 @@ sealed class SyntaxWrappingDiscovery
                 Delimited(list.Parameters, list.CloseBracketToken);
                 break;
             case InitializerExpressionSyntax initializer:
+                AddBoundary(initializer.OpenBraceToken, GapStyle.InitializerOpen);
                 Delimited(initializer.Expressions, initializer.CloseBraceToken, spacesInside: true);
                 break;
             case CollectionExpressionSyntax collection:
@@ -313,6 +316,7 @@ sealed class SyntaxWrappingDiscovery
 
         _occurrences.Add(new(
             node,
+            kind,
             setting,
             start,
             _boundaries.Count - start,

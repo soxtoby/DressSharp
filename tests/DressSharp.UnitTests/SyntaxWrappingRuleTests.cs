@@ -28,16 +28,6 @@ public class SyntaxWrappingRuleTests
         ) {} }
         """)]
     [InlineData(
-        "dress_initializers_layout",
-        "class C { object M() => new C { A = 1, B = 2 }; int A; int B; }",
-        "class C { object M() => new C { A = 1, B = 2 }; int A; int B; }",
-        """
-        class C { object M() => new C {
-            A = 1,
-            B = 2
-            }; int A; int B; }
-        """)]
-    [InlineData(
         "dress_collection_expressions_layout",
         "class C { int[] M() => [alpha, beta]; int alpha; int beta; }",
         "class C { int[] M() => [alpha, beta]; int alpha; int beta; }",
@@ -207,7 +197,7 @@ public class SyntaxWrappingRuleTests
     }
 
     [Fact]
-    public void Initializer_auto_expands_when_another_rule_makes_the_construction_multiline()
+    public void Initializer_layout_overrides_the_standard_open_brace_rule()
     {
         const string source = """
             class C
@@ -218,19 +208,14 @@ public class SyntaxWrappingRuleTests
 
         Format(
                 source,
-                ("dress_initializers_layout", "auto"),
+                ("dress_collection_initializer_layout", "compact"),
                 ("max_line_length", "500"),
                 ("csharp_new_line_before_open_brace", "object_collection_array_initializers"),
                 ("csharp_indent_block_contents", "true"),
                 ("dress_collection_initializer_indentation", "indented"))
             .ShouldBe("""
                 class C {
-                    static readonly HashSet<string> Values = new(StringComparer.OrdinalIgnoreCase)
-                        {
-                            ".git",
-                            ".hg",
-                            ".svn"
-                        };
+                    static readonly HashSet<string> Values = new(StringComparer.OrdinalIgnoreCase) { ".git", ".hg", ".svn" };
                 }
                 """);
     }
@@ -383,7 +368,7 @@ public class SyntaxWrappingRuleTests
     {
         var preferences = new[]
         {
-            ("dress_arguments_layout", "auto"), ("dress_initializers_layout", "auto"), ("max_line_length", "20")
+            ("dress_arguments_layout", "auto"), ("dress_array_initializer_layout", "auto"), ("max_line_length", "20")
         };
 
         var result = Format("""
@@ -970,20 +955,17 @@ public class SyntaxWrappingRuleTests
     }
 
     [Fact]
-    public void Later_initializer_member_new_line_rule_overrides_syntax_wrapping()
+    public void Initializer_layout_overrides_later_member_new_line_rule()
     {
         var result = Format(
             "class C { C M() => new C { X = 1, Y = 2 }; int X; int Y; }",
-            ("dress_initializers_layout", "always_single"),
+            ("dress_object_initializer_layout", "compact"),
             ("csharp_new_line_before_members_in_object_initializers", "true"));
 
-        result.ShouldBe("""
-            class C { C M() => new C { X = 1,
-            Y = 2 }; int X; int Y; }
-            """);
+        result.ShouldBe("class C { C M() => new C { X = 1, Y = 2 }; int X; int Y; }");
         Format(
             result,
-            ("dress_initializers_layout", "always_single"),
+            ("dress_object_initializer_layout", "compact"),
             ("csharp_new_line_before_members_in_object_initializers", "true")).ShouldBe(result);
     }
 
@@ -1031,14 +1013,14 @@ public class SyntaxWrappingRuleTests
             }
             """,
             ("dress_object_initializer_indentation", indentation),
-            ("dress_initializers_layout", "always_multi"),
+            ("dress_object_initializer_layout", "expanded"),
             ("csharp_indent_block_contents", "true"));
 
         result.ShouldBe(expected);
         Format(
             result,
             ("dress_object_initializer_indentation", indentation),
-            ("dress_initializers_layout", "always_multi"),
+            ("dress_object_initializer_layout", "expanded"),
             ("csharp_indent_block_contents", "true")).ShouldBe(result);
     }
 
@@ -1133,7 +1115,10 @@ public class SyntaxWrappingRuleTests
         [
             "dress_arguments_layout",
             "dress_parameters_layout",
-            "dress_initializers_layout",
+            "dress_object_initializer_layout",
+            "dress_collection_initializer_layout",
+            "dress_array_initializer_layout",
+            "dress_with_initializer_layout",
             "dress_collection_expressions_layout",
             "dress_base_type_lists_layout",
             "dress_constraint_clauses_layout",
