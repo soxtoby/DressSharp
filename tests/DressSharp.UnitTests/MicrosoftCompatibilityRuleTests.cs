@@ -154,14 +154,18 @@ public class MicrosoftCompatibilityRuleTests
     [InlineData("csharp_new_line_before_members_in_object_initializers",
         "class C { object M() => new C { P = 1, Q = 2 }; int P; int Q; }",
         """
-        class C { object M() => new C { P = 1,
-        Q = 2 }; int P; int Q; }
+        class C { object M() => new C {
+        P = 1,
+        Q = 2
+        }; int P; int Q; }
         """)]
     [InlineData("csharp_new_line_before_members_in_anonymous_types",
         "class C { object M() => new { P = 1, Q = 2 }; }",
         """
-        class C { object M() => new { P = 1,
-        Q = 2 }; }
+        class C { object M() => new {
+        P = 1,
+        Q = 2
+        }; }
         """)]
     [InlineData("csharp_new_line_between_query_expression_clauses",
         "class C { object M(int[] xs) => from x in xs where x > 0 select x; }",

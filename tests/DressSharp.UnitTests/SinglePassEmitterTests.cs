@@ -143,8 +143,10 @@ public class SinglePassEmitterTests
             ("csharp_new_line_before_members_in_object_initializers", "true"),
             "class C { int P; int Q; object M() => new C { P = 1, Q = 2 }; }",
             """
-            class C { int P; int Q; object M() => new C { P = 1,
-            Q = 2 }; }
+            class C { int P; int Q; object M() => new C {
+            P = 1,
+            Q = 2
+            }; }
             """);
     }
 
@@ -155,9 +157,34 @@ public class SinglePassEmitterTests
             ("csharp_new_line_before_members_in_anonymous_types", "true"),
             "class C { object M() => new { P = 1, Q = 2 }; }",
             """
-            class C { object M() => new { P = 1,
-            Q = 2 }; }
+            class C { object M() => new {
+            P = 1,
+            Q = 2
+            }; }
             """);
+    }
+
+    [Fact]
+    public void Anonymous_type_member_newlines_include_first_member_and_closing_brace()
+    {
+        Format(
+                """
+                static async Task WriteError(HttpListenerResponse response, int status, string code, string message) =>
+                    await WriteJson(response, status, new { code, message });
+                """,
+                ("csharp_new_line_before_open_brace", "anonymous_types"),
+                ("csharp_new_line_before_members_in_anonymous_types", "true"),
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "false"),
+                ("dress_object_initializer_indentation", "indented"))
+            .ShouldBe("""
+                static async Task WriteError(HttpListenerResponse response, int status, string code, string message) =>
+                    await WriteJson(response, status, new
+                        {
+                            code,
+                            message
+                        });
+                """);
     }
 
     [Fact]

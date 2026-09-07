@@ -37,7 +37,7 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
     };
 
     internal NewLineKind Kind => kind;
-    internal bool RequiresLaterElement => kind is NewLineKind.ObjectInitializerMembers or NewLineKind.AnonymousTypeMembers;
+    internal bool RequiresInitializerMemberBoundary => kind is NewLineKind.ObjectInitializerMembers or NewLineKind.AnonymousTypeMembers;
     internal ImmutableArray<SyntaxKind> EmitterTriggerKinds { get; } = kind switch
         {
             NewLineKind.OpenBrace => [SyntaxKind.OpenBraceToken],
@@ -60,7 +60,7 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
     internal bool? ClaimsBreakBefore(
         SyntaxToken token,
         BraceCategories categories,
-        SyntaxNode? laterElement) => kind switch
+        SyntaxNode? initializerAtMemberBoundary) => kind switch
         {
             NewLineKind.OpenBrace => token.IsKind(SyntaxKind.OpenBraceToken) && BraceCategory(token) is { } category
                 ? categories.Contains(category)
@@ -68,32 +68,44 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
             NewLineKind.Else => token.IsKind(SyntaxKind.ElseKeyword) ? categories.Enabled : null,
             NewLineKind.Catch => token.IsKind(SyntaxKind.CatchKeyword) ? categories.Enabled : null,
             NewLineKind.Finally => token.IsKind(SyntaxKind.FinallyKeyword) ? categories.Enabled : null,
-            NewLineKind.ObjectInitializerMembers => laterElement is InitializerExpressionSyntax initializer
+            NewLineKind.ObjectInitializerMembers => initializerAtMemberBoundary is InitializerExpressionSyntax initializer
                 && initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
                     ? categories.Enabled
                     : null,
-            NewLineKind.AnonymousTypeMembers => laterElement is AnonymousObjectCreationExpressionSyntax
+            NewLineKind.AnonymousTypeMembers => initializerAtMemberBoundary is AnonymousObjectCreationExpressionSyntax
                 ? categories.Enabled
                 : null,
             NewLineKind.QueryClauses => StartsQueryClause(token) ? categories.Enabled : null,
             _ => null
         };
 
-    internal static SyntaxNode? StartsLaterElement(SyntaxToken token)
+    internal static SyntaxNode? InitializerAtMemberBoundary(SyntaxToken token)
     {
+        if (token.Parent is InitializerExpressionSyntax { Expressions.Count: > 0 } initializer
+            && token == initializer.CloseBraceToken)
+        {
+            return initializer;
+        }
+
+        if (token.Parent is AnonymousObjectCreationExpressionSyntax { Initializers.Count: > 0 } anonymous
+            && token == anonymous.CloseBraceToken)
+        {
+            return anonymous;
+        }
+
         for (var node = token.Parent; node is not null; node = node.Parent)
         {
             if (node.SpanStart != token.SpanStart)
                 return null;
             var owner = node.Parent;
             var elements = owner switch
-                {
-                    InitializerExpressionSyntax initializer => (IReadOnlyList<SyntaxNode>)initializer.Expressions,
-                    AnonymousObjectCreationExpressionSyntax anonymous => anonymous.Initializers,
-                    _ => null
-                };
+            {
+                InitializerExpressionSyntax candidate => (IReadOnlyList<SyntaxNode>)candidate.Expressions,
+                AnonymousObjectCreationExpressionSyntax candidate => candidate.Initializers,
+                _ => null
+            };
             if (elements is not null)
-                return elements.Count > 0 && !ReferenceEquals(elements[0], node) ? owner : null;
+                return elements.Contains(node) ? owner : null;
         }
 
         return null;

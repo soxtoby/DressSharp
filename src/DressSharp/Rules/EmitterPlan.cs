@@ -21,7 +21,7 @@ sealed class EmitterPlan
         Dictionary<int, ulong> triggers,
         Dictionary<int, ulong> newLineTriggers,
         ulong newLineWildcards,
-        ulong laterElementRules,
+        ulong initializerMemberBoundaryRules,
         RuleSettings settings,
         bool? indentBraces,
         bool? indentSwitchExpression,
@@ -43,7 +43,7 @@ sealed class EmitterPlan
         _triggers = triggers;
         _newLineTriggers = newLineTriggers;
         _newLineWildcards = newLineWildcards;
-        LaterElementRules = laterElementRules;
+        InitializerMemberBoundaryRules = initializerMemberBoundaryRules;
         MaximumLineLength = settings.MaximumLineLength;
         IndentUnit = settings.IndentUnit;
         IndentBraces = indentBraces;
@@ -78,7 +78,7 @@ sealed class EmitterPlan
     internal bool ExpandSingleLineBlocks { get; }
     internal bool SeparateSingleLineStatements { get; }
     internal EmbeddedStatementSettings EmbeddedStatements { get; }
-    internal ulong LaterElementRules { get; }
+    internal ulong InitializerMemberBoundaryRules { get; }
     /// <summary>
     /// The bit set of spacing rules that could claim a pair containing a token of this kind.
     /// </summary>
@@ -141,14 +141,14 @@ sealed class EmitterPlan
 
         var newLineTriggers = new Dictionary<int, ulong>();
         var newLineWildcards = 0UL;
-        var laterElementRules = 0UL;
+        var initializerMemberBoundaryRules = 0UL;
         for (var index = 0; index < newLines.Count; index++)
         {
             var bit = 1UL << index;
-            if (newLines[index].Item1.RequiresLaterElement)
+            if (newLines[index].Item1.RequiresInitializerMemberBoundary)
             {
                 newLineWildcards |= bit;
-                laterElementRules |= bit;
+                initializerMemberBoundaryRules |= bit;
                 continue;
             }
 
@@ -181,7 +181,7 @@ sealed class EmitterPlan
             triggers,
             newLineTriggers,
             newLineWildcards,
-            laterElementRules,
+            initializerMemberBoundaryRules,
             RuleSettings.From(configuration),
             OptionalBoolean(configuration, RuleKey.CSharpIndentBraces),
             OptionalIndentation(configuration.Preferences.GetValueOrDefault(RuleKey.DressSwitchExpressionIndentation)),

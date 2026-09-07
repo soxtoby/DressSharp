@@ -383,11 +383,11 @@ sealed class SinglePassEmitter
         var candidates = _plan.NewLineTrigger(token.RawKind);
         if (candidates == 0 || _checkMalformedRegions && IsUnsafeOriginal(token))
             return null;
-        var laterElement = (candidates & _plan.LaterElementRules) != 0
-            ? NewLineRule.StartsLaterElement(token)
+        var initializerAtMemberBoundary = (candidates & _plan.InitializerMemberBoundaryRules) != 0
+            ? NewLineRule.InitializerAtMemberBoundary(token)
             : null;
         var initializer = token.Parent as InitializerExpressionSyntax
-            ?? laterElement as InitializerExpressionSyntax;
+            ?? initializerAtMemberBoundary as InitializerExpressionSyntax;
         if (initializer is not null
             && InitializerIndentationRule.KindOf(initializer) is { } initializerKind
             && _plan.HasInitializerLayout(initializerKind))
@@ -399,7 +399,7 @@ sealed class SinglePassEmitter
         for (var index = 0; index < rules.Length; index++)
         {
             if ((candidates & (1UL << index)) != 0
-                && rules[index].Rule.ClaimsBreakBefore(token, rules[index].Categories, laterElement) is { } claim)
+                && rules[index].Rule.ClaimsBreakBefore(token, rules[index].Categories, initializerAtMemberBoundary) is { } claim)
                 return claim;
         }
 
