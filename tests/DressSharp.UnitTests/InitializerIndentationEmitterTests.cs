@@ -6,6 +6,48 @@ namespace DressSharp.UnitTests;
 
 public sealed class InitializerIndentationEmitterTests
 {
+    [Theory]
+    [InlineData("Process(\n", ");")]
+    [InlineData("Process(values:\n", ");")]
+    [InlineData("new Container(\n", ");")]
+    [InlineData("Process((\n", "));")]
+    [InlineData("Process((string[])\n", ");")]
+    public void Collection_expression_arguments_have_independent_indentation(string prefix, string suffix)
+    {
+        var source = "class C\n{\nvoid M()\n{\n" + prefix + "[\n\"first\"\n]" + suffix + "\n}\n}";
+        var expected = "class C\n{\nvoid M()\n{\n" + prefix + "    [\n\"first\"\n    ]" + suffix + "\n}\n}";
+
+        Format(source, ("dress_collection_expression_indentation", "indented")).ShouldBe(source);
+        var result = Format(source,
+            ("dress_collection_expression_indentation", "not_indented"),
+            ("dress_collection_expression_argument_indentation", "indented"));
+        result.ShouldBe(expected);
+        Format(result, ("dress_collection_expression_argument_indentation", "indented")).ShouldBe(result);
+        Format(result, ("dress_collection_expression_argument_indentation", "not_indented")).ShouldBe(source);
+        Format(source, ("dress_collection_expression_argument_indentation", "unset")).ShouldBe(source);
+    }
+
+    [Theory]
+    [InlineData("static readonly string[] PropertyNames =")]
+    [InlineData("string[] Values { get; } =")]
+    [InlineData("string[] M() =>")]
+    [InlineData("void M() { string[] values =", "; }")]
+    [InlineData("void M() { Values =", "; }")]
+    [InlineData("string[] M() { return", "; }")]
+    [InlineData("void M() { Process(() =>", "); }")]
+    public void Collection_expressions_outside_arguments_have_independent_indentation(string prefix, string suffix = ";")
+    {
+        var source = "class C\n{\n" + prefix + "\n[\n\"first\"\n]" + suffix + "\n}";
+        var expected = source.Replace("\n[", "\n    [").Replace("\n]", "\n    ]");
+
+        Format(source, ("dress_collection_expression_argument_indentation", "indented")).ShouldBe(source);
+        var result = Format(source,
+            ("dress_collection_expression_indentation", "indented"),
+            ("dress_collection_expression_argument_indentation", "not_indented"));
+        result.ShouldBe(expected);
+        Format(result, ("dress_collection_expression_indentation", "indented")).ShouldBe(result);
+    }
+
     [Fact]
     public void Nested_initializer_uses_the_indent_from_a_planned_parent_line()
     {
@@ -16,7 +58,7 @@ public sealed class InitializerIndentationEmitterTests
                 }
                 """,
                 ("dress_arguments_layout", "always_multi"),
-                ("dress_collection_expression_indentation", "not_indented"),
+                ("dress_collection_expression_argument_indentation", "not_indented"),
                 ("csharp_indent_block_contents", "true"))
             .ShouldBe("""
                 class C
@@ -330,6 +372,7 @@ public sealed class InitializerIndentationEmitterTests
     [InlineData("dress_array_initializer_indentation")]
     [InlineData("dress_with_initializer_indentation")]
     [InlineData("dress_collection_expression_indentation")]
+    [InlineData("dress_collection_expression_argument_indentation")]
     public void Missing_unset_empty_and_single_line_preferences_add_no_opinion(string key)
     {
         var baseline = Format("""

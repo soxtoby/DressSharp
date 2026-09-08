@@ -87,6 +87,19 @@ var result =
 
 Operator position alone moves existing operator breaks without introducing new ones. Commented operator boundaries are preserved. Missing or `unset` style/position preferences leave the existing layout behavior in control.
 
+### Collection expression indentation
+
+Collection expressions (`[...]`) have separate indentation preferences for arguments and other contexts:
+
+```editorconfig
+dress_collection_expression_indentation = indented
+dress_collection_expression_argument_indentation = not_indented
+```
+
+These are the Defaults. Both accept `indented` and `not_indented`. The first applies outside arguments, including field/property initializers, variable declarations, assignments, and returns. The second applies when the collection expression is an argument to a call, constructor, or indexer, including named arguments and expressions wrapped in parentheses or casts. A collection returned by a lambda inside an argument uses the first rule.
+
+The argument preference controls the extra collection indentation relative to its surrounding argument indentation. Neither preference introduces line breaks; `csharp_indent_block_contents` controls element indentation. Missing or `unset` adds no indentation opinion. Previously, `dress_collection_expression_indentation` also applied to arguments; configure both keys to preserve that behavior.
+
 ### Switch expression indentation
 
 Use `dress_switch_expression_indentation = indented` (Default) to place multiline switch expression braces one indentation level below the line containing `switch`:

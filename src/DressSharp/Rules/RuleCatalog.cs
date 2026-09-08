@@ -124,8 +124,10 @@ sealed class RuleCatalog
                 InitializerKind.Collection, "indented"),
             new InitializerIndentationRule(RuleKey.DressArrayInitializerIndentation, "Array initializer", "Initializers and collections", InitializerKind.Array, "indented"),
             new InitializerIndentationRule(RuleKey.DressWithInitializerIndentation, "With initializer", "Initializers and collections", InitializerKind.With, "indented"),
-            new InitializerIndentationRule(RuleKey.DressCollectionExpressionIndentation, "Collection expression", "Initializers and collections",
-                InitializerKind.CollectionExpression, "not_indented")
+            new InitializerIndentationRule(RuleKey.DressCollectionExpressionIndentation, "Collection expression outside arguments", "Initializers and collections",
+                InitializerKind.CollectionExpression, "indented"),
+            new InitializerIndentationRule(RuleKey.DressCollectionExpressionArgumentIndentation, "Collection expression argument", "Initializers and collections",
+                InitializerKind.CollectionExpressionArgument, "not_indented")
         ];
         SyntaxWrappingRule[] syntaxWrappingRules =
         [

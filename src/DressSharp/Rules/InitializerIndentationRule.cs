@@ -14,10 +14,37 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
         ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
         GroupName = "Indentation",
         SubgroupName = subgroupName,
-        Description = "Controls multiline non-empty initializer delimiters. Only delimiter indentation changes.",
+        Description = kind switch
+        {
+            InitializerKind.CollectionExpression => "Controls multiline non-empty collection expression delimiters outside arguments, including assignments and returns.",
+            InitializerKind.CollectionExpressionArgument => "Controls multiline non-empty collection expression delimiters when the expression is an argument, including named arguments.",
+            _ => "Controls multiline non-empty initializer delimiters. Only delimiter indentation changes."
+        },
         Values = RuleValues.From(["indented", "not_indented"]),
         DefaultValue = defaultValue,
-        Example = """
+        Example = kind switch
+        {
+            InitializerKind.CollectionExpression => """
+                class Example
+                {
+                    string[] Values =
+                    [
+                        "first",
+                        "second"
+                    ];
+                }
+                """,
+            InitializerKind.CollectionExpressionArgument => """
+                class Example
+                {
+                    void M() => Process(
+                    [
+                        "first",
+                        "second"
+                    ]);
+                }
+                """,
+            _ => """
         class Example
         {
             object Value = new Example
@@ -26,7 +53,8 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
             };
             int Number { get; set; }
         }
-        """,
+        """
+        },
         OwnedSyntax = "multiline non-empty initializer delimiters",
         Invariant = "Only delimiter indentation changes"
     };
@@ -53,7 +81,7 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
         if (token.Parent is CollectionExpressionSyntax { Elements.Count: > 0 } collection
             && (token == collection.OpenBracketToken || token == collection.CloseBracketToken))
         {
-            return new(collection, InitializerKind.CollectionExpression, token == collection.OpenBracketToken);
+            return new(collection, CollectionKind(collection), token == collection.OpenBracketToken);
         }
 
         return null;
@@ -72,9 +100,19 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
     {
         AnonymousObjectCreationExpressionSyntax => InitializerKind.Object,
         InitializerExpressionSyntax expression => KindOf(expression),
-        CollectionExpressionSyntax => InitializerKind.CollectionExpression,
+        CollectionExpressionSyntax collection => CollectionKind(collection),
         _ => null
     };
+
+    static InitializerKind CollectionKind(CollectionExpressionSyntax collection)
+    {
+        SyntaxNode expression = collection;
+        while (expression.Parent is ParenthesizedExpressionSyntax or CastExpressionSyntax)
+            expression = expression.Parent;
+        return expression.Parent is ArgumentSyntax
+            ? InitializerKind.CollectionExpressionArgument
+            : InitializerKind.CollectionExpression;
+    }
 
     internal readonly record struct Delimiter(SyntaxNode Initializer, InitializerKind Kind, bool IsOpening);
 }
@@ -85,5 +123,6 @@ enum InitializerKind
     Collection,
     Array,
     With,
-    CollectionExpression
+    CollectionExpression,
+    CollectionExpressionArgument
 }
