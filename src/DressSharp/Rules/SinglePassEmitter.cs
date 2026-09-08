@@ -545,11 +545,23 @@ sealed class SinglePassEmitter
         return lambdaIndent + (indented ? _plan.IndentUnit : "");
     }
 
-    string BraceBaseIndent(SyntaxToken token) =>
-        token.Parent is BlockSyntax { Parent: AnonymousFunctionExpressionSyntax function }
-        && _emittedContentIndents.TryGetValue(function, out var functionIndent)
-            ? functionIndent
-            : _contentIndents[^1];
+    string BraceBaseIndent(SyntaxToken token)
+    {
+        if (token.Parent is BlockSyntax { Parent: AnonymousFunctionExpressionSyntax function }
+            && _emittedContentIndents.TryGetValue(function, out var functionIndent))
+            return functionIndent;
+
+        if (_plan.IndentBlockContents is null)
+        {
+            var owner = token.Parent is BlockSyntax or AccessorListSyntax ? token.Parent.Parent : token.Parent;
+            if (owner is not null && _emittedContentIndents.TryGetValue(owner, out var ownerIndent))
+                return ownerIndent;
+            if (owner is not null && _sourceIndents.TryGetValue(owner.GetFirstToken(), out var sourceIndent))
+                return sourceIndent;
+        }
+
+        return _contentIndents[^1];
+    }
 
     string SwitchLabelIndent()
     {
@@ -935,7 +947,10 @@ sealed class SinglePassEmitter
                     : _lineIndent);
             _braceIndents.Push(braceIndent);
             _contentIndents.Add(_plan.IndentBlockContents is { } indentBlockContents
-                ? braceIndent + (indentBlockContents ? _plan.IndentUnit : "")
+                ? braceIndent + (indentBlockContents
+                    || token.Parent is BaseNamespaceDeclarationSyntax or BaseTypeDeclarationSyntax or AccessorListSyntax
+                        ? _plan.IndentUnit
+                        : "")
                 : braceIndent);
         }
         else if (token.IsKind(SyntaxKind.CloseBraceToken) && _contentIndents.Count > 1)

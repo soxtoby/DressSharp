@@ -217,10 +217,10 @@ public class MicrosoftCompatibilityRuleTests
         """
         class C
         {
-        void M()
-        {
-        int x;
-        }
+            void M()
+            {
+            int x;
+            }
         }
         """)]
     [InlineData("csharp_indent_braces",
@@ -237,8 +237,8 @@ public class MicrosoftCompatibilityRuleTests
         class C
             {
         void M()
-                {
-                }
+            {
+            }
             }
         """)]
     [InlineData("csharp_indent_braces",

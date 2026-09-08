@@ -9,6 +9,80 @@ namespace DressSharp.UnitTests;
 public class IndentationEmitterTests
 {
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Disabling_block_indentation_still_indents_declarations_like_dotnet_format(string lineEnding)
+    {
+        var source = """
+            namespace N {
+            class C {
+            void M() {
+            if (true) {
+            Console.WriteLine("a");
+            }
+            }
+            int P {
+            get {
+            return 1;
+            }
+            }
+            }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var expected = """
+            namespace N {
+                class C {
+                    void M() {
+                    if (true) {
+                    Console.WriteLine("a");
+                    }
+                    }
+                    int P {
+                        get {
+                        return 1;
+                        }
+                    }
+                }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = new[] { ("csharp_indent_block_contents", "false"), ("csharp_indent_braces", "false") };
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("unset", "if (true) {\n    if (true) {\nConsole.WriteLine(\"a\");\nConsole.WriteLine(\"b\");\n    }\n}")]
+    [InlineData("true", "if (true) {\n    if (true) {\n        Console.WriteLine(\"a\");\n        Console.WriteLine(\"b\");\n    }\n}")]
+    [InlineData("false", "if (true) {\nif (true) {\nConsole.WriteLine(\"a\");\nConsole.WriteLine(\"b\");\n}\n}")]
+    public void Nested_same_line_blocks_follow_the_selected_content_indentation(string value, string expected)
+    {
+        const string source = "if (true) {\n    if (true) {\nConsole.WriteLine(\"a\");\nConsole.WriteLine(\"b\");\n    }\n}";
+        var preferences = new[] { ("csharp_indent_block_contents", value), ("csharp_indent_braces", "false") };
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("unset", false)]
+    [InlineData(null, false)]
+    [InlineData("unset", true)]
+    [InlineData(null, true)]
+    public void Brace_alignment_preserves_existing_member_indentation_without_a_content_preference(string? value, bool indentBraces)
+    {
+        const string source = "class C\n{\n    void M()\n    {\n        Work();\n    }\n}";
+        var preferences = new List<(string, string)> { ("csharp_indent_braces", indentBraces ? "true" : "false") };
+        if (value is not null)
+            preferences.Add(("csharp_indent_block_contents", value));
+        var result = Format(source, preferences.ToArray());
+        result.ShouldBe(indentBraces
+            ? "class C\n    {\n    void M()\n        {\n        Work();\n        }\n    }"
+            : source);
+        Format(result, preferences.ToArray()).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Else_if_body_has_the_same_indent_as_the_if_body(bool useDefaults)

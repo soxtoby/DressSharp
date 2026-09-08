@@ -318,8 +318,8 @@ async function stopServer() {
 }
 
 function originText(preference: PreferenceSnapshot) {
-    const local = preference.local.kind === "absent" ? "No local assignment" : `Local: ${preference.local.value ?? "unset"}`;
-    const effective = preference.effectiveValue === null ? "Effective: unset" : `Effective: ${preference.effectiveValue} from ${preference.effectiveSourcePath ?? "EditorConfig"}`;
+    const local = preference.local.kind === "absent" ? "No saved local assignment" : `Saved local: ${preference.local.value ?? "unset"}`;
+    const effective = preference.effectiveValue === null ? "Saved effective: unset" : `Saved effective: ${preference.effectiveValue} from ${preference.effectiveSourcePath ?? "EditorConfig"}`;
     return `${local}. ${effective}.`;
 }
 

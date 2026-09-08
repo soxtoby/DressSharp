@@ -23,6 +23,10 @@ namespace Example
 type PreviewResult = {text: string; encoding: string; lineEndings: string; finalNewline: boolean; skippedOccurrences: number; languageVersion: string};
 
 class PreviewDiff extends FileDiff {
+    override setEditorActiveLine(lineNumber: number | null, options?: Parameters<FileDiff["setEditorActiveLine"]>[1]) {
+        super.setEditorActiveLine(lineNumber, {...options, lineNumberOnly: true});
+    }
+
     refresh(source: string, output: string, host: HTMLElement) {
         // Pierre edits additions. Reverse the comparison and visually place source left.
         const oldFile: FileContents = {name: "Preview.cs", lang: "csharp", contents: output};
@@ -94,6 +98,7 @@ export class Preview {
     readonly selectionAction = document.createElement("button");
     readonly selectionSummary = document.createElement("span");
     private selection: LineSelection | undefined;
+    private selectionRulesPinned = false;
     private analysisController: AbortController | undefined;
     private readonly onSelectionRules: (keys: Set<string> | null, label: string) => void;
 
@@ -230,10 +235,6 @@ export class Preview {
             this.markerFrame = 0;
             this.updateHorizontalScroll();
             this.updateMarkers();
-            const side = this.selection?.side === "output" ? "deletions" : "additions";
-            this.diff.setSelectedLines(this.selection
-                ? {start: this.selection.start + 1, end: Math.max(this.selection.start + 1, this.selection.end), side}
-                : null, {notify: false, lineNumberOnly: true, activeLineSide: side});
         });
     }
 
@@ -257,7 +258,10 @@ export class Preview {
         this.selection = undefined;
         this.selectionAction.disabled = true;
         this.queueMarkers();
-        this.onSelectionRules(null, "");
+        if (this.selectionRulesPinned) {
+            this.selectionRulesPinned = false;
+            this.onSelectionRules(null, "");
+        }
     }
 
     private captureSelection() {
@@ -272,18 +276,19 @@ export class Preview {
         const last = lineOf(range?.endContainer);
         let selection: LineSelection | undefined;
         if (first?.closest("[data-deletions]") && last?.closest("[data-deletions]")) {
-            selection = {start: Number(first.dataset["line"]) - 1, end: Number(last.dataset["line"]), side: "output"};
+            if (range && (range.startContainer !== range.endContainer || range.startOffset !== range.endOffset))
+                selection = {start: Number(first.dataset["line"]) - 1, end: Number(last.dataset["line"]), side: "output"};
         } else if (first?.closest("[data-deletions]") || last?.closest("[data-deletions]")) {
             return;
         } else {
             const current = this.editor.getState().selections?.at(-1);
-            if (current) selection = {start: current.start.line,
+            if (current && (current.start.line !== current.end.line || current.start.character !== current.end.character)) selection = {start: current.start.line,
                 end: current.end.line + (current.end.character === 0 && current.end.line > current.start.line ? 0 : 1), side: "source"};
         }
-        if (!selection || JSON.stringify(selection) === JSON.stringify(this.selection)) return;
+        if (JSON.stringify(selection) === JSON.stringify(this.selection)) return;
         this.clearSelectionRules();
         this.selection = selection;
-        this.selectionAction.disabled = false;
+        this.selectionAction.disabled = !selection;
         this.queueMarkers();
     }
 
@@ -303,6 +308,7 @@ export class Preview {
                 return (await response.json() as PreviewResult).text;
             }, controller.signal);
             if (controller.signal.aborted) return;
+            this.selectionRulesPinned = true;
             this.onSelectionRules(keys, `${selection.side === "source" ? "Source" : "Output"} lines ${selection.start + 1}–${Math.max(selection.start + 1, selection.end)} · pinned`);
         } catch (error) {
             if (!controller.signal.aborted) {
