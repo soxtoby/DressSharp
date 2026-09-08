@@ -238,7 +238,9 @@ sealed class SyntaxWrappingDiscovery
             || !SyntaxWrappingTriggerMask.IsBinaryOperator((SyntaxKind)token.RawKind)
             || token.Parent is not BinaryExpressionSyntax binary
             || token != binary.OperatorToken
-            || binary.Parent is BinaryExpressionSyntax)
+            || binary.Parent is BinaryExpressionSyntax parent
+            && (Enabled(SyntaxWrappingKind.BinaryExpressions)?.Mode != SyntaxWrappingSettings.WrappingMode.Auto
+                || parent.RawKind == binary.RawKind))
         {
             return;
         }
@@ -313,8 +315,8 @@ sealed class SyntaxWrappingDiscovery
             case ConditionalAccessExpressionSyntax access:
                 MemberAccess(access, firstToken, lastToken);
                 break;
-            case BinaryExpressionSyntax:
-                Binary(firstToken, lastToken);
+            case BinaryExpressionSyntax binary:
+                Binary(binary, firstToken, lastToken);
                 break;
             case ConditionalExpressionSyntax conditional:
                 Conditional(conditional, firstToken, lastToken);
@@ -381,14 +383,16 @@ sealed class SyntaxWrappingDiscovery
     static bool IsInsideArgument(SyntaxNode node) =>
         node.Ancestors().Any(parent => parent is ArgumentSyntax or AttributeArgumentSyntax);
 
-    void Binary(int firstToken, int lastToken)
+    void Binary(BinaryExpressionSyntax root, int firstToken, int lastToken)
     {
         var pieces = _stream.Pieces;
         for (var index = firstToken; index <= lastToken; index++)
         {
             var token = pieces[index].Token;
             if (token.Parent is BinaryExpressionSyntax expression
-                && token == expression.OperatorToken)
+                && token == expression.OperatorToken
+                && (Enabled(SyntaxWrappingKind.BinaryExpressions)?.Mode != SyntaxWrappingSettings.WrappingMode.Auto
+                    || BelongsToBinary(expression, root)))
             {
                 OperatorBoundary(index, SyntaxWrappingKind.BinaryExpressions);
             }
@@ -481,6 +485,17 @@ sealed class SyntaxWrappingDiscovery
             _occurrences[index] = occurrence with { Parent = parent };
             ancestors.Add(index);
         }
+    }
+
+    static bool BelongsToBinary(BinaryExpressionSyntax expression, BinaryExpressionSyntax root)
+    {
+        while (expression != root)
+        {
+            if (expression.RawKind != root.RawKind || expression.Parent is not BinaryExpressionSyntax parent)
+                return false;
+            expression = parent;
+        }
+        return true;
     }
 
     static bool BelongsToConditional(ConditionalExpressionSyntax expression, ConditionalExpressionSyntax root)

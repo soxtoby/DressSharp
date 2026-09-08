@@ -7,6 +7,55 @@ namespace DressSharp.UnitTests;
 
 public class SyntaxWrappingRuleTests
 {
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_binary_wrapping_keeps_fitting_comparisons_together(string lineEnding)
+    {
+        const string source = """
+            static bool IsUnder(string path, string directory) =>
+                Path.GetRelativePath(directory, path) is var relative && relative != ".." && !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+            """;
+        const string expected = """
+            static bool IsUnder(string path, string directory) =>
+                Path.GetRelativePath(directory, path) is var relative
+                && relative != ".."
+                && !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+            """;
+        (string Key, string Value)[] preferences =
+        [
+            ("dress_binary_expressions_layout", "auto"),
+            ("csharp_indent_block_contents", "true"),
+            ("max_line_length", "100")
+        ];
+
+        var result = Format(source.ReplaceLineEndings(lineEnding), preferences);
+        result.ShouldBe(expected.ReplaceLineEndings(lineEnding));
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_binary_wrapping_still_breaks_oversized_comparisons()
+    {
+        const string source = """
+            bool M() => firstCondition && longComparisonOperand != anotherLongComparisonOperand;
+            """;
+        const string expected = """
+            bool M() => firstCondition
+                && longComparisonOperand
+                    != anotherLongComparisonOperand;
+            """;
+        (string Key, string Value)[] preferences =
+        [
+            ("dress_binary_expressions_layout", "auto"),
+            ("max_line_length", "45")
+        ];
+
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [InlineData(
         "dress_arguments_layout",
         "class C { void M() { N(alpha, beta); } void N(int a, int b) {} int alpha; int beta; }",

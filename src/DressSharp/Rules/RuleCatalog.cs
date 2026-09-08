@@ -37,11 +37,15 @@ sealed class RuleCatalog
         IFormattingRule[] embeddedStatementRules =
         [
             new EmbeddedStatementPreferenceRule(
-                    RuleKey.DressEmbeddedStatementPlacement, "Placement", "Embedded statements",
+                    RuleKey.DressEmbeddedStatementPlacement, "Control statement body placement", "Embedded statements",
                     ["same_line", "next_line"],
                     "next_line",
                 "the boundary before brace-optional embedded statements",
-                "Only boundary whitespace changes"),
+                "Only boundary whitespace changes",
+                description: "Place the body of if, else, loops, using, lock, and fixed on the same line or a new line. "
+                    + "For example: if (condition) return false;. Applies with or without braces. "
+                    + "Embedded statement placement: single-line if, inline return, return new line.",
+                expandedCaption: "Control statement body placement"),
             new EmbeddedStatementPreferenceRule(
                     RuleKey.DressEmbeddedStatementBraces, "Braces", "Embedded statements",
                     ["compact", "balanced", "always"],

@@ -37,17 +37,19 @@ sealed class EmbeddedStatementPreferenceRule(
     ImmutableArray<string> values,
     string defaultValue,
     string ownedSyntax,
-    string invariant
+    string invariant,
+    string? description = null,
+    string? expandedCaption = null
 ) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
     {
         RuleKey = key,
         Caption = caption,
-        ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
+        ExpandedCaption = expandedCaption ?? RuleMetadata.Humanize(key.ToName()),
         GroupName = "Braces and bodies",
         SubgroupName = subgroupName,
-        Description = $"Controls {ownedSyntax}. {invariant}.",
+        Description = description ?? $"Controls {ownedSyntax}. {invariant}.",
         Values = RuleValues.From(values),
         DefaultValue = defaultValue,
         Example = """
