@@ -8,7 +8,7 @@ using static DotNetDo.Tools;
 var packages = (Do.RootDirectory / "artifacts/packages").EnsureDirectoryExists();
 var manifest = Do.RootDirectory / ".config/dotnet-tools.json";
 
-await (Bun.Run with { Target = "build", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
+await (Bun.Run with { Target = "build:production", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
 await (DotNet.Pack with
     {
         Output = packages

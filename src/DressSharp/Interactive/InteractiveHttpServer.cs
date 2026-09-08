@@ -144,7 +144,10 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
             if (context.Request.HttpMethod == "GET" && path == "/app.js")
             {
-                await Write(context.Response, 200, "text/javascript; charset=utf-8", InteractiveAssets.JavaScript);
+                var asset = InteractiveAssets.JavaScript.ForRequest(context.Request.Headers["Accept-Encoding"]);
+                if (asset.ContentEncoding is not null)
+                    context.Response.Headers["Content-Encoding"] = asset.ContentEncoding;
+                await Write(context.Response, 200, "text/javascript; charset=utf-8", asset.Content);
                 return;
             }
 

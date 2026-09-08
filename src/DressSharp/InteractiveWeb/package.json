@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "bun run typecheck && bun run build.ts",
+    "build:production": "bun run typecheck && bun run build.ts --compress",
     "check": "bun run typecheck && bun test",
     "typecheck": "tsc --project tsconfig.json"
   },

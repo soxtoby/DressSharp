@@ -5,4 +5,4 @@ using static DotNetDo.Tools;
 
 [assembly: TaskDescription("Generate the embedded interactive browser assets.")]
 
-await (Bun.Run with { Target = "build", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
+await (Bun.Run with { Target = "build:production", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });

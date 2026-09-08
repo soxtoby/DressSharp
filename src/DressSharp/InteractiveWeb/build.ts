@@ -1,4 +1,7 @@
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { gzipSync } from "node:zlib";
+
+const compress = process.argv.includes("--compress");
 
 await mkdir("dist", {recursive: true});
 
@@ -24,3 +27,9 @@ await Promise.all([
     copyFile("src/index.html", "dist/index.html"),
     copyFile("src/app.css", "dist/app.css"),
 ]);
+
+if (compress) {
+    await writeFile("dist/app.js.gz", gzipSync(await readFile("dist/app.js"), {level: 9}));
+} else {
+    await rm("dist/app.js.gz", {force: true});
+}
