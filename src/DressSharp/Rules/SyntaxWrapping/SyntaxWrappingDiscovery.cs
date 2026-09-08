@@ -316,8 +316,8 @@ sealed class SyntaxWrappingDiscovery
             case BinaryExpressionSyntax:
                 Binary(firstToken, lastToken);
                 break;
-            case ConditionalExpressionSyntax:
-                Conditional(firstToken, lastToken);
+            case ConditionalExpressionSyntax conditional:
+                Conditional(conditional, firstToken, lastToken);
                 break;
             case QueryExpressionSyntax query:
                 QueryBody(query.Body);
@@ -390,21 +390,24 @@ sealed class SyntaxWrappingDiscovery
             if (token.Parent is BinaryExpressionSyntax expression
                 && token == expression.OperatorToken)
             {
-                AddBoundary(index, GapStyle.Item);
+                OperatorBoundary(index, SyntaxWrappingKind.BinaryExpressions);
             }
         }
     }
 
-    void Conditional(int firstToken, int lastToken)
+    void Conditional(ConditionalExpressionSyntax root, int firstToken, int lastToken)
     {
+        if (Enabled(SyntaxWrappingKind.ConditionalExpressions)?.NestedStyle == "decision_ladder" && firstToken > 0)
+            _boundaries.Add(new(firstToken, GapStyle.Item, BreakWhenMulti: false));
         var pieces = _stream.Pieces;
         for (var index = firstToken; index <= lastToken; index++)
         {
             var token = pieces[index].Token;
             if (token.Parent is ConditionalExpressionSyntax expression
+                && BelongsToConditional(expression, root)
                 && (token == expression.QuestionToken || token == expression.ColonToken))
             {
-                AddBoundary(index, GapStyle.Item);
+                OperatorBoundary(index, SyntaxWrappingKind.ConditionalExpressions);
             }
         }
     }
@@ -478,6 +481,29 @@ sealed class SyntaxWrappingDiscovery
             _occurrences[index] = occurrence with { Parent = parent };
             ancestors.Add(index);
         }
+    }
+
+    static bool BelongsToConditional(ConditionalExpressionSyntax expression, ConditionalExpressionSyntax root)
+    {
+        for (SyntaxNode? node = expression; node is ConditionalExpressionSyntax; node = node.Parent)
+        {
+            if (node == root)
+                return true;
+        }
+        return false;
+    }
+
+    void OperatorBoundary(int index, SyntaxWrappingKind kind)
+    {
+        var setting = Enabled(kind)!.Value;
+        if (!setting.ShapesOperators)
+        {
+            AddBoundary(index, GapStyle.Item);
+            return;
+        }
+        var trailing = setting.OperatorPlacement == "end_of_line";
+        _boundaries.Add(new(index, GapStyle.Item, index, !trailing));
+        _boundaries.Add(new(index + 1, GapStyle.Item, index, trailing));
     }
 
     SyntaxWrappingSettings.Setting? Enabled(SyntaxWrappingKind kind) => _byKind[(int)kind];

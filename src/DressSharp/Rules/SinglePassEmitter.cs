@@ -182,6 +182,7 @@ sealed class SinglePassEmitter
         }
 
         if (_syntaxWrapping.GapBefore(index - 1) is not null
+            && _syntaxWrapping.GapBefore(index) is null
             && IsWrappedExpressionOperator(left))
         {
             pair.Reset(left, right);

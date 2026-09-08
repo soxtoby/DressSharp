@@ -12,7 +12,7 @@ static class SyntaxWrappingRendering
             || item.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia));
     }
 
-    internal readonly record struct Boundary(int RightIndex, GapStyle Style);
+    internal readonly record struct Boundary(int RightIndex, GapStyle Style, int OperatorIndex = -1, bool BreakWhenMulti = true);
 
     internal enum GapStyle
     {

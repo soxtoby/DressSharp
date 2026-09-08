@@ -63,14 +63,43 @@ sealed class SyntaxWrappingSolver
 
             var indent = occurrence.Multi ? Indent(occurrenceIndex, 1) : "";
             var baseIndent = occurrence.Multi ? Indent(occurrenceIndex, 0) : "";
+            var ladder = occurrence.Multi && CanUseDecisionLadder(occurrence, gapMap);
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
+                if (boundary.RightIndex == occurrence.FirstToken && !boundary.BreakWhenMulti && !ladder)
+                    continue;
+                var multi = BoundaryBreak(occurrence, offset);
+                var boundaryIndent = indent;
+                if (occurrence.Multi && occurrence.Setting.NestedStyle is { } style)
+                {
+                    if (ladder)
+                    {
+                        boundaryIndent = Indent(occurrenceIndex,
+                            _emitterPlan.IndentBlockContents != true && _trivia!.HasLineBreak(occurrence.FirstToken) ? 0 : 1);
+                        multi = boundary.RightIndex == occurrence.FirstToken
+                            || boundary.BreakWhenMulti && boundary.OperatorIndex >= 0
+                            && _stream.Pieces[boundary.OperatorIndex].Token.IsKind(SyntaxKind.ColonToken);
+                    }
+                    else if (style != "flat" && boundary.OperatorIndex >= 0)
+                    {
+                        var expression = _stream.Pieces[boundary.OperatorIndex].Token.Parent!;
+                        var depth = 0;
+                        for (var parent = expression.Parent; parent is not null && expression != occurrence.Node; parent = parent.Parent)
+                        {
+                            if (parent is ConditionalExpressionSyntax)
+                                depth++;
+                            if (parent == occurrence.Node)
+                                break;
+                        }
+                        boundaryIndent = Indent(occurrenceIndex, 1 + depth);
+                    }
+                }
                 gapMap[boundary.RightIndex] = Render(
                     boundary,
                     _trivia!,
-                    _chainBoundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, occurrence.Multi),
-                    indent,
+                    multi,
+                    boundaryIndent,
                     baseIndent,
                     _lineEnding);
             }
@@ -91,12 +120,18 @@ sealed class SyntaxWrappingSolver
             var initializerLayout = SyntaxWrappingRule.InitializerKindFor(occurrence.Kind) is not null;
             var hasLineBreak = HasLineBreak(occurrence);
             var hasNestedLineBreak = initializerLayout && HasUnownedLineBreak(occurrence);
+            if (occurrence.Setting.ShapesOperators && HasCommentedOperator(occurrence))
+                continue;
+            if (occurrence.Setting.Mode == WrappingMode.Preserve && !hasLineBreak)
+                continue;
             if (occurrence.Setting.Mode == WrappingMode.Auto
                 && (hasLineBreak || hasNestedLineBreak)
-                && !initializerLayout)
+                && !initializerLayout && !occurrence.Setting.ShapesOperators)
                 continue;
 
             var multi = occurrence.Setting.Mode == WrappingMode.Multi
+                || occurrence.Setting.ShapesOperators && hasLineBreak
+                && occurrence.Setting.Mode is WrappingMode.Auto or WrappingMode.Preserve
                 || occurrence.Setting.Mode == WrappingMode.Auto
                 && initializerLayout
                 && (hasLineBreak || hasNestedLineBreak)
@@ -158,7 +193,7 @@ sealed class SyntaxWrappingSolver
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
-                var boundaryMulti = _chainBoundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, multi);
+                var boundaryMulti = BoundaryBreak(occurrence, offset);
                 if (boundaryMulti)
                 {
                     _plannedLineBreaks[boundary.RightIndex] = Render(
@@ -233,6 +268,61 @@ sealed class SyntaxWrappingSolver
         return false;
     }
 
+    bool BoundaryBreak(Occurrence occurrence, int offset)
+    {
+        var boundary = _boundaries[occurrence.BoundaryStart + offset];
+        if (!boundary.BreakWhenMulti)
+            return false;
+        if (occurrence.Setting.Mode == WrappingMode.Preserve
+            && occurrence.Setting.NestedStyle is null && boundary.OperatorIndex >= 0)
+            return _trivia!.HasLineBreak(boundary.OperatorIndex) || _trivia.HasLineBreak(boundary.OperatorIndex + 1);
+        return _chainBoundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, occurrence.Multi);
+    }
+
+    bool HasCommentedOperator(Occurrence occurrence)
+    {
+        for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+        {
+            var boundary = _boundaries[occurrence.BoundaryStart + offset];
+            if (boundary.OperatorIndex >= 0 && _trivia!.HasMeaningfulGap(boundary.RightIndex))
+                return true;
+        }
+        return false;
+    }
+
+    bool CanUseDecisionLadder(Occurrence occurrence, IReadOnlyDictionary<int, string> childGaps)
+    {
+        if (occurrence.Setting.NestedStyle != "decision_ladder"
+            || occurrence.Node is not ConditionalExpressionSyntax { WhenFalse: ConditionalExpressionSyntax } root)
+            return false;
+
+        // Only the false-branch spine can become a ladder. A nested true branch remains a tree.
+        for (var expression = root; ;)
+        {
+            if (expression.Condition.DescendantNodesAndSelf().OfType<ConditionalExpressionSyntax>().Any()
+                || expression.WhenTrue.DescendantNodesAndSelf().OfType<ConditionalExpressionSyntax>().Any())
+                return false;
+            if (expression.WhenFalse is not ConditionalExpressionSyntax next)
+                break;
+            expression = next;
+        }
+
+        var owned = new HashSet<int>();
+        for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+            owned.Add(_boundaries[occurrence.BoundaryStart + offset].RightIndex);
+        for (var index = occurrence.FirstToken; index <= occurrence.LastToken; index++)
+        {
+            if (_stream.Pieces[index].Token.Text.Contains('\n') || _stream.Pieces[index].Token.Text.Contains('\r'))
+                return false;
+            if (index > occurrence.FirstToken && !owned.Contains(index)
+                && (childGaps.TryGetValue(index, out var gap)
+                    ? gap.Contains('\n') || gap.Contains('\r')
+                    : _trivia!.HasLineBreak(index)))
+                return false;
+        }
+        return true;
+    }
+
     // Only lines containing this occurrence's wrapping boundaries can benefit from wrapping it.
     // Nested argument and lambda-body lines must not contribute to another line's width.
     bool[]? MeasureMultilineBoundaries(Occurrence occurrence)
@@ -291,7 +381,8 @@ sealed class SyntaxWrappingSolver
         for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
         {
             var boundary = _boundaries[occurrence.BoundaryStart + offset];
-            if (_trivia!.HasLineBreak(boundary.RightIndex))
+            if ((boundary.RightIndex != occurrence.FirstToken || boundary.BreakWhenMulti)
+                && _trivia!.HasLineBreak(boundary.RightIndex))
                 return true;
         }
 

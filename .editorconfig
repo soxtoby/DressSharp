@@ -92,3 +92,5 @@ dress_namespace_style = file_scoped
 dress_embedded_statement_placement = next_line
 dress_embedded_statement_braces = balanced
 dress_braces_for_multiline_statement_header = true
+dress_nested_conditional_style = decision_ladder
+dotnet_style_operator_placement_when_wrapping = beginning_of_line

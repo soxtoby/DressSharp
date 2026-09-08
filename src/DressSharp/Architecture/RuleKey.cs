@@ -68,6 +68,8 @@ enum RuleKey
     DressMemberAccessChainsLayout,
     DressBinaryExpressionsLayout,
     DressConditionalExpressionsLayout,
+    DressNestedConditionalStyle,
+    DotnetStyleOperatorPlacementWhenWrapping,
     DressQueryClausesLayout,
     DressAttributesLayout,
     DressBlankLinesAroundNamespaces,

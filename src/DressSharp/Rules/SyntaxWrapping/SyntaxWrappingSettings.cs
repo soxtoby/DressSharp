@@ -38,11 +38,30 @@ sealed class SyntaxWrappingSettings
             enabled = true;
         }
 
+        var style = Preference(RuleKey.DressNestedConditionalStyle);
+        var placement = Preference(RuleKey.DotnetStyleOperatorPlacementWhenWrapping);
+        Configure(SyntaxWrappingKind.ConditionalExpressions, style);
+        Configure(SyntaxWrappingKind.BinaryExpressions, null);
         return new(byKind, enabled);
+
+        string? Preference(RuleKey key) => configuration.Preferences.TryGetValue(key, out var value)
+            && !value.Equals("unset", StringComparison.OrdinalIgnoreCase) ? value.ToLowerInvariant() : null;
+
+        void Configure(SyntaxWrappingKind kind, string? nestedStyle)
+        {
+            if (nestedStyle is null && placement is null)
+                return;
+            var setting = byKind[(int)kind] ?? new Setting(WrappingMode.Preserve, maximumLineLength);
+            byKind[(int)kind] = setting with { NestedStyle = nestedStyle, OperatorPlacement = placement };
+            enabled = true;
+        }
     }
 
     internal readonly record struct Setting(WrappingMode Mode, int MaximumLineLength)
     {
+        internal string? NestedStyle { get; init; }
+        internal string? OperatorPlacement { get; init; }
+        internal bool ShapesOperators => NestedStyle is not null || OperatorPlacement is not null;
         internal static Setting For(string preference, int maximumLineLength) => new(
             preference.Equals("compact", StringComparison.OrdinalIgnoreCase)
                 ? WrappingMode.Compact
@@ -60,6 +79,7 @@ sealed class SyntaxWrappingSettings
 
     internal enum WrappingMode
     {
+        Preserve,
         Single,
         Compact,
         Auto,

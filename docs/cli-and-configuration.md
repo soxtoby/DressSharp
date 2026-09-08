@@ -55,6 +55,38 @@ Each accepts `compact`, `auto` (Default), or `expanded`. `compact` uses one line
 
 These preferences own the complete layout of their initializer kind. When configured, they override `csharp_new_line_before_open_brace` and `csharp_new_line_before_members_in_object_initializers` at the same boundaries. The corresponding `dress_*_initializer_indentation` preference controls indentation after a multiline layout is selected. Missing or `unset` leaves the standard newline preferences in control.
 
+### Nested ternaries and operator position
+
+```editorconfig
+dress_conditional_expressions_layout = auto
+dress_nested_conditional_style = flat
+dotnet_style_operator_placement_when_wrapping = beginning_of_line
+```
+
+`dress_nested_conditional_style` accepts `flat` (Default), `staircase`, and `decision_ladder`. The existing conditional layout preference controls whether expressions wrap. The style preference alone reshapes already-wrapped expressions; single-line expressions stay single-line. `always_single` takes precedence over the style.
+
+Flat keeps ternary operators at one indentation level. Staircase adds one level per nested ternary. Decision ladder puts each condition/result pair on one line, flattening only false-branch chains:
+
+```csharp
+var result =
+    first ? one
+    : second ? two
+    : three;
+```
+
+Decision ladders fall back to staircase when a condition or branch remains multiline, including multiline token content and wrapping introduced by another layout rule. True-branch nesting also uses staircase. There is no separate fallback preference.
+
+The standard `dotnet_style_operator_placement_when_wrapping` accepts `beginning_of_line` (Default) and `end_of_line`. It applies to binary operators and ternary `?` / `:`. With `end_of_line`, the ladder above becomes:
+
+```csharp
+var result =
+    first ? one :
+    second ? two :
+    three;
+```
+
+Operator position alone moves existing operator breaks without introducing new ones. Commented operator boundaries are preserved. Missing or `unset` style/position preferences leave the existing layout behavior in control.
+
 ### Switch expression indentation
 
 Use `dress_switch_expression_indentation = indented` (Default) to place multiline switch expression braces one indentation level below the line containing `switch`:
