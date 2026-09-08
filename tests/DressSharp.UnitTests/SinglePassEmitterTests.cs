@@ -165,7 +165,7 @@ public class SinglePassEmitterTests
     }
 
     [Fact]
-    public void Anonymous_type_member_newlines_include_first_member_and_closing_brace()
+    public void Auto_object_initializer_layout_keeps_fitting_anonymous_object_on_one_line()
     {
         Format(
                 """
@@ -176,14 +176,12 @@ public class SinglePassEmitterTests
                 ("csharp_new_line_before_members_in_anonymous_types", "true"),
                 ("csharp_indent_block_contents", "true"),
                 ("csharp_indent_braces", "false"),
-                ("dress_object_initializer_indentation", "indented"))
+                ("dress_object_initializer_indentation", "indented"),
+                ("dress_object_initializer_layout", "auto"),
+                ("max_line_length", "160"))
             .ShouldBe("""
                 static async Task WriteError(HttpListenerResponse response, int status, string code, string message) =>
-                    await WriteJson(response, status, new
-                        {
-                            code,
-                            message
-                        });
+                    await WriteJson(response, status, new { code, message });
                 """);
     }
 

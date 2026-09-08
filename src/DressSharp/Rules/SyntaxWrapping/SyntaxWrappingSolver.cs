@@ -323,7 +323,7 @@ sealed class SyntaxWrappingSolver
 
     int VisualStartColumn(Occurrence occurrence)
     {
-        if (SyntaxWrappingRule.InitializerKindFor(occurrence.Kind) is not null
+        if (occurrence.Node is InitializerExpressionSyntax
             && occurrence.FirstToken > 0)
         {
             var previous = occurrence.FirstToken - 1;

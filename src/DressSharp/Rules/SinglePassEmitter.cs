@@ -386,11 +386,12 @@ sealed class SinglePassEmitter
         var initializerAtMemberBoundary = (candidates & _plan.InitializerMemberBoundaryRules) != 0
             ? NewLineRule.InitializerAtMemberBoundary(token)
             : null;
-        var initializer = token.Parent as InitializerExpressionSyntax
-            ?? initializerAtMemberBoundary as InitializerExpressionSyntax;
+        var initializer = token.Parent is AnonymousObjectCreationExpressionSyntax or InitializerExpressionSyntax
+            ? token.Parent
+            : initializerAtMemberBoundary;
         if (initializer is not null
-            && InitializerIndentationRule.KindOf(initializer) is { } initializerKind
-            && _plan.HasInitializerLayout(initializerKind))
+            && InitializerIndentationRule.KindOf(initializer) is { } kind
+            && _plan.HasInitializerLayout(kind))
         {
             return null;
         }

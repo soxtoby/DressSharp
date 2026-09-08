@@ -68,6 +68,14 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
         _ => null
     };
 
+    internal static InitializerKind? KindOf(SyntaxNode initializer) => initializer switch
+    {
+        AnonymousObjectCreationExpressionSyntax => InitializerKind.Object,
+        InitializerExpressionSyntax expression => KindOf(expression),
+        CollectionExpressionSyntax => InitializerKind.CollectionExpression,
+        _ => null
+    };
+
     internal readonly record struct Delimiter(SyntaxNode Initializer, InitializerKind Kind, bool IsOpening);
 }
 

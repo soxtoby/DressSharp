@@ -99,6 +99,54 @@ public sealed class InitializerLayoutRuleTests
     }
 
     [Theory]
+    [InlineData("compact", false)]
+    [InlineData("auto", false)]
+    [InlineData("expanded", true)]
+    public void Object_initializer_layout_includes_anonymous_objects(string mode, bool expanded)
+    {
+        const string compact = "object M() => new { X = 1, Y = 2 };";
+        const string multi = """
+            object M() => new
+            {
+                X = 1,
+                Y = 2
+            };
+            """;
+
+        (string, string)[] preferences =
+        [
+            ("dress_object_initializer_layout", mode),
+            ("dress_object_initializer_indentation", "not_indented"),
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_new_line_before_open_brace", "anonymous_types"),
+            ("csharp_new_line_before_members_in_anonymous_types", "true"),
+            ("max_line_length", "200")
+        ];
+        var result = Format(compact, preferences);
+
+        result.ShouldBe(expanded ? multi : compact);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Anonymous_object_auto_expands_when_too_wide()
+    {
+        Format(
+                "object M() => new { FirstProperty = 1, SecondProperty = 2 };",
+                ("dress_object_initializer_layout", "auto"),
+                ("dress_object_initializer_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "40"))
+            .ShouldBe("""
+                object M() => new
+                {
+                    FirstProperty = 1,
+                    SecondProperty = 2
+                };
+                """);
+    }
+
+    [Theory]
     [InlineData("auto")]
     [InlineData("compact")]
     public void Width_aware_modes_expand_when_an_item_contains_multiple_lines(string mode)
