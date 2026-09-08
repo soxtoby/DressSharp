@@ -24,6 +24,8 @@ Inside a Git worktree, DressSharp selects tracked files plus nonignored untracke
 
 Edit the preview sample or paste C# into the left pane, then change preferences to compare real formatted output on the right. Preview updates automatically and never saves source. The Whitespace toggle reveals spaces, tabs, and line endings; output metadata shows encoding and final-newline changes. Pasted source uses LF, and preview uses the bundled formatter's latest stable C# version with no predefined symbols. External configuration changes enter the preview when you choose Reload; pending edits remain applied.
 
+Select lines in either preview pane, then click **Show related rules** in the permanent preview-selection row beneath preference search to filter preferences to settings affecting those lines. The selected pane keeps a gutter marker and the results stay pinned while you try different settings. Click **Show related rules** again to recheck; the **×** clear button, selecting different lines, or editing source clears the filter. The check temporarily disables each active setting in separate in-memory previews. It identifies individual settings affecting the current output, so already-satisfied settings or settings masked by another rule may not appear. Selection is measured by whole lines, including any lines introduced by wrapping. No configuration changes are saved by this check.
+
 ## Exit codes
 
 | Code | Meaning |

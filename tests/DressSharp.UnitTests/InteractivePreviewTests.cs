@@ -9,6 +9,20 @@ namespace DressSharp.UnitTests;
 public sealed class InteractivePreviewTests
 {
     [Fact]
+    public async Task Disabling_inherited_placement_explains_a_return_moving_to_a_new_line()
+    {
+        const string source = "if (true) return false;";
+        var placement = new InteractivePreference(RuleKey.DressEmbeddedStatementPlacement,
+            PreferenceAssignment.Absent, PreferenceAssignment.Explicit("next_line"), null, null, null);
+        var enabled = await InteractivePreview.Format(source, [placement], TestContext.Current.CancellationToken);
+        var disabled = await InteractivePreview.Format(source,
+            [placement with { Local = PreferenceAssignment.Unset }], TestContext.Current.CancellationToken);
+
+        enabled.Text.ShouldBe("if (true)\n    return false;");
+        disabled.Text.ShouldBe(source);
+    }
+
+    [Fact]
     public async Task Preview_runs_real_formatting_and_representation_preferences_in_memory()
     {
         var result = await InteractivePreview.Format(

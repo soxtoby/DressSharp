@@ -3,6 +3,7 @@ import {Editor} from "@pierre/diffs/edit";
 import {DiffsContainerLoaded} from "../node_modules/@pierre/diffs/dist/components/web-components.js";
 import {cursorPosition, PreviewRevision, previewPreferences, whitespaceMarkers} from "./preview-state";
 import type {ConfigurationSnapshot, PendingEdits} from "./state";
+import {findSelectionRules, outputSelection, type LineSelection} from "./selection-rules";
 
 const sample = `using System;
 
@@ -90,17 +91,31 @@ export class Preview {
     private controller: AbortController | undefined;
     private stale = true;
     private markerFrame = 0;
+    readonly selectionAction = document.createElement("button");
+    readonly selectionSummary = document.createElement("span");
+    private selection: LineSelection | undefined;
+    private analysisController: AbortController | undefined;
+    private readonly onSelectionRules: (keys: Set<string> | null, label: string) => void;
 
-    static async create() {
+    static async create(onSelectionRules: (keys: Set<string> | null, label: string) => void) {
         if (!DiffsContainerLoaded) throw new Error("The preview editor could not load.");
         await preloadHighlighter({themes: ["github-light"], langs: ["csharp"], preferredHighlighter: "shiki-js"});
-        return new Preview();
+        return new Preview(onSelectionRules);
     }
 
-    private constructor() {
+    private constructor(onSelectionRules: (keys: Set<string> | null, label: string) => void) {
+        this.onSelectionRules = onSelectionRules;
         this.element.className = "canvas preview-canvas";
         this.element.innerHTML = `<div class="preview-toolbar"><div><h1>Preview</h1><small class="parse-context">Latest stable C# · no predefined symbols</small></div><label><input type="checkbox" class="whitespace-toggle"> Whitespace</label></div><div class="preview-frame"><div class="preview-labels"><span>Source · editable · UTF-8 · LF</span><span>Formatted output · read only · select to copy</span></div><div class="diff-scroll"></div><div class="preview-note"></div></div>`;
         this.element.querySelector(".diff-scroll")!.append(this.host);
+        this.selectionAction.className = "quiet find-selection-rules";
+        this.selectionSummary.className = "preview-selection-summary";
+        this.selectionSummary.textContent = "No preview selection";
+        this.selectionAction.textContent = "Show related rules";
+        this.selectionAction.title = "Select source or output lines to find settings affecting their formatting. Already-satisfied or overlapping settings may not appear.";
+        this.selectionAction.disabled = true;
+        this.selectionAction.addEventListener("click", () => void this.analyzeSelection());
+        this.selectionAction.setAttribute("aria-label", "Show related rules for the preview selection");
         this.horizontalScroll.className = "diff-horizontal-scroll";
         this.horizontalScroll.tabIndex = 0;
         this.horizontalScroll.setAttribute("role", "region");
@@ -127,6 +142,7 @@ export class Preview {
         this.diff.refresh(this.source, this.output, this.host);
         this.editor = new Editor({onChange: file => {
             this.source = file.contents;
+            this.clearSelectionRules();
             queueMicrotask(() => this.updateCursor());
             this.schedule();
         }, onFocus: () => queueMicrotask(() => this.updateCursor())});
@@ -139,6 +155,8 @@ export class Preview {
         }, true);
         new ResizeObserver(() => this.queueMarkers()).observe(this.host);
         document.addEventListener("selectionchange", () => this.updateCursor());
+        this.host.addEventListener("pointerup", () => queueMicrotask(() => this.captureSelection()));
+        this.host.addEventListener("keyup", () => queueMicrotask(() => this.captureSelection()));
         this.updateCursor();
         if (this.host.shadowRoot) new MutationObserver(() => this.queueMarkers()).observe(this.host.shadowRoot, {childList: true, characterData: true, subtree: true});
     }
@@ -158,6 +176,9 @@ export class Preview {
     }
 
     private schedule() {
+        this.analysisController?.abort();
+        this.selectionAction.textContent = "Show related rules";
+        this.selectionAction.disabled = true;
         const revision = this.revision.next();
         window.clearTimeout(this.timer);
         this.controller?.abort();
@@ -183,8 +204,11 @@ export class Preview {
             }
             const result = await response.json() as PreviewResult;
             if (!this.revision.isCurrent(revision)) return;
+            if (this.selection?.side === "output")
+                this.selection = outputSelection(this.output, result.text, {...this.selection, side: "source"});
             this.output = result.text;
             this.stale = false;
+            this.selectionAction.disabled = !this.selection;
             this.status.textContent = result.skippedOccurrences > 0 ? `${result.skippedOccurrences} transformations skipped` : "Up to date";
             this.facts.textContent = `${result.encoding.toUpperCase()} · ${result.lineEndings} · final newline ${result.finalNewline ? "present" : "absent"}`;
             this.element.querySelector(".parse-context")!.textContent = `C# ${result.languageVersion} · no predefined symbols`;
@@ -197,11 +221,19 @@ export class Preview {
     }
 
     private queueMarkers() {
+        this.selectionSummary.textContent = this.selection
+            ? `${this.selection.side === "source" ? "Source" : "Output"} lines ${this.selection.start + 1}–${Math.max(this.selection.start + 1, this.selection.end)}`
+            : "No preview selection";
+        this.selectionSummary.title = `Preview selection: ${this.selectionSummary.textContent}`;
         if (this.markerFrame) return;
         this.markerFrame = requestAnimationFrame(() => {
             this.markerFrame = 0;
             this.updateHorizontalScroll();
             this.updateMarkers();
+            const side = this.selection?.side === "output" ? "deletions" : "additions";
+            this.diff.setSelectedLines(this.selection
+                ? {start: this.selection.start + 1, end: Math.max(this.selection.start + 1, this.selection.end), side}
+                : null, {notify: false, lineNumberOnly: true, activeLineSide: side});
         });
     }
 
@@ -216,6 +248,74 @@ export class Preview {
     private updateCursor() {
         const position = cursorPosition(this.editor.getState().selections);
         if (position) this.cursor.textContent = position;
+    }
+
+    clearSelectionRules() {
+        this.analysisController?.abort();
+        this.analysisController = undefined;
+        this.selectionAction.textContent = "Show related rules";
+        this.selection = undefined;
+        this.selectionAction.disabled = true;
+        this.queueMarkers();
+        this.onSelectionRules(null, "");
+    }
+
+    private captureSelection() {
+        if (this.stale) return;
+        const shadow = this.host.shadowRoot;
+        if (!shadow) return;
+        const native = document.getSelection();
+        const range = native?.getComposedRanges?.({shadowRoots: [shadow]})[0]
+            ?? (native?.rangeCount ? native.getRangeAt(0) : undefined);
+        const lineOf = (node: Node | undefined) => (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>("[data-line]");
+        const first = lineOf(range?.startContainer);
+        const last = lineOf(range?.endContainer);
+        let selection: LineSelection | undefined;
+        if (first?.closest("[data-deletions]") && last?.closest("[data-deletions]")) {
+            selection = {start: Number(first.dataset["line"]) - 1, end: Number(last.dataset["line"]), side: "output"};
+        } else if (first?.closest("[data-deletions]") || last?.closest("[data-deletions]")) {
+            return;
+        } else {
+            const current = this.editor.getState().selections?.at(-1);
+            if (current) selection = {start: current.start.line,
+                end: current.end.line + (current.end.character === 0 && current.end.line > current.start.line ? 0 : 1), side: "source"};
+        }
+        if (!selection || JSON.stringify(selection) === JSON.stringify(this.selection)) return;
+        this.clearSelectionRules();
+        this.selection = selection;
+        this.selectionAction.disabled = false;
+        this.queueMarkers();
+    }
+
+    private async analyzeSelection() {
+        if (this.stale || !this.selection) return;
+        this.analysisController?.abort();
+        const controller = new AbortController();
+        this.analysisController = controller;
+        this.selectionAction.disabled = true;
+        this.selectionAction.textContent = "Finding…";
+        const selection = this.selection;
+        try {
+            const keys = await findSelectionRules(this.source, this.output, JSON.parse(this.preferences), selection, async preferences => {
+                const response = await fetch("/api/preview", {method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({source: this.source, preferences}), signal: controller.signal});
+                if (!response.ok) throw new Error((await response.json() as {message: string}).message);
+                return (await response.json() as PreviewResult).text;
+            }, controller.signal);
+            if (controller.signal.aborted) return;
+            this.onSelectionRules(keys, `${selection.side === "source" ? "Source" : "Output"} lines ${selection.start + 1}–${Math.max(selection.start + 1, selection.end)} · pinned`);
+        } catch (error) {
+            if (!controller.signal.aborted) {
+                this.status.textContent = `Selection check failed · ${error instanceof Error ? error.message : "Try again"}`;
+                controller.abort();
+            }
+        } finally {
+            if (this.analysisController === controller) {
+                this.analysisController = undefined;
+                this.selectionAction.textContent = "Show related rules";
+                this.selectionAction.disabled = this.stale || !this.selection;
+            }
+        }
     }
 
     private updateMarkers() {

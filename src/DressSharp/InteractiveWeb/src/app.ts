@@ -16,6 +16,8 @@ let externalChange = false;
 let unavailable = false;
 let saved = false;
 let saveError = "";
+let selectionRules: Set<string> | null = null;
+let selectionLabel = "";
 const touched = new Set<string>();
 const expanded = new Set<string>();
 
@@ -24,7 +26,11 @@ start().catch(fatal);
 async function start() {
     bootstrap = await getJson<Bootstrap>("/api/bootstrap");
     snapshot = await getJson<ConfigurationSnapshot>("/api/configuration");
-    preview = await Preview.create();
+    preview = await Preview.create((keys, label) => {
+        selectionRules = keys;
+        selectionLabel = label;
+        render();
+    });
     render();
     window.setInterval(poll, 10_000);
     window.addEventListener("focus", poll);
@@ -47,7 +53,8 @@ function render() {
     const choicesScroll = openChoices?.scrollTop ?? 0;
     const preferences = new Map(snapshot.preferences.map(preference => [preference.key, preference]));
     const matching = bootstrap.catalog.rules.filter(rule =>
-        matchesRule(query, rule) || matchesRule(query, {...rule, expandedCaption: `${rule.subgroup ?? ""} ${rule.caption}`}));
+        (selectionRules === null || selectionRules.has(rule.key))
+        && (matchesRule(query, rule) || matchesRule(query, {...rule, expandedCaption: `${rule.subgroup ?? ""} ${rule.caption}`})));
     const search = input("search", "Find a preference");
     search.value = query;
     search.addEventListener("input", () => {
@@ -58,9 +65,9 @@ function render() {
     const list = el("div", "group-list");
     for (const [groupName, rules] of groupRules(matching)) {
         const details = document.createElement("details");
-        details.open = query.length > 0 || expanded.has(groupName);
+        details.open = selectionRules !== null || query.length > 0 || expanded.has(groupName);
         details.addEventListener("toggle", () => {
-            if (query) return;
+            if (query || selectionRules !== null) return;
             if (details.open) expanded.add(groupName); else expanded.delete(groupName);
         });
         details.append(el("summary", "group-heading", [el("span", "", [groupName]), el("span", "group-count", [String(rules.length)])]));
@@ -78,7 +85,15 @@ function render() {
         }
         list.append(details);
     }
-    if (!matching.length) list.append(el("p", "empty", ["No preferences match."]));
+    if (!matching.length) list.append(el("p", "empty", [selectionRules?.size === 0
+        ? "No individual setting changes these lines. Settings already satisfied or overridden by other settings may not appear."
+        : "No preferences match."]));
+    const relatedCount = el("span", "related-count", [selectionRules === null ? "" : String(selectionRules.size)]);
+    relatedCount.title = `${selectionLabel} · ${selectionRules?.size ?? 0} related rules`;
+    const clearSelection = el("button", "quiet clear-selection", ["×"]);
+    clearSelection.title = "Show all rules and clear preview selection";
+    clearSelection.setAttribute("aria-label", clearSelection.title);
+    clearSelection.addEventListener("click", () => preview.clearSelectionRules());
 
     const invalid = hasInvalidEdits();
     const save = el("button", "save", [saveLabel()]);
@@ -105,6 +120,12 @@ function render() {
             el("aside", "settings-rail", [
                 el("div", "rail-toolbar", [el("div", "", [el("h1", "", ["Preferences"]), el("span", "rule-count", [`${bootstrap.catalog.rules.length} rules`]), ...(saveError ? [el("span", "save-error", [saveError])] : [])]), save]),
                 el("label", "search", [el("span", "", ["⌕"]), search]),
+                el("div", "preview-selection-controls", [
+                    preview.selectionSummary,
+                    preview.selectionAction,
+                    relatedCount,
+                    clearSelection,
+                ]),
                 list,
             ]),
             el("section", "canvas"),
