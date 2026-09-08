@@ -759,6 +759,46 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_layout_keeps_a_conditional_indented_inside_a_multiline_lambda_argument(string lineEnding)
+    {
+        const string source = """
+            class C
+            {
+                void M()
+                {
+                    _ = 0;
+                    _occurrences.Sort(static (left, right) =>
+                        {
+                            var first = left.FirstToken.CompareTo(right.FirstToken);
+                            return first != 0
+                                ? first
+                                : right.LastToken.CompareTo(left.LastToken);
+                        });
+                }
+            }
+            """;
+        var preferences = new[]
+        {
+            ("dress_arguments_layout", "auto"),
+            ("dress_binary_expressions_layout", "auto"),
+            ("dress_conditional_expressions_layout", "auto"),
+            ("dress_nested_conditional_style", "flat"),
+            ("dotnet_style_operator_placement_when_wrapping", "beginning_of_line"),
+            ("dress_lambda_block_indentation", "indented"),
+            ("csharp_indent_block_contents", "true"),
+            ("max_line_length", "160")
+        };
+
+        var input = source.ReplaceLineEndings(lineEnding);
+        var result = Format(input, preferences);
+
+        result.ShouldBe(input);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData(160)]
     [InlineData(60)]
     public void Auto_member_access_measures_multiline_arguments_on_their_own_lines(int maximum)

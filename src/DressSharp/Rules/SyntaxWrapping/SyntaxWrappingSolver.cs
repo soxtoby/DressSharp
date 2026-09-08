@@ -606,10 +606,16 @@ sealed class SyntaxWrappingSolver
             {
                 _braceDepths[index] = depth;
                 var token = _stream.Pieces[index].Token;
+                var braceDepth = 1;
+                if (_emitterPlan.IndentLambdaBlock == true
+                    && token.Parent is BlockSyntax { Parent: LambdaExpressionSyntax })
+                {
+                    braceDepth++;
+                }
                 if (token.IsKind(SyntaxKind.OpenBraceToken))
-                    depth++;
+                    depth += braceDepth;
                 else if (token.IsKind(SyntaxKind.CloseBraceToken))
-                    depth--;
+                    depth -= braceDepth;
             }
         }
 
