@@ -63,7 +63,8 @@ sealed class SyntaxWrappingSolver
             if (!occurrence.Applies)
                 continue;
 
-            var indent = occurrence.Multi ? Indent(occurrenceIndex, 1) : "";
+            var conditionDepth = MultilineConditionDepth(occurrence, gapMap);
+            var indent = occurrence.Multi ? Indent(occurrenceIndex, 1 + conditionDepth) : "";
             var baseIndent = occurrence.Multi ? Indent(occurrenceIndex, 0) : "";
             var ladder = occurrence.Multi && CanUseDecisionLadder(occurrence, gapMap);
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
@@ -73,9 +74,7 @@ sealed class SyntaxWrappingSolver
                     continue;
                 var multi = BoundaryBreak(occurrence, offset);
                 var boundaryIndent = indent;
-                if (multi && occurrence.Kind == SyntaxWrappingKind.BinaryExpressions
-                    && occurrence.Setting.Mode == WrappingMode.Auto
-                    && occurrence.Setting.IndentationStyle is null
+                if (multi && occurrence is { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { Mode: WrappingMode.Auto, IndentationStyle: null } }
                     && _trivia!.HasLineBreak(boundary.RightIndex))
                 {
                     boundaryIndent = _indentation.ExistingContinuation(_stream.Pieces[boundary.RightIndex].Token) ?? indent;
@@ -88,14 +87,14 @@ sealed class SyntaxWrappingSolver
                         : 0;
                     boundaryIndent = _indentation.Continuation(occurrence.Node, 1 + precedenceDepth, "");
                 }
-                if (occurrence.Multi && occurrence.Setting.NestedStyle is { } style)
+                if (occurrence is { Multi: true, Setting.NestedStyle: { } style })
                 {
                     if (ladder)
                     {
                         boundaryIndent = Indent(occurrenceIndex,
                             _emitterPlan.IndentBlockContents != true && _trivia!.HasLineBreak(occurrence.FirstToken) ? 0 : 1);
                         multi = boundary.RightIndex == occurrence.FirstToken
-                            || boundary.BreakWhenMulti && boundary.OperatorIndex >= 0
+                            || boundary is { BreakWhenMulti: true, OperatorIndex: >= 0 }
                             && _stream.Pieces[boundary.OperatorIndex].Token.IsKind(SyntaxKind.ColonToken);
                     }
                     else if (style != "flat" && boundary.OperatorIndex >= 0)
@@ -109,7 +108,7 @@ sealed class SyntaxWrappingSolver
                             if (parent == occurrence.Node)
                                 break;
                         }
-                        boundaryIndent = Indent(occurrenceIndex, 1 + depth);
+                        boundaryIndent = Indent(occurrenceIndex, 1 + conditionDepth + depth);
                     }
                 }
                 gapMap[boundary.RightIndex] = Render(
@@ -129,6 +128,26 @@ sealed class SyntaxWrappingSolver
             gaps[tokenIndex] = text;
         return new(gaps, _skippedOccurrences);
     }
+
+    int MultilineConditionDepth(Occurrence occurrence, IReadOnlyDictionary<int, string> childGaps)
+    {
+        if (occurrence.Node is not ConditionalExpressionSyntax conditional
+            || conditional.Ancestors().OfType<BinaryExpressionSyntax>().None())
+            return 0;
+
+        var questionIndex = _stream.IndexOf(
+            conditional.QuestionToken,
+            _stream.Pieces[occurrence.FirstToken].SegmentIndex);
+        for (var index = occurrence.FirstToken + 1; index < questionIndex; index++)
+        {
+            if (_trivia!.HasLineBreak(index)
+                || childGaps.TryGetValue(index, out var gap) && (gap.Contains('\n') || gap.Contains('\r')))
+                return 1;
+        }
+
+        return 0;
+    }
+
     void Decide()
     {
         for (var occurrenceIndex = 0; occurrenceIndex < _occurrences.Length; occurrenceIndex++)
@@ -290,8 +309,7 @@ sealed class SyntaxWrappingSolver
         var boundary = _boundaries[occurrence.BoundaryStart + offset];
         if (!boundary.BreakWhenMulti)
             return false;
-        if (occurrence.Setting.Mode == WrappingMode.Preserve
-            && occurrence.Setting.NestedStyle is null && boundary.OperatorIndex >= 0)
+        if (occurrence.Setting is { Mode: WrappingMode.Preserve, NestedStyle: null } && boundary.OperatorIndex >= 0)
             return _trivia!.HasLineBreak(boundary.OperatorIndex) || _trivia.HasLineBreak(boundary.OperatorIndex + 1);
         return _chainBoundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, occurrence.Multi);
     }
@@ -431,8 +449,7 @@ sealed class SyntaxWrappingSolver
 
     int VisualStartColumn(Occurrence occurrence)
     {
-        if (occurrence.Node is InitializerExpressionSyntax
-            && occurrence.FirstToken > 0)
+        if (occurrence is { Node: InitializerExpressionSyntax, FirstToken: > 0 })
         {
             var previous = occurrence.FirstToken - 1;
             return VisualStartColumn(previous)
