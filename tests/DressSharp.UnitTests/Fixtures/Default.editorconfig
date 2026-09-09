@@ -42,6 +42,7 @@ csharp_space_around_declaration_statements = false
 csharp_space_before_open_square_brackets = false
 csharp_space_between_empty_square_brackets = false
 csharp_space_between_square_brackets = false
+dress_space_after_collection_spread_operator = true
 csharp_preserve_single_line_blocks = true
 csharp_preserve_single_line_statements = true
 dotnet_sort_system_directives_first = true

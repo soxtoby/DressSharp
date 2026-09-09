@@ -357,6 +357,8 @@ public class MicrosoftCompatibilityRuleTests
     [InlineData("csharp_space_before_comma", "true", "class C { void M(int x, int y) { } }", "class C { void M(int x , int y) { } }")]
     [InlineData("csharp_space_after_dot", "true", "class C { string M() => this.ToString(); }", "class C { string M() => this. ToString(); }")]
     [InlineData("csharp_space_before_dot", "true", "class C { string M() => this.ToString(); }", "class C { string M() => this .ToString(); }")]
+    [InlineData("dress_space_after_collection_spread_operator", "true", "class C { int[] M(int[] values) => [..values]; }", "class C { int[] M(int[] values) => [.. values]; }")]
+    [InlineData("dress_space_after_collection_spread_operator", "false", "class C { int[] M(int[] values) => [.. values]; }", "class C { int[] M(int[] values) => [..values]; }")]
     [InlineData("csharp_space_after_semicolon_in_for_statement",
         "false",
         "class C { void M() { for (int i = 0; i < 1; i++) { } } }",
@@ -382,6 +384,20 @@ public class MicrosoftCompatibilityRuleTests
                 "class C { void M() { int x  =  1; } }",
                 ("csharp_space_around_declaration_statements", "ignore"))
             .ShouldBe("class C { void M() { int x  =  1; } }");
+    }
+
+    [Fact]
+    public void Collection_spread_spacing_preserves_unset_comments_line_breaks_and_ranges()
+    {
+        const string source = "class C { int[] M(int[] values) => [..  values]; }";
+        Format(source).ShouldBe(source);
+        Format(source, ("dress_space_after_collection_spread_operator", "unset")).ShouldBe(source);
+
+        const string boundaries = "class C { int[] M(int[] values) => [../* keep */ values]; int[] N(int[] values, int end) => values[..end]; }";
+        Format(boundaries, ("dress_space_after_collection_spread_operator", "true")).ShouldBe(boundaries);
+
+        const string lineBreak = "class C { int[] M(int[] values) => [..\nvalues]; }";
+        Format(lineBreak, ("dress_space_after_collection_spread_operator", "true")).ShouldBe(lineBreak);
     }
 
     [Theory]

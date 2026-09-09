@@ -12,7 +12,8 @@ abstract class TokenSpacingRule(
     string? subgroupName,
     RuleValueDefinition values,
     string defaultValue,
-    string ownedSyntax
+    string ownedSyntax,
+    string? example = null
 ) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
@@ -25,7 +26,7 @@ abstract class TokenSpacingRule(
         Description = $"Controls {ownedSyntax}. Only same-line whitespace changes.",
         Values = values,
         DefaultValue = defaultValue,
-        Example = """
+        Example = example ?? """
             class Example : Base
             {
                 int Add(int left,int right) => left+right;
@@ -50,8 +51,9 @@ abstract class TokenSpacingRule(
         string? subgroupName,
         ImmutableArray<string> acceptedValues,
         string defaultValue,
-        string ownedSyntax)
-        : this(ruleKey, caption, subgroupName, RuleValues.From(acceptedValues), defaultValue, ownedSyntax)
+        string ownedSyntax,
+        string? example = null)
+        : this(ruleKey, caption, subgroupName, RuleValues.From(acceptedValues), defaultValue, ownedSyntax, example)
     {
     }
 }

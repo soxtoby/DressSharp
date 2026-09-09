@@ -52,6 +52,7 @@ enum RuleKey
     CSharpSpaceBeforeOpenSquareBrackets,
     CSharpSpaceBetweenEmptySquareBrackets,
     CSharpSpaceBetweenSquareBrackets,
+    DressSpaceAfterCollectionSpreadOperator,
     CSharpPreserveSingleLineBlocks,
     CSharpPreserveSingleLineStatements,
     DotnetSortSystemDirectivesFirst,

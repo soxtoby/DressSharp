@@ -103,6 +103,10 @@ var result =
 
 Operator position alone moves existing operator breaks without introducing new ones. Commented operator boundaries are preserved. Missing or `unset` style/position preferences leave the existing layout behavior in control.
 
+### Collection spread spacing
+
+Use `dress_space_after_collection_spread_operator = true` (Default) for `[.. values]`, or `false` for `[..values]`. It applies only to collection-expression spread elements, not range expressions such as `values[..end]`. Missing or `unset` preserves existing spacing.
+
 ### Collection expression indentation
 
 Collection expressions (`[...]`) have separate indentation preferences for arguments and other contexts:
