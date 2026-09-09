@@ -22,6 +22,18 @@ namespace Example
 
 type PreviewResult = {text: string; encoding: string; lineEndings: string; finalNewline: boolean; skippedOccurrences: number; languageVersion: string};
 
+export function overviewMarkerRanges(rows: readonly {top: number; height: number}[], scale: number) {
+    const ranges = rows.map(row => ({top: row.top * scale, bottom: (row.top + row.height) * scale, target: row.top}))
+        .sort((left, right) => left.top - right.top);
+    const merged: typeof ranges = [];
+    for (const range of ranges) {
+        const previous = merged.at(-1);
+        if (previous && range.top <= previous.bottom + 1) previous.bottom = Math.max(previous.bottom, range.bottom);
+        else merged.push({...range});
+    }
+    return merged;
+}
+
 class PreviewDiff extends FileDiff {
     override setEditorActiveLine(lineNumber: number | null, options?: Parameters<FileDiff["setEditorActiveLine"]>[1]) {
         super.setEditorActiveLine(lineNumber, {...options, lineNumberOnly: true});
@@ -80,6 +92,8 @@ pre[data-diff-type="split"] > [data-deletions] { grid-column: 2; grid-row: 1; }
 export class Preview {
     readonly element = document.createElement("section");
     private readonly host = document.createElement("diffs-container");
+    private readonly scroll: HTMLElement;
+    private readonly overview: HTMLElement;
     private readonly horizontalScroll = document.createElement("div");
     private readonly horizontalTrack = document.createElement("div");
     private readonly status = document.createElement("span");
@@ -111,8 +125,10 @@ export class Preview {
     private constructor(onSelectionRules: (keys: Set<string> | null, label: string) => void) {
         this.onSelectionRules = onSelectionRules;
         this.element.className = "canvas preview-canvas";
-        this.element.innerHTML = `<div class="preview-toolbar"><div><h1>Preview</h1><small class="parse-context">Latest stable C# · no predefined symbols</small></div><label><input type="checkbox" class="whitespace-toggle"> Whitespace</label></div><div class="preview-frame"><div class="preview-labels"><span>Source · editable · UTF-8 · LF</span><span>Formatted output · read only · select to copy</span></div><div class="diff-scroll"></div><div class="preview-note"></div></div>`;
-        this.element.querySelector(".diff-scroll")!.append(this.host);
+        this.element.innerHTML = `<div class="preview-toolbar"><div><h1>Preview</h1><small class="parse-context">Latest stable C# · no predefined symbols</small></div><label><input type="checkbox" class="whitespace-toggle"> Whitespace</label></div><div class="preview-frame"><div class="preview-labels"><span>Source · editable · UTF-8 · LF</span><span>Formatted output · read only · select to copy</span></div><div class="diff-viewport"><div class="diff-scroll"></div><div class="diff-overview" role="navigation" aria-label="Differences in preview" hidden></div></div><div class="preview-note"></div></div>`;
+        this.scroll = this.element.querySelector(".diff-scroll")!;
+        this.overview = this.element.querySelector(".diff-overview")!;
+        this.scroll.append(this.host);
         this.selectionAction.className = "quiet find-selection-rules";
         this.selectionSummary.className = "preview-selection-summary";
         this.selectionSummary.textContent = "No preview selection";
@@ -234,6 +250,7 @@ export class Preview {
         this.markerFrame = requestAnimationFrame(() => {
             this.markerFrame = 0;
             this.updateHorizontalScroll();
+            this.updateOverview();
             this.updateMarkers();
         });
     }
@@ -244,6 +261,34 @@ export class Preview {
         const overflow = Math.max(...Array.from(panes, pane => pane.scrollWidth - pane.clientWidth));
         this.horizontalTrack.style.width = `${this.horizontalScroll.clientWidth + overflow}px`;
         this.horizontalScroll.scrollLeft = this.diff.getCodeScrollLeft();
+    }
+
+    private updateOverview() {
+        this.overview.replaceChildren();
+        const hasOverflow = this.scroll.scrollHeight > this.scroll.clientHeight;
+        this.overview.hidden = !hasOverflow;
+        if (this.stale || !hasOverflow) return;
+        const shadow = this.host.shadowRoot;
+        if (!shadow) return;
+        const scrollBox = this.scroll.getBoundingClientRect();
+        const scale = this.overview.clientHeight / this.scroll.scrollHeight;
+        const rows = Array.from(shadow.querySelectorAll<HTMLElement>('[data-line-type^="change-"]'), line => {
+            const box = line.getBoundingClientRect();
+            const top = box.top - scrollBox.top + this.scroll.scrollTop;
+            return {top, height: box.height};
+        });
+        const merged = overviewMarkerRanges(rows, scale);
+        merged.forEach((range, index) => {
+            const marker = document.createElement("button");
+            marker.className = "diff-overview-marker";
+            marker.type = "button";
+            marker.style.top = `${range.top}px`;
+            marker.style.height = `${Math.max(3, range.bottom - range.top)}px`;
+            marker.title = `Difference ${index + 1} of ${merged.length}`;
+            marker.setAttribute("aria-label", marker.title);
+            marker.addEventListener("click", () => this.scroll.scrollTo({top: Math.max(0, range.target - this.scroll.clientHeight * .35), behavior: "smooth"}));
+            this.overview.append(marker);
+        });
     }
 
     private updateCursor() {

@@ -87,8 +87,13 @@ details[open] > .group-heading::before { content: "−"; }
 .preview-toolbar h1 { font-size: 23px; letter-spacing: -.03em; }
 .preview-toolbar small { color: var(--muted); font-size: 11px; }
 .preview-toolbar label { white-space: nowrap; font-size: 12px; }
-.diff-scroll { flex: 1; min-height: 0; overflow: auto; }
+.diff-viewport { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.diff-scroll { min-height: 0; overflow: auto; }
 .diff-scroll diffs-container { display: block; min-height: 100%; }
+.diff-overview { position: relative; width: 10px; overflow: hidden; background: #e7e7df; border-left: 1px solid var(--line); }
+.diff-overview-marker { position: absolute; right: 1px; left: 1px; min-height: 3px; padding: 0; background: var(--orange); border-radius: 1px; }
+.diff-overview-marker:hover { background: var(--ink); }
+.diff-overview-marker:focus-visible { z-index: 1; outline: 2px solid var(--ink); outline-offset: -1px; }
 .diff-horizontal-scroll { flex: none; overflow-x: scroll; overflow-y: hidden; border-top: 1px solid var(--line); }
 .diff-horizontal-scroll > div { height: 1px; }
 .preview-note { flex-wrap: wrap; line-height: 1.6; }

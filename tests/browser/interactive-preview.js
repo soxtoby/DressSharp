@@ -39,6 +39,17 @@ async page => {
         const markers = await page.locator("[data-additions] [data-line]").first().evaluate(line => getComputedStyle(line, "::after").content);
         assert(markers.includes("·") && markers.includes("↵"), "Whitespace markers must be visible");
         assert(await sourceText() === source, "Whitespace must not mutate source");
+        const longSource = ["class LongPreview {", "    void First(int a,int b) {}",
+            ...Array.from({length: 80}, (_, index) => `    // context ${index + 1}`),
+            "    void Last(int a,int b) {}", "}", ""].join("\n");
+        await paste(longSource);
+        await ready();
+        const rulerMarkers = page.getByRole("navigation", {name: "Differences in preview"}).locator("button");
+        assert(await rulerMarkers.count() >= 2, "Overview ruler must mark separated differences");
+        await rulerMarkers.last().click();
+        await page.waitForFunction(() => document.querySelector(".diff-scroll").scrollTop > 0);
+        await paste(source);
+        await ready();
         await editor().click();
         await page.keyboard.press("Control+Home");
         await page.keyboard.type("// undo test");

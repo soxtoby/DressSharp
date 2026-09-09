@@ -52,7 +52,7 @@ test("marker updates do not write line selections back into the editor", () => {
     const setSelectedLines = mock(() => {});
     const preview = Object.assign(Object.create(Preview.prototype), {
         selection: {start: 2, end: 4, side: "source"}, selectionSummary: {}, markerFrame: 0,
-        updateHorizontalScroll: mock(() => {}), updateMarkers: mock(() => {}),
+        updateHorizontalScroll: mock(() => {}), updateOverview: mock(() => {}), updateMarkers: mock(() => {}),
         diff: {setSelectedLines},
     });
     preview.queueMarkers();
