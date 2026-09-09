@@ -7,6 +7,36 @@ namespace DressSharp.UnitTests;
 public sealed class InitializerIndentationEmitterTests
 {
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Non_indented_collection_expression_arguments_keep_the_argument_indent(string lineEnding)
+    {
+        var source = """
+            class C
+            {
+                Result M()
+                {
+                    return new(
+                        [.. spacing],
+                        [.. newLines],
+                        triggers);
+                }
+            }
+            """;
+        source = source.Replace("\n", lineEnding);
+
+        var result = Format(source,
+                ("dress_collection_expression_argument_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"));
+
+        result.ShouldBe(source);
+        Format(result,
+                ("dress_collection_expression_argument_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"))
+            .ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData("Process(\n", ");")]
     [InlineData("Process(values:\n", ");")]
     [InlineData("new Container(\n", ");")]

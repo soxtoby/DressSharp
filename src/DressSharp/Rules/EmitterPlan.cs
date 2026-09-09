@@ -79,10 +79,12 @@ sealed class EmitterPlan
     internal bool SeparateSingleLineStatements { get; }
     internal EmbeddedStatementSettings EmbeddedStatements { get; }
     internal ulong InitializerMemberBoundaryRules { get; }
+
     /// <summary>
     /// The bit set of spacing rules that could claim a pair containing a token of this kind.
     /// </summary>
     internal ulong Trigger(int rawKind) => _triggers.GetValueOrDefault(rawKind);
+
     internal ulong NewLineTrigger(int rawKind) => _newLineWildcards | _newLineTriggers.GetValueOrDefault(rawKind);
     internal bool? InitializerIndentation(InitializerKind kind) => _initializerIndentations[(int)kind];
     internal bool HasInitializerLayout(InitializerKind kind) => _initializerLayouts[(int)kind];
@@ -90,14 +92,13 @@ sealed class EmitterPlan
     internal bool? DesiredSpace(SyntaxToken left, SyntaxToken right)
     {
         var candidates = Trigger(left.RawKind) | Trigger(right.RawKind);
-        return candidates == 0 
-            ? null 
+        return candidates == 0
+            ? null
             : DesiredSpace(left, right, candidates);
     }
 
     internal bool? DesiredSpace(SyntaxToken left, SyntaxToken right, ulong candidates)
     {
-
         var desired = default(bool?);
         for (var index = 0; index < Spacing.Length; index++)
         {
@@ -213,14 +214,12 @@ sealed class EmitterPlan
                 : null;
 
     static LabelIndentationStyle? OptionalLabelIndentation(FormattingConfiguration configuration) =>
-        configuration.Preferences.GetValueOrDefault(RuleKey.CSharpIndentLabels) switch
-        {
+        configuration.Preferences.GetValueOrDefault(RuleKey.CSharpIndentLabels) switch {
             "flush_left" => LabelIndentationStyle.FlushLeft,
             "no_change" => LabelIndentationStyle.NoChange,
             "one_less_than_current" => LabelIndentationStyle.OneLessThanCurrent,
             _ => null
         };
-
 }
 
 enum LabelIndentationStyle

@@ -112,7 +112,7 @@ sealed class SinglePassEmitter
             }
             else
             {
-                EnterInitializer(piece.Token);
+                EnterInitializer(piece.Token, index);
                 EmitGap(pair, index);
             }
 
@@ -133,7 +133,7 @@ sealed class SinglePassEmitter
         return _output.ToString();
     }
 
-    void EnterInitializer(SyntaxToken token)
+    void EnterInitializer(SyntaxToken token, int index)
     {
         if (InitializerIndentationRule.FindDelimiter(token) is not { IsOpening: true } delimiter
             || _plan.InitializerIndentation(delimiter.Kind) is not { } indented
@@ -143,9 +143,33 @@ sealed class SinglePassEmitter
             return;
         }
 
+        var baseIndent = delimiter.Kind == InitializerKind.CollectionExpressionArgument
+            ? ArgumentIndent(token, index)
+            : _lineIndent;
         _initializerFrames.Push(new(
             delimiter.Initializer,
-            _lineIndent + (indented ? _plan.IndentUnit : "")));
+            baseIndent + (indented ? _plan.IndentUnit : "")));
+    }
+
+    string ArgumentIndent(SyntaxToken token, int index)
+    {
+        if (_syntaxWrapping.GapBefore(index) is { } gap
+            && gap.LastIndexOfAny(LineBreaks) is var lastBreak and >= 0)
+        {
+            return gap[(lastBreak + 1)..];
+        }
+
+        if (_plan.IndentBlockContents is not null
+            && token.Parent is CollectionExpressionSyntax collection)
+        {
+            SyntaxNode expression = collection;
+            while (expression.Parent is ParenthesizedExpressionSyntax or CastExpressionSyntax)
+                expression = expression.Parent;
+            if (expression.Parent is ArgumentSyntax { Parent: { } argumentList })
+                return _indentation.Continuation(argumentList, 1, "");
+        }
+
+        return _lineIndent;
     }
 
     /// <summary>
