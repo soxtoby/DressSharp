@@ -75,9 +75,18 @@ sealed class SyntaxWrappingSolver
                 var boundaryIndent = indent;
                 if (multi && occurrence.Kind == SyntaxWrappingKind.BinaryExpressions
                     && occurrence.Setting.Mode == WrappingMode.Auto
+                    && occurrence.Setting.IndentationStyle is null
                     && _trivia!.HasLineBreak(boundary.RightIndex))
                 {
                     boundaryIndent = _indentation.ExistingContinuation(_stream.Pieces[boundary.RightIndex].Token) ?? indent;
+                }
+                if (multi && occurrence is
+                    { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { IndentationStyle: not null } })
+                {
+                    var precedenceDepth = occurrence.Setting.IndentationStyle == "precedence"
+                        ? BinaryPrecedenceDepth(_stream.Pieces[boundary.OperatorIndex].Token.Parent as BinaryExpressionSyntax)
+                        : 0;
+                    boundaryIndent = _indentation.Continuation(occurrence.Node, 1 + precedenceDepth, "");
                 }
                 if (occurrence.Multi && occurrence.Setting.NestedStyle is { } style)
                 {
@@ -600,6 +609,12 @@ sealed class SyntaxWrappingSolver
             {
                 break;
             }
+            if (occurrence is { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { IndentationStyle: not null } }
+                && parent.Kind == SyntaxWrappingKind.BinaryExpressions)
+            {
+                parentIndex = parent.Parent;
+                continue;
+            }
             if (parent is { Applies: true, Multi: true })
                 count++;
             parentIndex = parent.Parent;
@@ -607,6 +622,42 @@ sealed class SyntaxWrappingSolver
 
         return count;
     }
+
+    static int BinaryPrecedenceDepth(BinaryExpressionSyntax? binary)
+    {
+        var depth = 0;
+        if (binary is null)
+            return depth;
+
+        var precedence = BinaryPrecedence(binary.Kind());
+        foreach (var parentBinary in binary.Ancestors().OfType<BinaryExpressionSyntax>())
+        {
+            var parentPrecedence = BinaryPrecedence(parentBinary.Kind());
+            if (precedence > parentPrecedence)
+                depth++;
+            precedence = parentPrecedence;
+        }
+
+        return depth;
+    }
+
+    static int BinaryPrecedence(SyntaxKind kind) => kind switch
+    {
+        SyntaxKind.MultiplyExpression or SyntaxKind.DivideExpression or SyntaxKind.ModuloExpression => 11,
+        SyntaxKind.AddExpression or SyntaxKind.SubtractExpression => 10,
+        SyntaxKind.LeftShiftExpression or SyntaxKind.RightShiftExpression or SyntaxKind.UnsignedRightShiftExpression => 9,
+        SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression
+            or SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression
+            or SyntaxKind.IsExpression or SyntaxKind.AsExpression => 8,
+        SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression => 7,
+        SyntaxKind.BitwiseAndExpression => 6,
+        SyntaxKind.ExclusiveOrExpression => 5,
+        SyntaxKind.BitwiseOrExpression => 4,
+        SyntaxKind.LogicalAndExpression => 3,
+        SyntaxKind.LogicalOrExpression => 2,
+        SyntaxKind.CoalesceExpression => 1,
+        _ => 0
+    };
 
     static bool StartsOnSameLine(SyntaxNode node, SyntaxNode ancestor)
     {

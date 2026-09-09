@@ -9,6 +9,53 @@ namespace DressSharp.UnitTests;
 public class IndentationOwnershipTests
 {
     [Theory]
+    [InlineData("flat", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;")]
+    [InlineData("precedence", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n        && _safetyContext?.IsUnsafe(node) == true;")]
+    public void Binary_indentation_can_follow_operator_precedence(string indentation, string expected)
+    {
+        const string source = "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;";
+        var preferences = new[]
+        {
+            ("dress_binary_expressions_layout", "auto"),
+            ("dress_binary_expression_indentation", indentation),
+            ("dotnet_style_operator_placement_when_wrapping", "beginning_of_line"),
+            ("max_line_length", "160")
+        };
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Precedence_indentation_does_not_indent_operators_at_the_same_precedence()
+    {
+        const string source = "var result = first\n    + second\n    - third;";
+        var preferences = new[]
+        {
+            ("dress_binary_expressions_layout", "auto"),
+            ("dress_binary_expression_indentation", "precedence")
+        };
+        var result = Format(source, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Precedence_indentation_adds_a_level_for_each_higher_precedence_group()
+    {
+        const string source = "var result = first || second && third == fourth + fifth;";
+        const string expected = "var result = first\n    || second\n        && third\n            == fourth\n                + fifth;";
+        var preferences = new[]
+        {
+            ("dress_binary_expressions_layout", "always_multi"),
+            ("dress_binary_expression_indentation", "precedence")
+        };
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
     public void Rewritten_loop_body_retains_argument_continuation_anchors(string lineEnding)

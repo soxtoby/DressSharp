@@ -57,6 +57,7 @@ dress_base_type_lists_layout = auto
 dress_constraint_clauses_layout = auto
 dress_member_access_chains_layout = auto
 dress_binary_expressions_layout = auto
+dress_binary_expression_indentation = flat
 dress_conditional_expressions_layout = auto
 dress_nested_conditional_style = flat
 dotnet_style_operator_placement_when_wrapping = beginning_of_line

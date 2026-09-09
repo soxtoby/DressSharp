@@ -113,4 +113,14 @@ public class RuleCatalogTests
             rules[key].Metadata.DefaultValue.ShouldBe("auto");
         });
     }
+
+    [Fact]
+    public void Binary_expression_indentation_exposes_flat_and_precedence_modes()
+    {
+        var metadata = RuleCatalog.BuiltIn.Rules
+            .Single(rule => rule.Metadata.RuleKey == RuleKey.DressBinaryExpressionIndentation)
+            .Metadata;
+        metadata.AcceptedValueForms.ShouldMatch(["flat", "precedence"]);
+        metadata.DefaultValue.ShouldBe("flat");
+    }
 }

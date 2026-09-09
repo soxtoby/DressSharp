@@ -25,6 +25,7 @@ public sealed class RuleKeyTests
     [InlineData(RuleKey.DressCollectionInitializerLayout, "dress_collection_initializer_layout")]
     [InlineData(RuleKey.DressArrayInitializerLayout, "dress_array_initializer_layout")]
     [InlineData(RuleKey.DressWithInitializerLayout, "dress_with_initializer_layout")]
+    [InlineData(RuleKey.DressBinaryExpressionIndentation, "dress_binary_expression_indentation")]
     [InlineData(RuleKey.DressSwitchExpressionIndentation, "dress_switch_expression_indentation")]
     [InlineData(RuleKey.InsertFinalNewline, "insert_final_newline")]
     internal void Names_convert_to_the_expected_editorconfig_spelling(RuleKey key, string expected) =>

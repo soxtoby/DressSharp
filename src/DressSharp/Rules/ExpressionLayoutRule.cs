@@ -2,6 +2,23 @@ using DressSharp.Architecture;
 
 namespace DressSharp.Rules;
 
+sealed class BinaryExpressionIndentationRule : IFormattingRule
+{
+    public RuleMetadata Metadata { get; } = new()
+        {
+            RuleKey = RuleKey.DressBinaryExpressionIndentation,
+            Caption = "Binary expression indentation",
+            GroupName = "Wrapping",
+            SubgroupName = "Expressions",
+            Description = "Controls whether wrapped higher-precedence binary groups align with the outer expression or indent one additional level per precedence group. Does not introduce wrapping.",
+            Values = RuleValues.Choice("flat", "precedence"),
+            DefaultValue = "flat",
+            Example = "var result = first\n    || second\n        && third;",
+            OwnedSyntax = "wrapped binary expression indentation",
+            Invariant = "Only whitespace changes"
+        };
+}
+
 sealed class NestedConditionalStyleRule : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()

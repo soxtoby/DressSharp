@@ -39,20 +39,26 @@ sealed class SyntaxWrappingSettings
         }
 
         var style = Preference(RuleKey.DressNestedConditionalStyle);
+        var binaryIndentation = Preference(RuleKey.DressBinaryExpressionIndentation);
         var placement = Preference(RuleKey.DotnetStyleOperatorPlacementWhenWrapping);
         Configure(SyntaxWrappingKind.ConditionalExpressions, style);
-        Configure(SyntaxWrappingKind.BinaryExpressions, null);
+        Configure(SyntaxWrappingKind.BinaryExpressions, null, binaryIndentation);
         return new(byKind, enabled);
 
         string? Preference(RuleKey key) => configuration.Preferences.TryGetValue(key, out var value)
             && !value.Equals("unset", StringComparison.OrdinalIgnoreCase) ? value.ToLowerInvariant() : null;
 
-        void Configure(SyntaxWrappingKind kind, string? nestedStyle)
+        void Configure(SyntaxWrappingKind kind, string? nestedStyle, string? indentationStyle = null)
         {
-            if (nestedStyle is null && placement is null)
+            if (nestedStyle is null && indentationStyle is null && placement is null)
                 return;
             var setting = byKind[(int)kind] ?? new Setting(WrappingMode.Preserve, maximumLineLength);
-            byKind[(int)kind] = setting with { NestedStyle = nestedStyle, OperatorPlacement = placement };
+            byKind[(int)kind] = setting with
+            {
+                NestedStyle = nestedStyle,
+                IndentationStyle = indentationStyle,
+                OperatorPlacement = placement
+            };
             enabled = true;
         }
     }
@@ -60,8 +66,9 @@ sealed class SyntaxWrappingSettings
     internal readonly record struct Setting(WrappingMode Mode, int MaximumLineLength)
     {
         internal string? NestedStyle { get; init; }
+        internal string? IndentationStyle { get; init; }
         internal string? OperatorPlacement { get; init; }
-        internal bool ShapesOperators => NestedStyle is not null || OperatorPlacement is not null;
+        internal bool ShapesOperators => NestedStyle is not null || IndentationStyle is not null || OperatorPlacement is not null;
         internal static Setting For(string preference, int maximumLineLength) => new(
             preference.Equals("compact", StringComparison.OrdinalIgnoreCase)
                 ? WrappingMode.Compact

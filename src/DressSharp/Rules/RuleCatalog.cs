@@ -178,6 +178,7 @@ sealed class RuleCatalog
             .Concat(spacingRules)
             .Concat(preservationRules)
             .Concat(syntaxWrappingRules)
+            .Append(new BinaryExpressionIndentationRule())
             .Append(new NestedConditionalStyleRule())
             .Append(new OperatorPlacementRule())
             .Concat(newLineRules)

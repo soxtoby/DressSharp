@@ -65,6 +65,20 @@ dress_nested_conditional_style = flat
 dotnet_style_operator_placement_when_wrapping = beginning_of_line
 ```
 
+Wrapped binary expressions have an independent indentation preference:
+
+```editorconfig
+dress_binary_expression_indentation = flat
+```
+
+It accepts `flat` (Default) or `precedence`. `flat` aligns every wrapped binary operator. `precedence` indents a nested higher-precedence binary group by one additional level. It controls indentation only; `dress_binary_expressions_layout` decides whether the expression wraps.
+
+```csharp
+var result = first
+    || second
+        && third;
+```
+
 `dress_nested_conditional_style` accepts `flat` (Default), `staircase`, and `decision_ladder`. The existing conditional layout preference controls whether expressions wrap. The style preference alone reshapes already-wrapped expressions; single-line expressions stay single-line. `always_single` takes precedence over the style.
 
 Flat keeps ternary operators at one indentation level. Staircase adds one level per nested ternary. Decision ladder puts each condition/result pair on one line, flattening only false-branch chains:
