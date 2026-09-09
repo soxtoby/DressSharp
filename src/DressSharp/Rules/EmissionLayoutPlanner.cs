@@ -42,6 +42,7 @@ sealed class EmissionLayoutPlanner
                 SyntaxWrappingTriggerMask.For(_wrappingSettings.ByKind))
             : EffectiveTokenStream.For(root, source, rewrites);
 
+        var indentation = new IndentationModel(_emitterPlan, root, rewrites);
         SyntaxWrappingSolver? wrappingSolver = null;
         if (_wrappingSettings.Enabled)
         {
@@ -56,12 +57,13 @@ sealed class EmissionLayoutPlanner
                 _wrappingSettings.ByKind,
                 _settings,
                 _emitterPlan,
+                indentation,
                 context,
                 discovery);
         }
 
         var trivia = TriviaLayoutPlan.For(root, stream, _triviaSettings, context);
         var wrapping = wrappingSolver?.Finish(trivia) ?? new([], 0);
-        return new(stream, trivia, wrapping);
+        return new(stream, trivia, wrapping, indentation);
     }
 }

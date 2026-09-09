@@ -9,6 +9,66 @@ namespace DressSharp.UnitTests;
 public class IndentationEmitterTests
 {
     [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void Simple_conditional_in_switch_case_retains_indentation(bool indentLabels, bool indentContents)
+    {
+        var labelIndent = indentLabels ? "    " : "";
+        var statementIndent = labelIndent + (indentContents ? "    " : "");
+        var source = $"switch (foo) {{\n{labelIndent}case 0:\n{statementIndent}if (ready)\n{statementIndent}{{\n{statementIndent}    Work();\n{statementIndent}}}\n}}";
+        var preferences = new[]
+        {
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_braces", "false"),
+            ("csharp_indent_switch_labels", indentLabels ? "true" : "false"),
+            ("csharp_indent_case_contents", indentContents ? "true" : "false")
+        };
+        var result = Format(source, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n", "unset")]
+    [InlineData("\r\n", "unset")]
+    [InlineData("\n", "auto")]
+    [InlineData("\r\n", "auto")]
+    public void Conditional_in_switch_case_retains_indentation(string lineEnding, string binaryLayout)
+    {
+        var source = """
+            switch (foo) {
+                case SyntaxKind.OpenParenToken:
+                    if (Enabled(SyntaxWrappingKind.Arguments) is not null
+                        && token.Parent is ArgumentListSyntax { Arguments.Count: > 0 } arguments
+                        && token == arguments.OpenParenToken)
+                    {
+                        AddOccurrence(arguments, SyntaxWrappingKind.Arguments);
+                    }
+                    else if (Enabled(SyntaxWrappingKind.Parameters) is not null
+                        && token.Parent is ParameterListSyntax { Parameters.Count: > 0 } parameters
+                        && token == parameters.OpenParenToken)
+                    {
+                        AddOccurrence(parameters, SyntaxWrappingKind.Parameters);
+                    }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = new[]
+        {
+            ("dress_binary_expressions_layout", binaryLayout),
+            ("max_line_length", "100"),
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_braces", "false"),
+            ("csharp_indent_switch_labels", "true"),
+            ("csharp_indent_case_contents", "true")
+        };
+        var result = Format(source, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
     public void Disabling_block_indentation_still_indents_declarations_like_dotnet_format(string lineEnding)

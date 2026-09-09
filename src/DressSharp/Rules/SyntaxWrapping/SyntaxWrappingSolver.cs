@@ -12,6 +12,7 @@ sealed class SyntaxWrappingSolver
     readonly EffectiveTokenStream _stream;
     readonly RuleSettings _settings;
     readonly EmitterPlan _emitterPlan;
+    readonly IndentationModel _indentation;
     readonly string _lineEnding;
     readonly bool _needsWidths;
     readonly Occurrence[] _occurrences;
@@ -23,13 +24,13 @@ sealed class SyntaxWrappingSolver
     Dictionary<int, int>? _baseGapWidths;
     readonly Dictionary<int, bool> _chainBoundaryBreaks = [];
     readonly Dictionary<int, string> _plannedLineBreaks = [];
-    int[]? _braceDepths;
     internal SyntaxWrappingSolver(
         string source,
         EffectiveTokenStream stream,
         SyntaxWrappingSettings.Setting?[] byKind,
         RuleSettings settings,
         EmitterPlan emitterPlan,
+        IndentationModel indentation,
         RuleContext context,
         SyntaxWrappingDiscovery.Result discovery)
     {
@@ -37,6 +38,7 @@ sealed class SyntaxWrappingSolver
         _stream = stream;
         _settings = settings;
         _emitterPlan = emitterPlan;
+        _indentation = indentation;
         _lineEnding = context.LineEnding;
         _occurrences = discovery.Occurrences;
         _boundaries = discovery.Boundaries;
@@ -71,6 +73,12 @@ sealed class SyntaxWrappingSolver
                     continue;
                 var multi = BoundaryBreak(occurrence, offset);
                 var boundaryIndent = indent;
+                if (multi && occurrence.Kind == SyntaxWrappingKind.BinaryExpressions
+                    && occurrence.Setting.Mode == WrappingMode.Auto
+                    && _trivia!.HasLineBreak(boundary.RightIndex))
+                {
+                    boundaryIndent = _indentation.ExistingContinuation(_stream.Pieces[boundary.RightIndex].Token) ?? indent;
+                }
                 if (occurrence.Multi && occurrence.Setting.NestedStyle is { } style)
                 {
                     if (ladder)
@@ -559,11 +567,9 @@ sealed class SyntaxWrappingSolver
         var occurrence = _occurrences[occurrenceIndex];
         var node = occurrence.Node;
         var units = extra + MultilineLayoutAncestors(occurrenceIndex);
-        var unit = _settings.IndentUnit;
-        if (_emitterPlan.IndentBlockContents == true)
+        if (_emitterPlan.IndentBlockContents is not null)
         {
-            var blockDepth = BraceDepth(occurrence.FirstToken);
-            return string.Concat(Enumerable.Repeat(unit, blockDepth + units));
+            return _indentation.Continuation(node, units, "");
         }
 
         var pieceIndex = node is InitializerExpressionSyntax or CollectionExpressionSyntax
@@ -580,46 +586,7 @@ sealed class SyntaxWrappingSolver
             leading++;
         }
 
-        return string.Create(
-            leading + units * unit.Length,
-            (text, line.Start, leading, unit, units),
-            static (destination, state) =>
-                {
-                    for (var index = 0; index < state.leading; index++)
-                        destination[index] = state.text[state.Start + index];
-                    var position = state.leading;
-                    for (var count = 0; count < state.units; count++)
-                    {
-                        state.unit.AsSpan().CopyTo(destination[position..]);
-                        position += state.unit.Length;
-                    }
-                });
-    }
-
-    int BraceDepth(int tokenIndex)
-    {
-        if (_braceDepths is null)
-        {
-            _braceDepths = new int[_stream.Pieces.Length];
-            var depth = 0;
-            for (var index = 0; index < _stream.Pieces.Length; index++)
-            {
-                _braceDepths[index] = depth;
-                var token = _stream.Pieces[index].Token;
-                var braceDepth = 1;
-                if (_emitterPlan.IndentLambdaBlock == true
-                    && token.Parent is BlockSyntax { Parent: LambdaExpressionSyntax })
-                {
-                    braceDepth++;
-                }
-                if (token.IsKind(SyntaxKind.OpenBraceToken))
-                    depth += braceDepth;
-                else if (token.IsKind(SyntaxKind.CloseBraceToken))
-                    depth -= braceDepth;
-            }
-        }
-
-        return _braceDepths[tokenIndex];
+        return _indentation.Continuation(node, units, piece.Source.Substring(line.Start, leading));
     }
 
     int MultilineLayoutAncestors(int occurrenceIndex)
@@ -629,8 +596,7 @@ sealed class SyntaxWrappingSolver
         for (var parentIndex = occurrence.Parent; parentIndex >= 0;)
         {
             var parent = _occurrences[parentIndex];
-            if (_emitterPlan.IndentBlockContents != true
-                && !StartsOnSameLine(occurrence.Node, parent.Node))
+            if (!StartsOnSameLine(occurrence.Node, parent.Node))
             {
                 break;
             }

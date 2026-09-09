@@ -38,13 +38,12 @@ sealed class SinglePassEmitter
     bool _lastPreservationContainerIsSafe;
 
     /// <summary>
-    /// The indentation for content at each open brace, innermost last. Nesting alone decides it,
-    /// so no lookup of where an owning syntax node started is needed.
+    /// The active brace contents, innermost last, resolved by the shared indentation model.
     /// </summary>
     readonly List<string> _contentIndents = [""];
     readonly Stack<string> _braceIndents = new();
     readonly Stack<InitializerFrame> _initializerFrames = new();
-    readonly Dictionary<SyntaxNode, string> _emittedContentIndents = [];
+    readonly IndentationModel _indentation;
     readonly Dictionary<SyntaxToken, string> _sourceIndents = [];
     readonly HashSet<SyntaxToken> _originalTokens = [];
 
@@ -59,6 +58,7 @@ sealed class SinglePassEmitter
         int capacity)
     {
         _plan = plan;
+        _indentation = layout.Indentation;
         _syntaxWrapping = layout.Wrapping;
         _triviaLayout = layout.Trivia;
         _context = context;
@@ -454,13 +454,12 @@ sealed class SinglePassEmitter
             };
         }
 
-        if (_plan.IndentSwitchLabels is { } indentSwitchLabels
+        if (_plan.IndentSwitchLabels is not null
             && token.Parent is SwitchLabelSyntax label
             && token == label.GetFirstToken()
             && (!_checkMalformedRegions || !IsUnsafeOriginal(label)))
         {
-            var switchIndent = _braceIndents.Count != 0 ? _braceIndents.Peek() : "";
-            return switchIndent + (indentSwitchLabels ? _plan.IndentUnit : "");
+            return _indentation.SwitchLabel((SwitchSectionSyntax)label.Parent!);
         }
 
         if (CaseBlockIndent(token) is { } caseBlockIndent)
@@ -482,18 +481,14 @@ sealed class SinglePassEmitter
         if (EmbeddedStatements.StartsBody(token, out var embeddedStatement)
             && (!_checkMalformedRegions || !IsUnsafeOriginal(embeddedStatement)))
         {
-            return _contentIndents[^1]
-                + string.Concat(Enumerable.Repeat(
-                    _plan.IndentUnit,
-                    EmbeddedStatements.UnbracedDepth(embeddedStatement)));
+            return _indentation.ForNode(embeddedStatement);
         }
 
-        if (_plan.IndentCaseContents is { } indentCaseContents
+        if (_plan.IndentCaseContents is not null
             && DirectSwitchSectionStatement(token) is { } section
             && (!_checkMalformedRegions || !IsUnsafeOriginal(section)))
         {
-            var labelIndent = SwitchLabelIndent();
-            return labelIndent + (indentCaseContents ? _plan.IndentUnit : "");
+            return _indentation.ForNode(token.Parent?.FirstAncestorOrSelf<StatementSyntax>());
         }
 
         if (_plan.IndentBlockContents is not null
@@ -506,7 +501,9 @@ sealed class SinglePassEmitter
 
         return token.IsKind(SyntaxKind.CloseBraceToken) && _braceIndents.Count != 0
             ? _braceIndents.Peek()
-            : _contentIndents[^1];
+            : token.Parent is ElseClauseSyntax or CatchClauseSyntax or FinallyClauseSyntax
+                ? _indentation.ForNode(token.Parent)
+                : _contentIndents[^1];
     }
 
     string? SwitchExpressionIndentFor(SyntaxToken token)
@@ -537,7 +534,7 @@ sealed class SinglePassEmitter
             || token != block.OpenBraceToken && token != block.CloseBraceToken
             || block.ContainsDirectives
             || _checkMalformedRegions && IsUnsafeOriginal(lambda)
-            || !_emittedContentIndents.TryGetValue(lambda, out var lambdaIndent))
+            || !_indentation.TryGet(lambda, out var lambdaIndent))
         {
             return null;
         }
@@ -548,13 +545,16 @@ sealed class SinglePassEmitter
     string BraceBaseIndent(SyntaxToken token)
     {
         if (token.Parent is BlockSyntax { Parent: AnonymousFunctionExpressionSyntax function }
-            && _emittedContentIndents.TryGetValue(function, out var functionIndent))
+            && _indentation.TryGet(function, out var functionIndent))
             return functionIndent;
+
+        if (_plan.IndentBlockContents is not null && token.Parent is { } braceOwner)
+            return _indentation.ForNode(braceOwner);
 
         if (_plan.IndentBlockContents is null)
         {
             var owner = token.Parent is BlockSyntax or AccessorListSyntax ? token.Parent.Parent : token.Parent;
-            if (owner is not null && _emittedContentIndents.TryGetValue(owner, out var ownerIndent))
+            if (owner is not null && _indentation.TryGet(owner, out var ownerIndent))
                 return ownerIndent;
             if (owner is not null && _sourceIndents.TryGetValue(owner.GetFirstToken(), out var sourceIndent))
                 return sourceIndent;
@@ -562,18 +562,6 @@ sealed class SinglePassEmitter
 
         return _contentIndents[^1];
     }
-
-    string SwitchLabelIndent()
-    {
-        if (_plan.IndentSwitchLabels is not { } indentSwitchLabels)
-            return _contentIndents[^1];
-
-        var switchIndent = _braceIndents.Count != 0 ? _braceIndents.Peek() : "";
-        return SwitchLabelIndentFrom(switchIndent, indentSwitchLabels);
-    }
-
-    string SwitchLabelIndentFrom(string switchIndent, bool indentSwitchLabels) =>
-        switchIndent + (indentSwitchLabels ? _plan.IndentUnit : "");
 
     static SwitchSectionSyntax? DirectSwitchSectionStatement(SyntaxToken token)
     {
@@ -591,22 +579,14 @@ sealed class SinglePassEmitter
 
     string? CaseBlockIndent(SyntaxToken token)
     {
-        if (_plan.IndentCaseContentsWhenBlock is not { } indentCaseContentsWhenBlock
+        if (_plan.IndentCaseContentsWhenBlock is null
             || DirectSwitchSectionBlock(token) is not { } section
             || !CaseBlockSectionIsSafe(section))
         {
             return null;
         }
 
-        var switchIndent = token.IsKind(SyntaxKind.CloseBraceToken) && _braceIndents.Count > 1
-            ? _braceIndents.ElementAt(1)
-            : _braceIndents.Count != 0 ? _braceIndents.Peek() : "";
-        var labelIndent = _plan.IndentSwitchLabels is { } indentSwitchLabels
-            ? SwitchLabelIndentFrom(switchIndent, indentSwitchLabels)
-            : token.IsKind(SyntaxKind.CloseBraceToken) && _contentIndents.Count > 1
-                ? _contentIndents[^2]
-                : _contentIndents[^1];
-        return labelIndent + (indentCaseContentsWhenBlock ? _plan.IndentUnit : "");
+        return _indentation.Brace(token.Parent!);
     }
 
     bool CaseBlockSectionIsSafe(SwitchSectionSyntax section)
@@ -824,7 +804,7 @@ sealed class SinglePassEmitter
         {
             return null;
         }
-        if (!_emittedContentIndents.TryGetValue(content, out var emittedContentIndent))
+        if (!_indentation.TryGet(content, out var emittedContentIndent))
             return null;
         if (!_originalTokens.Contains(token)
             && contentIndent.Length == 0
@@ -840,12 +820,12 @@ sealed class SinglePassEmitter
     void RememberContentIndents(SyntaxToken token)
     {
         if (DirectContentFor(token) is { } content && content.GetFirstToken() == token)
-            _emittedContentIndents[content] = _lineIndent;
+            _indentation.Remember(content, _lineIndent);
 
         for (var node = token.Parent; node is not null && node.GetFirstToken() == token; node = node.Parent)
         {
             if (node is AnonymousFunctionExpressionSyntax)
-                _emittedContentIndents[node] = _lineIndent;
+                _indentation.Remember(node, _lineIndent);
         }
     }
 
@@ -946,11 +926,9 @@ sealed class SinglePassEmitter
                     ? BraceBaseIndent(token) + (indentBraces ? _plan.IndentUnit : "")
                     : _lineIndent);
             _braceIndents.Push(braceIndent);
-            _contentIndents.Add(_plan.IndentBlockContents is { } indentBlockContents
-                ? braceIndent + (indentBlockContents
-                    || token.Parent is BaseNamespaceDeclarationSyntax or BaseTypeDeclarationSyntax or AccessorListSyntax
-                        ? _plan.IndentUnit
-                        : "")
+            _indentation.RememberBrace(token.Parent!, braceIndent);
+            _contentIndents.Add(_plan.IndentBlockContents is not null
+                ? _indentation.Contents(token.Parent!)
                 : braceIndent);
         }
         else if (token.IsKind(SyntaxKind.CloseBraceToken) && _contentIndents.Count > 1)

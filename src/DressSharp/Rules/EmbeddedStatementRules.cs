@@ -87,26 +87,6 @@ static class EmbeddedStatements
             && statement is not IfStatementSyntax { Parent: ElseClauseSyntax };
     }
 
-    internal static int UnbracedDepth(StatementSyntax statement)
-    {
-        var depth = 0;
-        StatementSyntax? current = statement;
-        if (current is BlockSyntax)
-            current = ContainingStatement(OwnerOf(current));
-
-        while (current is not null && OwnerOf(current) is { } owner)
-        {
-            if (current is not IfStatementSyntax || owner is not ElseClauseSyntax)
-                depth++;
-            current = ContainingStatement(owner);
-        }
-
-        return depth;
-    }
-
-    static StatementSyntax? ContainingStatement(SyntaxNode? owner) =>
-        (owner is ElseClauseSyntax alternative ? alternative.Parent : owner) as StatementSyntax;
-
     static SyntaxNode? OwnerOf(StatementSyntax statement) => statement.Parent switch
         {
             IfStatementSyntax conditional when ReferenceEquals(conditional.Statement, statement) => conditional,
@@ -318,9 +298,13 @@ static class EmbeddedStatementBraces
             if (IsMultiline(statement))
             {
                 var lineEnding = SyntaxFactory.EndOfLine(context.LineEnding);
+                // Keep the source anchor for continuation lines; emission will reindent the body.
+                var indentation = leading.Reverse().TakeWhile(trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia)).Reverse();
                 block = block
                     .WithOpenBraceToken(block.OpenBraceToken.WithTrailingTrivia(lineEnding))
-                    .WithStatements(SyntaxFactory.SingletonList(inner.WithTrailingTrivia(lineEnding)));
+                    .WithStatements(SyntaxFactory.SingletonList(inner
+                        .WithLeadingTrivia(indentation)
+                        .WithTrailingTrivia(lineEnding)));
             }
             else
             {
