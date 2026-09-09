@@ -834,6 +834,84 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_layout_keeps_a_property_pattern_indented_as_the_right_operand_of_is(string lineEnding)
+    {
+        const string source = """
+            class C
+            {
+                void M(bool multi, Occurrence occurrence)
+                {
+                    if (!multi
+                        && occurrence.Setting is
+                            { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue })
+                    {
+                    }
+                }
+            }
+            """;
+        var preferences = new[]
+        {
+            ("dress_binary_expressions_layout", "auto"),
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_braces", "false"),
+            ("max_line_length", "160")
+        };
+
+        var input = source.ReplaceLineEndings(lineEnding);
+        var result = Format(input, preferences);
+
+        result.ShouldBe(input);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_layout_indents_a_property_pattern_once_from_the_is_expression(string lineEnding)
+    {
+        const string source = """
+            class C
+            {
+                void M(IEnumerable<Setting> settings)
+                {
+                    foreach (var setting in settings)
+                    {
+                        _needsWidths |= setting is
+                                    { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue };
+                    }
+                }
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                void M(IEnumerable<Setting> settings)
+                {
+                    foreach (var setting in settings)
+                    {
+                        _needsWidths |= setting is
+                            { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue };
+                    }
+                }
+            }
+            """;
+        var preferences = new[]
+        {
+            ("dress_binary_expressions_layout", "auto"),
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_braces", "false"),
+            ("max_line_length", "160")
+        };
+
+        var result = Format(source.ReplaceLineEndings(lineEnding), preferences);
+
+        result.ShouldBe(expected.ReplaceLineEndings(lineEnding));
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData(160)]
     [InlineData(60)]
     public void Auto_member_access_measures_multiline_arguments_on_their_own_lines(int maximum)

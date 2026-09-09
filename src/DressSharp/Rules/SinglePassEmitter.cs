@@ -433,6 +433,14 @@ sealed class SinglePassEmitter
 
     string IndentFor(SyntaxToken token)
     {
+        if (token.IsKind(SyntaxKind.OpenBraceToken)
+            && token.Parent is PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax pattern }
+            && pattern.Parent is IsPatternExpressionSyntax isPattern
+            && _indentation.ExistingContinuation(isPattern.GetFirstToken()) is { } isPatternIndent)
+        {
+            return isPatternIndent + _plan.IndentUnit;
+        }
+
         if (SwitchExpressionIndentFor(token) is { } switchExpressionIndent)
             return switchExpressionIndent;
 

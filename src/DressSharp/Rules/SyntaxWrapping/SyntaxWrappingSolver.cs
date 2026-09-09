@@ -47,7 +47,7 @@ sealed class SyntaxWrappingSolver
         foreach (var setting in byKind)
         {
             _needsWidths |= setting is
-                        { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue };
+                { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue };
         }
     }
     internal SyntaxWrappingPlan Finish(TriviaLayoutPlan trivia)
