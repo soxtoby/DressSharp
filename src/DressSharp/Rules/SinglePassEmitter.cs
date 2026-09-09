@@ -458,12 +458,8 @@ sealed class SinglePassEmitter
     string IndentFor(SyntaxToken token)
     {
         if (token.IsKind(SyntaxKind.OpenBraceToken)
-            && token.Parent is PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax pattern }
-            && pattern.Parent is IsPatternExpressionSyntax isPattern
-            && _indentation.ExistingContinuation(isPattern.GetFirstToken()) is { } isPatternIndent)
-        {
-            return isPatternIndent + _plan.IndentUnit;
-        }
+            && PropertyPatternBraceIndent(token) is { } propertyPatternIndent)
+            return propertyPatternIndent;
 
         if (SwitchExpressionIndentFor(token) is { } switchExpressionIndent)
             return switchExpressionIndent;
@@ -576,6 +572,9 @@ sealed class SinglePassEmitter
 
     string BraceBaseIndent(SyntaxToken token)
     {
+        if (PropertyPatternBraceIndent(token) is { } propertyPatternIndent)
+            return propertyPatternIndent;
+
         if (token.Parent is BlockSyntax { Parent: AnonymousFunctionExpressionSyntax function }
             && _indentation.TryGet(function, out var functionIndent))
             return functionIndent;
@@ -593,6 +592,20 @@ sealed class SinglePassEmitter
         }
 
         return _contentIndents[^1];
+    }
+
+    string? PropertyPatternBraceIndent(SyntaxToken token)
+    {
+        if (token.Parent is not PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax pattern }
+            || pattern.Parent is not IsPatternExpressionSyntax isPattern)
+        {
+            return null;
+        }
+
+        var anchor = pattern.Type?.GetFirstToken() ?? isPattern.GetFirstToken();
+        return _indentation.ExistingContinuation(anchor) is { } indent
+            ? indent + (pattern.Type is null ? _plan.IndentUnit : "")
+            : null;
     }
 
     static SwitchSectionSyntax? DirectSwitchSectionStatement(SyntaxToken token)

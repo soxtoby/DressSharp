@@ -181,6 +181,32 @@ public class IndentationOwnershipTests
         Format(result, preferences).ShouldBe(result);
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Property_patterns_follow_their_binary_expression_continuation(string lineEnding)
+    {
+        var source = """
+            class C
+            {
+                void M()
+                {
+                    bool CanConvert(LambdaExpressionSyntax node) => expression
+                        && node.Body is BlockSyntax
+                        {
+                            Statements: [ReturnStatementSyntax { Expression: not null } or ExpressionStatementSyntax]
+                        };
+                }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults
+            .Select(item => (item.Key.ToName(), item.Default))
+            .ToArray();
+        var result = Format(source, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Fact]
     public void Nested_block_braces_and_wrapping_share_the_same_anchor()
     {
