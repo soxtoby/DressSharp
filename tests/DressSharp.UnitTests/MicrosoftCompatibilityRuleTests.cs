@@ -337,6 +337,10 @@ public class MicrosoftCompatibilityRuleTests
     [InlineData("csharp_space_between_method_declaration_parameter_list_parentheses", "true", "class C { void M(int x) { } }", "class C { void M( int x ) { } }")]
     [InlineData("csharp_space_between_method_declaration_empty_parameter_list_parentheses", "true", "class C { void M() { } }", "class C { void M( ) { } }")]
     [InlineData("csharp_space_between_method_declaration_name_and_open_parenthesis", "true", "class C { void M() { } }", "class C { void M () { } }")]
+    [InlineData("csharp_space_between_method_declaration_name_and_open_parenthesis",
+        "false",
+        "class C { void M() { _occurrences.Sort(static (left, right) => 0); } }",
+        "class C { void M() { _occurrences.Sort(static (left, right) => 0); } }")]
     [InlineData("csharp_space_between_method_call_parameter_list_parentheses",
         "true",
         "class C { void M() { N(1); } void N(int x) { } }",

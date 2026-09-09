@@ -252,7 +252,7 @@ sealed class MethodDeclarationSpacingRule(RuleKey ruleKey, string caption, strin
                 && right.IsKind(SyntaxKind.CloseParenToken)
                 && left.Parent is ParameterListSyntax { Parameters.Count: 0 },
             _ => right.IsKind(SyntaxKind.OpenParenToken)
-                && right.Parent is ParameterListSyntax
+                && right.Parent is ParameterListSyntax { Parent: not AnonymousFunctionExpressionSyntax }
         };
 
     static T? Parent<T>(SyntaxToken left, SyntaxToken right) where T : SyntaxNode =>
