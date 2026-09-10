@@ -245,6 +245,34 @@ public class SyntaxWrappingRuleTests
                 """);
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_base_type_list_measures_only_lines_containing_its_boundaries(string lineEnding)
+    {
+        const string source = """
+            sealed class ControlFlowKeywordSpacingRule() : TokenSpacingRule(
+                RuleKey.CSharpSpaceAfterKeywordsInControlFlowStatements, "After keywords in control flow statements", null,
+                ["true", "false"],
+                "true",
+                "control-flow keywords")
+            { }
+            """;
+        var expected = source.ReplaceLineEndings(lineEnding);
+
+        var result = Format(
+            expected,
+            ("dress_base_type_lists_layout", "auto"),
+            ("max_line_length", "160"));
+
+        result.ShouldBe(expected);
+        Format(
+                result,
+                ("dress_base_type_lists_layout", "auto"),
+                ("max_line_length", "160"))
+            .ShouldBe(result);
+    }
+
     [Fact]
     public void Initializer_layout_overrides_the_standard_open_brace_rule()
     {

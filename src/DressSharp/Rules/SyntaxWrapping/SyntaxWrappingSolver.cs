@@ -180,7 +180,7 @@ sealed class SyntaxWrappingSolver
                 && occurrence.Setting is
                     { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue })
             {
-                if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax or BaseArgumentListSyntax
+                if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax or BaseArgumentListSyntax or BaseListSyntax
                     && MeasureMultilineBoundaries(occurrence) is { } breaks)
                 {
                     multi = breaks.Any(value => value);
