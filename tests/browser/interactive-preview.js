@@ -30,7 +30,10 @@ async page => {
         const sent = await paste("class C { void M(int a,int b) {} }\r\n");
         assert(sent.source.endsWith("\n") && !sent.source.includes("\r"), "Paste must normalize to LF");
         await ready();
+        assert(await page.locator(".settings-rail .find-selection-rules").count() === 0, "Related-rules action must not add a settings row");
+        assert(await page.locator(".preview-note .find-selection-rules").count() === 1, "Related-rules action must sit beside preview position");
         await page.getByRole("searchbox", {name: "Find a preference"}).fill("csharp_space_after_comma");
+        assert(await page.getByRole("button", {name: "Clear preference search and related-rules filter"}).count() === 1, "Search and related rules must share one clear action");
         await page.locator(".rule-row select").selectOption("explicit:true");
         await ready();
         assert(await page.locator("[data-deletions] [data-content]").textContent().then(text => text.includes("int a, int b")), "Real pending preference must format output");

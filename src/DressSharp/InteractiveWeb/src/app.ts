@@ -62,6 +62,19 @@ function render() {
         render();
         document.querySelector<HTMLInputElement>(".search input")?.focus();
     });
+    const clearFilters = el("button", "clear-filters", ["×"]);
+    clearFilters.title = "Clear preference search and related-rules filter";
+    clearFilters.setAttribute("aria-label", clearFilters.title);
+    clearFilters.hidden = query.length === 0 && selectionRules === null;
+    clearFilters.addEventListener("click", () => {
+        query = "";
+        preview.clearSelectionRules();
+        render();
+        document.querySelector<HTMLInputElement>(".search input")?.focus();
+    });
+    const relatedFilter = el("span", "related-filter", [selectionRules === null ? "" : `${selectionRules.size} related`]);
+    relatedFilter.hidden = selectionRules === null;
+    relatedFilter.title = selectionLabel;
     const list = el("div", "group-list");
     for (const [groupName, rules] of groupRules(matching)) {
         const details = document.createElement("details");
@@ -88,13 +101,6 @@ function render() {
     if (!matching.length) list.append(el("p", "empty", [selectionRules?.size === 0
         ? "No individual setting changes these lines. Settings already satisfied or overridden by other settings may not appear."
         : "No preferences match."]));
-    const relatedCount = el("span", "related-count", [selectionRules === null ? "" : String(selectionRules.size)]);
-    relatedCount.title = `${selectionLabel} · ${selectionRules?.size ?? 0} related rules`;
-    const clearSelection = el("button", "quiet clear-selection", ["×"]);
-    clearSelection.title = "Show all rules and clear preview selection";
-    clearSelection.setAttribute("aria-label", clearSelection.title);
-    clearSelection.addEventListener("click", () => preview.clearSelectionRules());
-
     const invalid = hasInvalidEdits();
     const save = el("button", "save", [saveLabel()]);
     setDisabled(save, edits.size === 0 || invalid || unavailable || saving);
@@ -119,13 +125,7 @@ function render() {
         el("main", "workbench-grid", [
             el("aside", "settings-rail", [
                 el("div", "rail-toolbar", [el("div", "", [el("h1", "", ["Preferences"]), el("span", "rule-count", [`${bootstrap.catalog.rules.length} rules`]), ...(saveError ? [el("span", "save-error", [saveError])] : [])]), save]),
-                el("label", "search", [el("span", "", ["⌕"]), search]),
-                el("div", "preview-selection-controls", [
-                    preview.selectionSummary,
-                    preview.selectionAction,
-                    relatedCount,
-                    clearSelection,
-                ]),
+                el("div", "search", [el("span", "", ["⌕"]), search, relatedFilter, clearFilters]),
                 list,
             ]),
             el("section", "canvas"),

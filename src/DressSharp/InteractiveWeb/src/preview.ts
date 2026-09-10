@@ -151,9 +151,12 @@ export class Preview {
         this.status.setAttribute("role", "status");
         this.cursor.className = "cursor-position";
         this.cursor.textContent = "Ln 1, Col 1";
+        const selectionTools = document.createElement("span");
+        selectionTools.className = "preview-selection-tools";
+        selectionTools.append(this.selectionSummary, this.selectionAction);
         const details = document.createElement("span");
         details.className = "preview-details";
-        details.append(this.cursor, this.facts);
+        details.append(selectionTools, this.cursor, this.facts);
         this.element.querySelector(".preview-note")!.append(this.status, details);
         this.element.querySelector<HTMLInputElement>(".whitespace-toggle")!.addEventListener("change", event => {
             this.host.toggleAttribute("data-whitespace", (event.target as HTMLInputElement).checked);
