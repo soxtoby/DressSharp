@@ -67,6 +67,22 @@ sealed class SyntaxWrappingSolver
             var indent = occurrence.Multi ? Indent(occurrenceIndex, 1 + conditionDepth) : "";
             var baseIndent = occurrence.Multi ? Indent(occurrenceIndex, 0) : "";
             var ladder = occurrence.Multi && CanUseDecisionLadder(occurrence, gapMap);
+            var flatBinaryIndent = occurrence is
+                {
+                    Kind: SyntaxWrappingKind.BinaryExpressions,
+                    Setting: { Mode: WrappingMode.Auto or WrappingMode.Preserve, IndentationStyle: "flat" }
+                }
+                ? ExistingFlatBinaryIndent(occurrence)
+                : null;
+            var precedenceOperandIndent = occurrence is
+                {
+                    Kind: SyntaxWrappingKind.BinaryExpressions,
+                    Setting: { Mode: WrappingMode.Auto or WrappingMode.Preserve, IndentationStyle: "precedence" },
+                    Node: BinaryExpressionSyntax binary
+                }
+                && binary.Ancestors().OfType<BinaryExpressionSyntax>().None()
+                ? ExistingBinaryOperandIndent(occurrence)
+                : null;
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
@@ -77,13 +93,20 @@ sealed class SyntaxWrappingSolver
                 {
                     boundaryIndent = _indentation.ExistingContinuation(_stream.Pieces[boundary.RightIndex].Token) ?? indent;
                 }
-                if (multi && occurrence is
-                    { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { IndentationStyle: not null } })
+                if (multi && flatBinaryIndent is not null
+                    && occurrence.Setting.IndentationStyle == "flat")
                 {
-                    var precedenceDepth = occurrence.Setting.IndentationStyle == "precedence"
-                        ? BinaryPrecedenceDepth(_stream.Pieces[boundary.OperatorIndex].Token.Parent as BinaryExpressionSyntax)
-                        : 0;
-                    boundaryIndent = _indentation.Continuation(occurrence.Node, 1 + precedenceDepth, "");
+                    boundaryIndent = flatBinaryIndent;
+                }
+                if (multi && occurrence is
+                    { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { IndentationStyle: "precedence" } })
+                {
+                    var precedenceDepth = BinaryPrecedenceDepth(
+                        _stream.Pieces[boundary.OperatorIndex].Token.Parent as BinaryExpressionSyntax);
+                    boundaryIndent = precedenceOperandIndent is null
+                        ? _indentation.Continuation(occurrence.Node, 1 + precedenceDepth, "")
+                        : precedenceOperandIndent
+                            + string.Concat(Enumerable.Repeat(_emitterPlan.IndentUnit, precedenceDepth));
                 }
                 if (occurrence is { Multi: true, Setting.NestedStyle: { } style })
                 {
@@ -321,6 +344,26 @@ sealed class SyntaxWrappingSolver
         }
         return false;
     }
+
+    string? ExistingFlatBinaryIndent(Occurrence occurrence)
+    {
+        if (_trivia!.HasLineBreak(occurrence.FirstToken))
+            return _indentation.ExistingContinuation(_stream.Pieces[occurrence.FirstToken].Token);
+
+        for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+        {
+            var boundary = _boundaries[occurrence.BoundaryStart + offset];
+            if (_trivia.HasLineBreak(boundary.RightIndex))
+                return _indentation.ExistingContinuation(_stream.Pieces[boundary.RightIndex].Token);
+        }
+
+        return null;
+    }
+
+    string? ExistingBinaryOperandIndent(Occurrence occurrence) =>
+        _trivia!.HasLineBreak(occurrence.FirstToken)
+            ? _indentation.ExistingContinuation(_stream.Pieces[occurrence.FirstToken].Token)
+            : null;
 
     bool CanUseDecisionLadder(Occurrence occurrence, IReadOnlyDictionary<int, string> childGaps)
     {

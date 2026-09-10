@@ -58,6 +58,44 @@ public class IndentationOwnershipTests
     [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
+    public void Binary_continuations_follow_a_multiline_lambda_in_a_collection_expression(string lineEnding)
+    {
+        var expected = """
+            abstract class B
+            {
+                internal abstract ImmutableArray<SyntaxKind> TriggerKinds { get; }
+            }
+
+            class C : B
+            {
+                internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } =
+                    [
+                        .. Enum.GetValues<SyntaxKind>()
+                            .Where(kind =>
+                                SyntaxFacts.GetBinaryExpression(kind) != SyntaxKind.None
+                                || SyntaxFacts.GetAssignmentExpression(kind) != SyntaxKind.None)
+                    ];
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var source = expected.Replace(
+            lineEnding + "                    ||",
+            lineEnding + "    ||",
+            StringComparison.Ordinal);
+        var preferences = PreferenceCatalog.Defaults
+            .Select(item => (item.Key.ToName(), item.Key == RuleKey.DressBinaryExpressionIndentation
+                ? "precedence"
+                : item.Default))
+            .ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
     public void Rewritten_loop_body_retains_argument_continuation_anchors(string lineEnding)
     {
         var source = """

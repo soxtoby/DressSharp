@@ -51,6 +51,44 @@ public sealed class InteractivePreviewTests
         result.Text.ShouldBe(source);
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public async Task Preview_aligns_a_binary_operator_with_its_first_operand(string lineEnding)
+    {
+        var source = """
+            abstract class B
+            {
+                internal abstract ImmutableArray<SyntaxKind> TriggerKinds { get; }
+            }
+
+            class C : B
+            {
+                internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } =
+                    [
+                        .. Enum.GetValues<SyntaxKind>()
+                            .Where(kind =>
+                                SyntaxFacts.GetBinaryExpression(kind) != SyntaxKind.None
+                                || SyntaxFacts.GetAssignmentExpression(kind) != SyntaxKind.None)
+                    ];
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = new[]
+        {
+            Preference(RuleKey.IndentSize, "4"),
+            Preference(RuleKey.CSharpIndentBlockContents, "true"),
+            Preference(RuleKey.DressBinaryExpressionsLayout, "auto"),
+            Preference(RuleKey.DressBinaryExpressionIndentation, "precedence"),
+            Preference(RuleKey.DotnetStyleOperatorPlacementWhenWrapping, "beginning_of_line"),
+            Preference(RuleKey.MaxLineLength, "160")
+        };
+
+        var result = await InteractivePreview.Format(source, preferences, TestContext.Current.CancellationToken);
+
+        result.Text.ShouldBe(source);
+        (await InteractivePreview.Format(result.Text, preferences, TestContext.Current.CancellationToken)).Text.ShouldBe(result.Text);
+    }
+
     [Fact]
     public void Pending_assignments_resolve_inheritance_unset_and_derived_values()
     {
