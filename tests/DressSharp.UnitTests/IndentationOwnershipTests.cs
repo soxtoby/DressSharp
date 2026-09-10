@@ -162,6 +162,74 @@ public class IndentationOwnershipTests
         Format(result, preferences).ShouldBe(result);
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Conditional_invocation_arguments_follow_the_conditional_branch(string lineEnding)
+    {
+        var source = """
+            class C
+            {
+                public override SyntaxNode? VisitMethodDeclaration(MethodDeclarationSyntax node) =>
+                    kind == MemberBodyKind.Method
+                        ? RewriteCallable(node, node.Body, node.ExpressionBody, node.SemicolonToken, node.ReturnType is PredefinedTypeSyntax { Keyword.RawKind: (int)SyntaxKind.VoidKeyword })
+                        : base.VisitMethodDeclaration(node);
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var expected = """
+            class C
+            {
+                public override SyntaxNode? VisitMethodDeclaration(MethodDeclarationSyntax node) =>
+                    kind == MemberBodyKind.Method
+                        ? RewriteCallable(
+                            node,
+                            node.Body,
+                            node.ExpressionBody,
+                            node.SemicolonToken,
+                            node.ReturnType is PredefinedTypeSyntax { Keyword.RawKind: (int)SyntaxKind.VoidKeyword }
+                        )
+                        : base.VisitMethodDeclaration(node);
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults
+            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .ToArray();
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Nested_invocation_arguments_follow_their_expression_body(string lineEnding)
+    {
+        var source = """
+            class C
+            {
+                static AccessorListSyntax Getter(ArrowExpressionClauseSyntax arrow, SyntaxToken semicolon) =>
+                    SyntaxFactory.AccessorList(SyntaxFactory.SingletonList(SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration, GeneratedSyntax.Mark(SyntaxFactory.Block(Return(arrow.Expression))))));
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var expected = """
+            class C
+            {
+                static AccessorListSyntax Getter(ArrowExpressionClauseSyntax arrow, SyntaxToken semicolon) =>
+                    SyntaxFactory.AccessorList(
+                        SyntaxFactory.SingletonList(
+                            SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration, GeneratedSyntax.Mark(SyntaxFactory.Block(Return(arrow.Expression))))
+                        )
+                    );
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults
+            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .ToArray();
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Fact]
     public void Binary_continuations_follow_their_multiline_argument()
     {

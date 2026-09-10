@@ -65,6 +65,11 @@ sealed class IndentationModel
         return node.Parent switch
         {
             ArgumentListSyntax arguments when node is ArgumentSyntax => ForNode(arguments) + PreservedContinuation(node, arguments),
+            ArrowExpressionClauseSyntax clause when node is ConditionalExpressionSyntax or InvocationExpressionSyntax
+                && node == clause.Expression =>
+                ForNode(clause.Parent) + Unit(StartsAfterArrow(clause)),
+            ConditionalExpressionSyntax conditional when node == conditional.WhenTrue || node == conditional.WhenFalse =>
+                ForNode(conditional) + _plan.IndentUnit,
             BlockSyntax block => Contents(block),
             SwitchSectionSyntax section => CaseContents(section, node is BlockSyntax),
             ElseClauseSyntax clause => ForNode(clause) + Unit(node is not (BlockSyntax or IfStatementSyntax)),
@@ -117,6 +122,10 @@ sealed class IndentationModel
             ? indent[ownerIndent.Length..]
             : "";
     }
+
+    static bool StartsAfterArrow(ArrowExpressionClauseSyntax clause) =>
+        clause.Expression.GetLocation().GetLineSpan().StartLinePosition.Line
+        > clause.ArrowToken.GetLocation().GetLineSpan().StartLinePosition.Line;
 
     static string LeadingIndent(SourceText text, TextLine line)
     {
