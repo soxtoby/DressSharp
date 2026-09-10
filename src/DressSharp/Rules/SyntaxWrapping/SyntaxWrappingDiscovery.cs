@@ -401,8 +401,6 @@ sealed class SyntaxWrappingDiscovery
 
     void Conditional(ConditionalExpressionSyntax root, int firstToken, int lastToken)
     {
-        if (Enabled(SyntaxWrappingKind.ConditionalExpressions)?.NestedStyle == "decision_ladder" && firstToken > 0)
-            _boundaries.Add(new(firstToken, GapStyle.Item, BreakWhenMulti: false));
         var pieces = _stream.Pieces;
         for (var index = firstToken; index <= lastToken; index++)
         {

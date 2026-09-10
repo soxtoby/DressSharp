@@ -84,8 +84,7 @@ var result = first
 Flat keeps ternary operators at one indentation level. Staircase adds one level per nested ternary. Decision ladder puts each condition/result pair on one line, flattening only false-branch chains:
 
 ```csharp
-var result =
-    first ? one
+var result = first ? one
     : second ? two
     : three;
 ```
@@ -95,8 +94,7 @@ Decision ladders fall back to staircase when a condition or branch remains multi
 The standard `dotnet_style_operator_placement_when_wrapping` accepts `beginning_of_line` (Default) and `end_of_line`. It applies to binary operators and ternary `?` / `:`. With `end_of_line`, the ladder above becomes:
 
 ```csharp
-var result =
-    first ? one :
+var result = first ? one :
     second ? two :
     three;
 ```

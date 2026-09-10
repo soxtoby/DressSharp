@@ -70,8 +70,6 @@ sealed class SyntaxWrappingSolver
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
-                if (boundary.RightIndex == occurrence.FirstToken && !boundary.BreakWhenMulti && !ladder)
-                    continue;
                 var multi = BoundaryBreak(occurrence, offset);
                 var boundaryIndent = indent;
                 if (multi && occurrence is { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { Mode: WrappingMode.Auto, IndentationStyle: null } }
@@ -93,8 +91,7 @@ sealed class SyntaxWrappingSolver
                     {
                         boundaryIndent = Indent(occurrenceIndex,
                             _emitterPlan.IndentBlockContents != true && _trivia!.HasLineBreak(occurrence.FirstToken) ? 0 : 1);
-                        multi = boundary.RightIndex == occurrence.FirstToken
-                            || boundary is { BreakWhenMulti: true, OperatorIndex: >= 0 }
+                        multi = boundary is { BreakWhenMulti: true, OperatorIndex: >= 0 }
                             && _stream.Pieces[boundary.OperatorIndex].Token.IsKind(SyntaxKind.ColonToken);
                     }
                     else if (style != "flat" && boundary.OperatorIndex >= 0)

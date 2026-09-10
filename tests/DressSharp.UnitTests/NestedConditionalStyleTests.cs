@@ -9,11 +9,11 @@ public class NestedConditionalStyleTests
     [InlineData("flat", "end_of_line", "first ?\n    one :\n    second ?\n    two :\n    three")]
     [InlineData("staircase", "beginning_of_line", "first\n    ? one\n    : second\n        ? two\n        : three")]
     [InlineData("staircase", "end_of_line", "first ?\n    one :\n    second ?\n        two :\n        three")]
-    [InlineData("decision_ladder", "beginning_of_line", "\n    first ? one\n    : second ? two\n    : three")]
-    [InlineData("decision_ladder", "end_of_line", "\n    first ? one :\n    second ? two :\n    three")]
+    [InlineData("decision_ladder", "beginning_of_line", "first ? one\n    : second ? two\n    : three")]
+    [InlineData("decision_ladder", "end_of_line", "first ? one :\n    second ? two :\n    three")]
     public void Styles_and_operator_positions(string style, string placement, string expression)
     {
-        var expected = "var result =" + (expression.StartsWith('\n') ? "" : " ") + expression + ";";
+        var expected = "var result = " + expression + ";";
         Check("var result = first ? one : second ? two : three;", expected,
             ("dress_conditional_expressions_layout", "always_multi"),
             ("dress_nested_conditional_style", style),
@@ -50,6 +50,16 @@ public class NestedConditionalStyleTests
         ("dress_nested_conditional_style", "decision_ladder"));
 
     [Fact]
+    public void Decision_ladder_keeps_the_first_condition_on_its_existing_line() => Check(
+        "var parent = left.IsKind(SyntaxKind.OpenParenToken) ? left.Parent\n"
+            + "    : right.IsKind(SyntaxKind.CloseParenToken) ? right.Parent\n"
+            + "    : null;",
+        "var parent = left.IsKind(SyntaxKind.OpenParenToken) ? left.Parent\n"
+            + "    : right.IsKind(SyntaxKind.CloseParenToken) ? right.Parent\n"
+            + "    : null;",
+        ("dress_nested_conditional_style", "decision_ladder"));
+
+    [Fact]
     public void Style_alone_reshapes_existing_wrapping() => Check(
         "var result = first\n    ? one\n    : second\n    ? two\n    : three;",
         "var result = first\n    ? one\n    : second\n        ? two\n        : three;",
@@ -81,7 +91,7 @@ public class NestedConditionalStyleTests
     [Fact]
     public void Auto_wraps_into_a_ladder() => Check(
         "var result = first ? one : second ? two : three;",
-        "var result =\n    first ? one :\n    second ? two :\n    three;",
+        "var result = first ? one :\n    second ? two :\n    three;",
         ("dress_conditional_expressions_layout", "auto"),
         ("max_line_length", "30"),
         ("dress_nested_conditional_style", "decision_ladder"),
@@ -104,7 +114,7 @@ public class NestedConditionalStyleTests
     [Fact]
     public void Ladder_uses_structural_indentation() => Check(
         "class C\n{\n    int M()\n    {\n        return first ? one : second ? two : three;\n    }\n}",
-        "class C\n{\n    int M()\n    {\n        return\n            first ? one\n            : second ? two\n            : three;\n    }\n}",
+        "class C\n{\n    int M()\n    {\n        return first ? one\n            : second ? two\n            : three;\n    }\n}",
         ("dress_conditional_expressions_layout", "always_multi"),
         ("dress_nested_conditional_style", "decision_ladder"),
         ("csharp_indent_block_contents", "true"));
@@ -112,7 +122,7 @@ public class NestedConditionalStyleTests
     [Fact]
     public void Ladder_uses_a_branch_compacted_by_another_rule() => Check(
         "var result = first ? Call(\n    one,\n    two\n) : second ? two : three;",
-        "var result =\n    first ? Call(one, two)\n    : second ? two\n    : three;",
+        "var result = first ? Call(one, two)\n    : second ? two\n    : three;",
         ("dress_conditional_expressions_layout", "always_multi"),
         ("dress_arguments_layout", "always_single"),
         ("dress_nested_conditional_style", "decision_ladder"));
