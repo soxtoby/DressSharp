@@ -1,4 +1,6 @@
 using EasyAssertions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using static DressSharp.UnitTests.EmitterTestHarness;
 
@@ -141,6 +143,66 @@ public sealed class InitializerIndentationEmitterTests
             }
             """);
         Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n", "")]
+    [InlineData("\n", "u8")]
+    [InlineData("\r\n", "")]
+    [InlineData("\r\n", "u8")]
+    public void Indenting_an_initializer_rebases_owned_lines_and_raw_string_margin_without_changing_value(string lineEnding, string suffix)
+    {
+        const string sourceTemplate = """"
+            class C(string? example)
+            {
+                object Metadata { get; } = new()
+                {
+                    Value = first
+                        + second,
+                    Example = example ?? """
+                        first
+                          second
+                        """RAW_SUFFIX
+                };
+            }
+            """";
+        const string expectedTemplate = """"
+            class C(string? example)
+            {
+                object Metadata { get; } = new()
+                    {
+                        Value = first
+                            + second,
+                        Example = example ?? """
+                            first
+                              second
+                            """RAW_SUFFIX
+                    };
+            }
+            """";
+        var source = sourceTemplate.Replace("RAW_SUFFIX", suffix).ReplaceLineEndings(lineEnding);
+        var expected = expectedTemplate.Replace("RAW_SUFFIX", suffix).ReplaceLineEndings(lineEnding);
+        (string, string)[] preferences =
+        [
+            ("csharp_indent_block_contents", "true"),
+            ("dress_object_initializer_indentation", "indented")
+        ];
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        RawValue(result).ShouldBe(RawValue(source));
+        Format(result, preferences).ShouldBe(result);
+        Format(result,
+                ("csharp_indent_block_contents", "true"),
+                ("dress_object_initializer_indentation", "not_indented"))
+            .ShouldBe(source);
+
+        static string RawValue(string text) => CSharpSyntaxTree.ParseText(text)
+            .GetRoot()
+            .DescendantTokens()
+            .Single(token => token.Kind() is SyntaxKind.MultiLineRawStringLiteralToken or SyntaxKind.Utf8MultiLineRawStringLiteralToken)
+            .ValueText;
     }
 
     [Fact]

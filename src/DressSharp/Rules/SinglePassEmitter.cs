@@ -118,7 +118,7 @@ sealed class SinglePassEmitter
 
             RememberContentIndents(piece.Token);
             EnterOrLeave(piece.Token);
-            Append(piece.Token.Text);
+            Append(_indentation.RebaseTokenText(piece.Token, _sourceIndents[piece.Token], _lineIndent));
         }
 
         if (_pieces.Length > 0)
@@ -834,7 +834,7 @@ sealed class SinglePassEmitter
     {
         if (token.Parent is ElseClauseSyntax or CatchClauseSyntax or FinallyClauseSyntax or SwitchLabelSyntax
             || token.IsKind(SyntaxKind.WhileKeyword) && token.Parent is DoStatementSyntax
-            || DirectContentFor(token) is not { } content
+            || IndentationModel.DirectContentFor(token) is not { } content
             || content.GetFirstToken() == token
             || token.Parent?.FirstAncestorOrSelf<StatementSyntax>() is { } nestedStatement
             && nestedStatement != content
@@ -857,14 +857,12 @@ sealed class SinglePassEmitter
         {
             return tokenIndent;
         }
-        return tokenIndent.StartsWith(contentIndent, StringComparison.Ordinal)
-            ? emittedContentIndent + tokenIndent[contentIndent.Length..]
-            : null;
+        return IndentationModel.Rebase(contentIndent, emittedContentIndent, tokenIndent);
     }
 
     void RememberContentIndents(SyntaxToken token)
     {
-        if (DirectContentFor(token) is { } content && content.GetFirstToken() == token)
+        if (IndentationModel.DirectContentFor(token) is { } content && content.GetFirstToken() == token)
             _indentation.Remember(content, _lineIndent);
 
         for (var node = token.Parent; node is not null && node.GetFirstToken() == token; node = node.Parent)
@@ -872,25 +870,6 @@ sealed class SinglePassEmitter
             if (node is AnonymousFunctionExpressionSyntax)
                 _indentation.Remember(node, _lineIndent);
         }
-    }
-
-    static SyntaxNode? DirectContentFor(SyntaxToken token)
-    {
-        for (var node = token.Parent; node is not null; node = node.Parent)
-        {
-            if (node is StatementSyntax && node.Parent is BlockSyntax or SwitchSectionSyntax
-                || node is MemberDeclarationSyntax && node.Parent is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax
-                || node is AccessorDeclarationSyntax && node.Parent is AccessorListSyntax
-                || node is EnumMemberDeclarationSyntax && node.Parent is EnumDeclarationSyntax
-                || node is SwitchExpressionArmSyntax && node.Parent is SwitchExpressionSyntax
-                || node is AnonymousObjectMemberDeclaratorSyntax && node.Parent is AnonymousObjectCreationExpressionSyntax
-                || node is SubpatternSyntax && node.Parent is PropertyPatternClauseSyntax)
-            {
-                return node;
-            }
-        }
-
-        return null;
     }
 
     static string SourceIndent(string source, int position)

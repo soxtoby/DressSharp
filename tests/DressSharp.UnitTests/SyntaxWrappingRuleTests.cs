@@ -34,6 +34,36 @@ public class SyntaxWrappingRuleTests
         Format(result, preferences).ShouldBe(result);
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_binary_wrapping_keeps_coalesce_with_multiline_raw_string_inside_initializer(string lineEnding)
+    {
+        const string source = """"
+            class C(string? example)
+            {
+                object Metadata { get; } = new
+                {
+                    Example = example ?? """
+                        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+                        cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+                        """
+                };
+            }
+            """";
+        (string Key, string Value)[] preferences =
+        [
+            ("dress_binary_expressions_layout", "auto"),
+            ("max_line_length", "100")
+        ];
+
+        var input = source.ReplaceLineEndings(lineEnding);
+        var result = Format(input, preferences);
+        result.ShouldBe(input);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Fact]
     public void Auto_binary_wrapping_still_breaks_oversized_comparisons()
     {

@@ -164,8 +164,8 @@ public sealed class InitializerLayoutRuleTests
                 C M() => new C
                 {
                     X = N(
-                    first,
-                    second),
+                        first,
+                        second),
                     Y = 2
                 };
                 """);

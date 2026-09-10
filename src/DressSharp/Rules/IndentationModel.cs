@@ -1,4 +1,6 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
@@ -49,9 +51,72 @@ sealed class IndentationModel
             return indent;
 
         var ownerIndent = LeadingIndent(text, text.Lines.GetLineFromPosition(owner.SpanStart));
-        return indent.StartsWith(ownerIndent, StringComparison.Ordinal)
-            ? ForNode(owner) + indent[ownerIndent.Length..]
+        return Rebase(ownerIndent, ForNode(owner), indent);
+    }
+
+    internal static string? Rebase(string sourceOwnerIndent, string emittedOwnerIndent, string sourceLineIndent) =>
+        sourceLineIndent.StartsWith(sourceOwnerIndent, StringComparison.Ordinal)
+            ? emittedOwnerIndent + sourceLineIndent[sourceOwnerIndent.Length..]
             : null;
+
+    internal static SyntaxNode? DirectContentFor(SyntaxToken token)
+    {
+        for (var node = token.Parent; node is not null; node = node.Parent)
+        {
+            if (node is StatementSyntax && node.Parent is BlockSyntax or SwitchSectionSyntax
+                || node is MemberDeclarationSyntax && node.Parent is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax
+                || node is AccessorDeclarationSyntax && node.Parent is AccessorListSyntax
+                || node is EnumMemberDeclarationSyntax && node.Parent is EnumDeclarationSyntax
+                || node is ExpressionSyntax && node.Parent is InitializerExpressionSyntax
+                || node is CollectionElementSyntax && node.Parent is CollectionExpressionSyntax
+                || node is SwitchExpressionArmSyntax && node.Parent is SwitchExpressionSyntax
+                || node is AnonymousObjectMemberDeclaratorSyntax && node.Parent is AnonymousObjectCreationExpressionSyntax
+                || node is SubpatternSyntax && node.Parent is PropertyPatternClauseSyntax)
+            {
+                return node;
+            }
+        }
+
+        return null;
+    }
+
+    internal string RebaseTokenText(SyntaxToken token, string sourceOwnerIndent, string emittedOwnerIndent)
+    {
+        var text = token.Text;
+        if (token.Kind() is not (SyntaxKind.MultiLineRawStringLiteralToken or SyntaxKind.Utf8MultiLineRawStringLiteralToken))
+            return text;
+
+        if (DirectContentFor(token) is { } owner && _anchors.TryGetValue(owner, out var emittedOwner))
+        {
+            var syntaxText = owner.SyntaxTree.GetText();
+            sourceOwnerIndent = LeadingIndent(syntaxText, syntaxText.Lines.GetLineFromPosition(owner.SpanStart));
+            emittedOwnerIndent = emittedOwner;
+        }
+        var textSource = SourceText.From(text);
+        var sourceMargin = LeadingIndent(textSource, textSource.Lines[^1]);
+        if (Rebase(sourceOwnerIndent, emittedOwnerIndent, sourceMargin) is not { } emittedMargin
+            || emittedMargin == sourceMargin)
+        {
+            return text;
+        }
+
+        var output = new StringBuilder(text.Length);
+        output.Append(text, 0, textSource.Lines[1].Start);
+        for (var index = 1; index < textSource.Lines.Count; index++)
+        {
+            var line = textSource.Lines[index];
+            if (line.Start == text.Length)
+                break;
+            var lineIndent = LeadingIndent(textSource, line);
+            var rebased = Rebase(sourceMargin, emittedMargin, lineIndent);
+            if (rebased is null && lineIndent.Length != line.Span.Length)
+                return text;
+
+            output.Append(rebased ?? emittedMargin);
+            output.Append(text, line.Start + lineIndent.Length, line.EndIncludingLineBreak - line.Start - lineIndent.Length);
+        }
+
+        return output.ToString();
     }
 
     internal string ForNode(SyntaxNode? node)
