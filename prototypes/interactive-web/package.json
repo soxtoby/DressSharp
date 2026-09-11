@@ -5,7 +5,7 @@
     "dev": "vite --host 0.0.0.0"
   },
   "dependencies": {
-    "@pierre/diffs": "1.3.6",
+    "@pierre/diffs": "1.4.1",
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest"

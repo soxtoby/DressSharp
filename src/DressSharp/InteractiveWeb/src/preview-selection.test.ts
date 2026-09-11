@@ -21,7 +21,7 @@ function previewSelection(start: number, end: number) {
     const onSelectionRules = mock(() => {});
     const preview = Object.assign(Object.create(Preview.prototype), {
         host: {shadowRoot: {}}, stale: false,
-        editor: {getState: () => ({selections: [current]})},
+        editor: {getViewState: () => ({selections: [current]})},
         selectionAction: {}, onSelectionRules, selectionRulesPinned: false,
         queueMarkers: mock(() => {}),
     });

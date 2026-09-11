@@ -1,0 +1,13 @@
+diff --git a/dist/utils/createTransformerWithState.js b/dist/utils/createTransformerWithState.js
+index 1ed89b0c394cb9b6d121e46040268d0913135d9e..0ab9b4f7d62de002bb0c4f38ee8aa865829bf826 100644
+--- a/dist/utils/createTransformerWithState.js
++++ b/dist/utils/createTransformerWithState.js
+@@ -42,7 +42,7 @@ function createTransformerWithState(useTokenTransformer = false, useCSSClasses =
+ 			span(hast, _line, _char, _lineElement, token) {
+ 				if (token?.offset != null && token.content != null) {
+ 					const tokenChar = token.__lineChar;
+-					if (tokenChar != null) hast.properties["data-char"] = tokenChar;
++					if (tokenChar != null) hast.properties["data-char"] = _char;
+ 					return hast;
+ 				}
+ 				return hast;

@@ -30,6 +30,7 @@ async page => {
         const sent = await paste("class C { void M(int a,int b) {} }\r\n");
         assert(sent.source.endsWith("\n") && !sent.source.includes("\r"), "Paste must normalize to LF");
         await ready();
+        assert(await editor().evaluate(element => element.getRootNode().activeElement === element), "Formatting after paste must preserve source focus");
         assert(await page.locator(".settings-rail .find-selection-rules").count() === 0, "Related-rules action must not add a settings row");
         assert(await page.locator(".preview-note .find-selection-rules").count() === 1, "Related-rules action must sit beside preview position");
         await page.getByRole("searchbox", {name: "Find a preference"}).fill("csharp_space_after_comma");
@@ -55,6 +56,9 @@ async page => {
         await ready();
         await editor().click();
         await page.keyboard.press("Control+Home");
+        await page.keyboard.press("ArrowRight");
+        await page.waitForFunction(() => document.querySelector(".cursor-position").textContent === "Ln 1, Col 2", undefined, {timeout: 1000});
+        await page.keyboard.press("Control+Home");
         await page.keyboard.type("// undo test");
         await page.keyboard.press("Enter");
         await ready();
@@ -66,6 +70,13 @@ async page => {
         await page.keyboard.press("Control+z");
         await ready();
         assert(await sourceText() === source, "Undo must survive output refresh and polling");
+        await page.keyboard.press("Control+y");
+        await ready();
+        assert(await sourceText() !== source, "Redo must survive the formatting response after undo");
+        assert(await editor().evaluate(element => element.getRootNode().activeElement === element), "Redo formatting must preserve source focus");
+        await page.keyboard.press("Control+z");
+        await ready();
+        assert(await sourceText() === source, "Undo after redo must restore exact source");
         await page.locator(".rule-row select").selectOption("explicit:false");
         await ready();
         if (!await page.locator(".save").isEnabled()) {

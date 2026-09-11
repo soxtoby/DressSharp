@@ -58,11 +58,10 @@ class PreviewDiff extends FileDiff {
             fileDiff.splitLineCount = lines;
             fileDiff.unifiedLineCount = lines;
         }
-        fileDiff.cacheKey = "preview";
         this.hunksRenderer.clearRenderCache();
         if (source.length === 0) {
             this.hunksRenderer.hydrate(fileDiff);
-            this.hunksRenderer.beginEditSession();
+            this.hunksRenderer.beginEditSession(fileDiff);
         }
         this.render({fileDiff, oldFile, newFile, fileContainer: host, forceRender: true});
     }
@@ -101,9 +100,9 @@ export class Preview {
     private readonly facts = document.createElement("span");
     private readonly revision = new PreviewRevision();
     private readonly diff: PreviewDiff;
-    private readonly editor: Editor<undefined>;
+    private editor: Editor<"file-diff">;
     private source = sample;
-    private output = "";
+    private output = this.source;
     private preferences = "";
     private timer = 0;
     private controller: AbortController | undefined;
@@ -163,14 +162,7 @@ export class Preview {
             this.updateMarkers();
         });
         this.diff = new PreviewDiff(this.options());
-        this.diff.refresh(this.source, this.output, this.host);
-        this.editor = new Editor({onChange: file => {
-            this.source = file.contents;
-            this.clearSelectionRules();
-            queueMicrotask(() => this.updateCursor());
-            this.schedule();
-        }, onFocus: () => queueMicrotask(() => this.updateCursor())});
-        this.editor.edit(this.diff);
+        this.editor = this.createEditor();
         this.host.shadowRoot?.addEventListener("scroll", event => {
             const pane = event.target;
             if (pane instanceof HTMLElement && pane.matches("code[data-additions], code[data-deletions]")) {
@@ -178,11 +170,42 @@ export class Preview {
             }
         }, true);
         new ResizeObserver(() => this.queueMarkers()).observe(this.host);
-        document.addEventListener("selectionchange", () => this.updateCursor());
-        this.host.addEventListener("pointerup", () => queueMicrotask(() => this.captureSelection()));
-        this.host.addEventListener("keyup", () => queueMicrotask(() => this.captureSelection()));
-        this.updateCursor();
+        document.addEventListener("selectionchange", () => queueMicrotask(() => this.updateCursor()));
+        const selectionChanged = () => queueMicrotask(() => { this.updateCursor(); this.captureSelection(); });
+        this.host.addEventListener("pointerup", selectionChanged);
+        this.host.addEventListener("keyup", selectionChanged);
         if (this.host.shadowRoot) new MutationObserver(() => this.queueMarkers()).observe(this.host.shadowRoot, {childList: true, characterData: true, subtree: true});
+    }
+
+    mount() {
+        // Pierre measures fonts and padding when editing begins; the DOM must be connected.
+        this.diff.refresh(this.source, this.output, this.host);
+        this.editor.edit(this.diff);
+        this.updateCursor();
+    }
+
+    private createEditor(initialState?: NonNullable<ConstructorParameters<typeof Editor<"file-diff">>[1]>["initialState"]) {
+        return new Editor("file-diff", {...initialState ? {initialState} : {}, onChange: event => {
+            this.source = event.file.contents;
+            this.clearSelectionRules();
+            queueMicrotask(() => this.updateCursor());
+            this.schedule();
+        }, onFocus: () => queueMicrotask(() => this.updateCursor())});
+    }
+
+    private refreshOutput() {
+        const state = this.editor.getEditState();
+        const view = this.editor.getViewState();
+        const focused = this.host.shadowRoot?.activeElement?.matches('[role="textbox"]') ?? false;
+        // The formatted baseline changes, but the source document and its undo history do not.
+        this.editor.cleanUp();
+        this.diff.setOptions(this.options());
+        this.diff.refresh(this.source, this.output, this.host);
+        this.editor = this.createEditor(state ? {type: "file-diff", document: state.document, fileInfo: state.fileInfo, editor: view} : undefined);
+        this.editor.edit(this.diff);
+        if (focused) this.editor.focus({preventScroll: true});
+        this.editor.setViewState(view);
+        this.updateCursor();
     }
 
     configure(snapshot: ConfigurationSnapshot, edits: PendingEdits) {
@@ -192,7 +215,7 @@ export class Preview {
         this.schedule();
     }
 
-    private options(): FileDiffOptions<undefined> {
+    private options(): FileDiffOptions<undefined, undefined> {
         return {diffStyle: "split", expandUnchanged: true, disableFileHeader: true, theme: "github-light", themeType: "light",
             preferredHighlighter: "shiki-js", overflow: "scroll", unsafeCSS: editorCss,
             disableBackground: this.stale, diffIndicators: "none", lineDiffType: this.stale ? "none" : "char",
@@ -211,7 +234,6 @@ export class Preview {
         // Editor onChange runs before its own render completes.
         queueMicrotask(() => {
             this.diff.setOptions(this.options());
-            this.diff.refresh(this.source, this.output, this.host);
         });
         this.timer = window.setTimeout(() => void this.format(revision), 250);
     }
@@ -236,8 +258,7 @@ export class Preview {
             this.status.textContent = result.skippedOccurrences > 0 ? `${result.skippedOccurrences} transformations skipped` : "Up to date";
             this.facts.textContent = `${result.encoding.toUpperCase()} · ${result.lineEndings} · final newline ${result.finalNewline ? "present" : "absent"}`;
             this.element.querySelector(".parse-context")!.textContent = `C# ${result.languageVersion} · no predefined symbols`;
-            this.diff.setOptions(this.options());
-            this.diff.refresh(this.source, this.output, this.host);
+            this.refreshOutput();
         } catch (error) {
             if (!this.revision.isCurrent(revision) || controller.signal.aborted) return;
             this.status.textContent = `Output outdated · ${error instanceof Error ? error.message : "Preview failed"}`;
@@ -295,7 +316,7 @@ export class Preview {
     }
 
     private updateCursor() {
-        const position = cursorPosition(this.editor.getState().selections);
+        const position = cursorPosition(this.editor.getViewState().selections);
         if (position) this.cursor.textContent = position;
     }
 
@@ -329,7 +350,7 @@ export class Preview {
         } else if (first?.closest("[data-deletions]") || last?.closest("[data-deletions]")) {
             return;
         } else {
-            const current = this.editor.getState().selections?.at(-1);
+            const current = this.editor.getViewState().selections?.at(-1);
             if (current && (current.start.line !== current.end.line || current.start.character !== current.end.character)) selection = {start: current.start.line,
                 end: current.end.line + (current.end.character === 0 && current.end.line > current.start.line ? 0 : 1), side: "source"};
         }

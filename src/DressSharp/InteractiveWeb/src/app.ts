@@ -134,6 +134,7 @@ function render() {
     if (!root.querySelector(".shell")) {
         shell.querySelector(".canvas")!.replaceWith(preview.element);
         root.replaceChildren(shell);
+        preview.mount();
     } else {
         for (const selector of [".app-header", ".notices", ".settings-rail"]) {
             const current = root.querySelector<HTMLElement>(selector)!;
