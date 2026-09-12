@@ -67,6 +67,8 @@ These preferences own the complete layout of their initializer kind. When config
 
 ### Nested ternaries and operator position
 
+When `dress_conditional_expressions_layout` wraps a ternary with a multiline condition, its branches indent one level beyond the deepest formatted condition line. Single-line conditions keep the usual one-level branch indentation.
+
 ```editorconfig
 dress_conditional_expressions_layout = auto
 dress_nested_conditional_style = flat

@@ -19,7 +19,9 @@ sealed class SyntaxWrappingRule(
         Description = $"Controls {kind}. Only whitespace owned by syntax wrapping changes."
             + (kind is SyntaxWrappingKind.Arguments or SyntaxWrappingKind.Parameters or SyntaxWrappingKind.CollectionExpressions
                 ? " Auto puts each item in a multiline list on its own line and keeps fitting single-line lists compact."
-                : ""),
+                : kind == SyntaxWrappingKind.ConditionalExpressions
+                    ? " Wrapped branches indent one level beyond the deepest formatted line of a multiline condition."
+                    : ""),
         Values = RuleValues.From(InitializerKindFor(kind) is not null
             ? ["compact", "auto", "expanded"]
             : ["always_single", "auto", "always_multi"]),

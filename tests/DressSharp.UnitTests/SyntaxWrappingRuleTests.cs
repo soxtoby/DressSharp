@@ -717,8 +717,8 @@ public class SyntaxWrappingRuleTests
                 firstArgument,
                 secondArgument
             )
-            ? firstArgument
-            : secondArgument; }
+                    ? firstArgument
+                    : secondArgument; }
         """)]
     [InlineData("dress_query_clauses_layout",
         "class C { object M(int[] xs) => from x in xs where N(firstArgument, secondArgument) select x; }",

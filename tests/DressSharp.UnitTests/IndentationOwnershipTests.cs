@@ -9,6 +9,79 @@ namespace DressSharp.UnitTests;
 public class IndentationOwnershipTests
 {
     [Theory]
+    [InlineData("\n", "space")]
+    [InlineData("\r\n", "space")]
+    [InlineData("\n", "tab")]
+    public void Conditional_branches_follow_deeper_precedence_indentation(string lineEnding, string indentStyle)
+    {
+        var expected = """
+            var result = first
+                || second
+                    && third
+                        ? yes
+                        : no;
+            """.ReplaceLineEndings(lineEnding);
+        if (indentStyle == "tab")
+            expected = expected.Replace("    ", "\t", StringComparison.Ordinal);
+        var source = "var result = first || second && third ? yes : no;";
+        var preferences = new[]
+        {
+            ("dress_binary_expressions_layout", "always_multi"),
+            ("dress_binary_expression_indentation", "precedence"),
+            ("dress_conditional_expressions_layout", "always_multi"),
+            ("csharp_indent_block_contents", "true"),
+            ("indent_style", indentStyle),
+            ("indent_size", "4"),
+            ("tab_width", "4")
+        };
+        // Supply the line ending without pre-wrapping the condition.
+        source += lineEnding;
+        expected += lineEnding;
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Conditional_branches_follow_the_deepest_formatted_condition_line(string lineEnding)
+    {
+        var source = """
+            var maximum = configuration.Preferences.TryGetValue(RuleKey.MaxLineLength, out var configuredMaximum)
+                && int.TryParse(configuredMaximum, out var parsedMaximum)
+                    ? parsedMaximum
+                    : int.MaxValue;
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+        var result = Format(source, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n", "??=")]
+    [InlineData("\r\n", "??=")]
+    [InlineData("\n", "=")]
+    [InlineData("\r\n", "=")]
+    public void Conditional_in_an_arrow_body_assignment_follows_the_assignment_indent(string lineEnding, string assignmentOperator)
+    {
+        var source = """
+            class C
+            {
+                MalformedRegionIndex MalformedRegions =>
+                    field ??= _knownWellFormed
+                        ? MalformedRegionIndex.Empty
+                        : new(ScanMalformedRegions(_root));
+            }
+            """.Replace("??=", assignmentOperator, StringComparison.Ordinal).ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+        var result = Format(source, preferences);
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
     public void Wrapped_constructor_arguments_follow_the_collection_element(string lineEnding)

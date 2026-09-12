@@ -63,7 +63,7 @@ sealed class SyntaxWrappingSolver
             if (!occurrence.Applies)
                 continue;
 
-            var conditionDepth = MultilineConditionDepth(occurrence, gapMap);
+            var conditionDepth = MultilineConditionDepth(occurrenceIndex, gapMap);
             var existingMultilineList = IsExistingMultilineList(occurrence);
             var indent = occurrence.Multi ? Indent(occurrenceIndex, 1 + conditionDepth) : "";
             var baseIndent = occurrence.Multi ? Indent(occurrenceIndex, 0) : "";
@@ -154,23 +154,38 @@ sealed class SyntaxWrappingSolver
         return new(gaps, _skippedOccurrences);
     }
 
-    int MultilineConditionDepth(Occurrence occurrence, IReadOnlyDictionary<int, string> childGaps)
+    int MultilineConditionDepth(int occurrenceIndex, IReadOnlyDictionary<int, string> childGaps)
     {
-        if (occurrence.Node is not ConditionalExpressionSyntax conditional
-            || conditional.Ancestors().OfType<BinaryExpressionSyntax>().None())
+        var occurrence = _occurrences[occurrenceIndex];
+        if (occurrence.Node is not ConditionalExpressionSyntax conditional)
             return 0;
 
+        var baseWidth = VisualWidth(Indent(occurrenceIndex, 0), _settings.TabWidth);
+        var deepestWidth = baseWidth;
         var questionIndex = _stream.IndexOf(
             conditional.QuestionToken,
             _stream.Pieces[occurrence.FirstToken].SegmentIndex);
         for (var index = occurrence.FirstToken + 1; index < questionIndex; index++)
         {
-            if (_trivia!.HasLineBreak(index)
-                || childGaps.TryGetValue(index, out var gap) && (gap.Contains('\n') || gap.Contains('\r')))
-                return 1;
+            if (childGaps.TryGetValue(index, out var gap))
+            {
+                var lineStart = gap.LastIndexOfAny(['\r', '\n']) + 1;
+                if (lineStart == 0)
+                    continue;
+                var end = lineStart;
+                while (end < gap.Length && gap[end] is ' ' or '\t')
+                    end++;
+                deepestWidth = Math.Max(deepestWidth, VisualWidth(gap[lineStart..end], _settings.TabWidth));
+            }
+            else if (_trivia!.HasLineBreak(index)
+                && _indentation.ExistingContinuation(_stream.Pieces[index].Token) is { } indent)
+            {
+                deepestWidth = Math.Max(deepestWidth, VisualWidth(indent, _settings.TabWidth));
+            }
         }
 
-        return 0;
+        var unitWidth = Math.Max(1, VisualWidth(_emitterPlan.IndentUnit, _settings.TabWidth));
+        return (deepestWidth - baseWidth + unitWidth - 1) / unitWidth;
     }
 
     void Decide()
