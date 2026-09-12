@@ -73,14 +73,19 @@ sealed class DocumentFormatter
         CancellationToken cancellationToken)
     {
         var transformStart = Stopwatch.GetTimestamp();
-        var transformed = TransformOnce(root, source, options, cancellationToken);
+        BraceEmission? braceEmission = null;
+        var transformed = TransformOnce(root, source, options, ref braceEmission, cancellationToken);
         if (_stabilizeWrapping && transformed.Text != source)
         {
-            var stabilizedRoot = ParseCandidate(transformed.Text, options, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var stabilizedRoot = braceEmission is { } previous && previous.Source == transformed.Text
+                ? previous.Root
+                : ParseCandidate(transformed.Text, options, cancellationToken);
             transformed = TransformOnce(
                 stabilizedRoot,
                 transformed.Text,
                 options,
+                ref braceEmission,
                 cancellationToken);
         }
 
@@ -92,11 +97,12 @@ sealed class DocumentFormatter
         SyntaxNode root,
         string source,
         CSharpParseOptions options,
+        ref BraceEmission? braceEmission,
         CancellationToken cancellationToken)
     {
         var structural = ApplyFileScopedRules(root);
         var text = ReferenceEquals(structural.Root, root) ? source : structural.Root.ToFullString();
-        var emitted = Emit(structural.Root, text, options, cancellationToken);
+        var emitted = Emit(structural.Root, text, options, ref braceEmission, cancellationToken);
         return new(
             emitted.Text,
             structural.SkippedOccurrences + emitted.SkippedOccurrences);
@@ -116,6 +122,7 @@ sealed class DocumentFormatter
         SyntaxNode root,
         string text,
         CSharpParseOptions options,
+        ref BraceEmission? braceEmission,
         CancellationToken cancellationToken)
     {
         if (!_embeddedStatements.NeedsBracePlanning)
@@ -131,20 +138,31 @@ sealed class DocumentFormatter
             _embeddedStatements.NeedsBraceFreeCandidate
                 ? EmbeddedStatementBraces.MinimizeMember
                 : null);
-        var candidateRoot = ParseCandidate(candidate.Text, options, cancellationToken);
-        var final = EmitStage(
-            candidateRoot,
-            candidate.Text,
-            MemberRuleSet.Empty,
-            (member, context) => EmbeddedStatementBraces.ApplyMember(
-                member,
-                _embeddedStatements,
-                context));
+        // Stabilization often produces the same brace-free candidate again. Its parsed tree and
+        // completed brace emission are reusable within this document and parse context.
+        cancellationToken.ThrowIfCancellationRequested();
+        if (braceEmission is null || braceEmission.Source != candidate.Text)
+            braceEmission = EmitBraces(candidate.Text, options, cancellationToken);
+        var final = braceEmission.Result;
         return new(
             final.Text,
             candidate.RewriteSkippedOccurrences
                 + final.RewriteSkippedOccurrences
                 + final.LayoutSkippedOccurrences);
+    }
+
+    BraceEmission EmitBraces(string source, CSharpParseOptions options, CancellationToken cancellationToken)
+    {
+        var candidateRoot = ParseCandidate(source, options, cancellationToken);
+        var final = EmitStage(
+            candidateRoot,
+            source,
+            MemberRuleSet.Empty,
+            (member, context) => EmbeddedStatementBraces.ApplyMember(
+                member,
+                _embeddedStatements,
+                context));
+        return new(source, candidateRoot, final);
     }
 
     SyntaxNode ParseCandidate(string text, CSharpParseOptions options, CancellationToken cancellationToken)
@@ -224,6 +242,8 @@ sealed class DocumentFormatter
         };
 
     static bool? Boolean(string? value) => bool.TryParse(value, out var parsed) ? parsed : null;
+
+    sealed record BraceEmission(string Source, SyntaxNode Root, EmissionStage Result);
 }
 
 sealed record TransformedDocument(string Text, int SkippedOccurrences);

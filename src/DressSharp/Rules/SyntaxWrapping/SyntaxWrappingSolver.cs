@@ -521,21 +521,19 @@ sealed class SyntaxWrappingSolver
 
     bool HasUnownedLineBreak(Occurrence occurrence)
     {
+        // Delimited lists contribute boundaries in token order. Advance once through them rather
+        // than searching the whole list for every line break in a large initializer or call.
+        var boundaryIndex = occurrence.BoundaryStart;
+        var boundaryEnd = boundaryIndex + occurrence.BoundaryCount;
         for (var index = occurrence.FirstToken; index <= occurrence.LastToken; index++)
         {
             if (!_trivia!.HasLineBreak(index))
                 continue;
 
-            var owned = false;
-            for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
-            {
-                if (_boundaries[occurrence.BoundaryStart + offset].RightIndex != index)
-                    continue;
-                owned = true;
-                break;
-            }
+            while (boundaryIndex < boundaryEnd && _boundaries[boundaryIndex].RightIndex < index)
+                boundaryIndex++;
 
-            if (!owned)
+            if (boundaryIndex == boundaryEnd || _boundaries[boundaryIndex].RightIndex != index)
                 return true;
         }
 
