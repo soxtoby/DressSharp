@@ -121,8 +121,8 @@ public class SyntaxWrappingRuleTests
         "class C : Alpha, IBeta {} class Alpha {} interface IBeta {}",
         "class C : Alpha, IBeta {} class Alpha {} interface IBeta {}",
         """
-        class C :
-            Alpha,
+        class C
+            : Alpha,
             IBeta {} class Alpha {} interface IBeta {}
         """)]
     [InlineData(

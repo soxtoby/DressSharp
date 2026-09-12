@@ -207,7 +207,7 @@ public sealed class EditorConfigTests : IDisposable
         first.Changed.ShouldBe(true);
         second.Changed.ShouldBe(false);
         text.ShouldStartWith("root = true\n\n[*.cs]\nindent_size = 2\ncharset = utf-8\n");
-        text.ShouldContain("dress_braces_for_multiline_statement_header = true\n\n[generated.cs]");
+        text.ShouldContain("dress_multiline_parameter_list_open_brace_position = next_line\n\n[generated.cs]");
         (text.Split("indent_size =", StringSplitOptions.None).Length - 1).ShouldBe(1);
     }
 
@@ -223,7 +223,7 @@ public sealed class EditorConfigTests : IDisposable
         var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
         (text.Split("indent_size =", StringSplitOptions.None).Length - 1).ShouldBe(1);
         (text.Split("charset =", StringSplitOptions.None).Length - 1).ShouldBe(1);
-        text.ShouldEndWith("dress_braces_for_multiline_statement_header = true\n");
+        text.ShouldEndWith("dress_multiline_parameter_list_open_brace_position = next_line\n");
     }
 
     [Fact]

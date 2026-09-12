@@ -59,6 +59,7 @@ enum RuleKey
     DotnetSeparateImportDirectiveGroups,
     DressArgumentsLayout,
     DressParametersLayout,
+    DressMultilineParametersClosingParenthesisPosition,
     DressObjectInitializerLayout,
     DressCollectionInitializerLayout,
     DressArrayInitializerLayout,
@@ -106,7 +107,8 @@ enum RuleKey
     DressNamespaceStyle,
     DressEmbeddedStatementPlacement,
     DressEmbeddedStatementBraces,
-    DressBracesForMultilineStatementHeader
+    DressBracesForMultilineStatementHeader,
+    DressMultilineParameterListOpenBracePosition
 }
 
 static class RuleKeys

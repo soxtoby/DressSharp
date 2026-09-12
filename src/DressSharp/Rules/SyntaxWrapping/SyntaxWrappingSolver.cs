@@ -182,7 +182,8 @@ sealed class SyntaxWrappingSolver
                 continue;
             if (occurrence.Setting.Mode == WrappingMode.Auto
                 && (hasLineBreak || hasNestedLineBreak)
-                && !initializerLayout && !occurrence.Setting.ShapesOperators)
+                && !initializerLayout && !occurrence.Setting.ShapesOperators
+                && occurrence.Node is not BaseListSyntax)
                 continue;
 
             var multi = occurrence.Setting.Mode == WrappingMode.Multi
@@ -638,7 +639,7 @@ sealed class SyntaxWrappingSolver
             return _indentation.Continuation(node, units, "");
         }
 
-        var pieceIndex = node is InitializerExpressionSyntax or CollectionExpressionSyntax
+        var pieceIndex = node is InitializerExpressionSyntax or CollectionExpressionSyntax or BaseListSyntax
             ? Math.Max(0, occurrence.FirstToken - 1)
             : occurrence.FirstToken;
         var piece = _stream.Pieces[pieceIndex];

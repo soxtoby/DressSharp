@@ -46,6 +46,10 @@ sealed class SinglePassEmitter
     readonly IndentationModel _indentation;
     readonly Dictionary<SyntaxToken, string> _sourceIndents = [];
     readonly HashSet<SyntaxToken> _originalTokens = [];
+    readonly Dictionary<ParameterListSyntax, int> _parameterListStartLines = [];
+    readonly HashSet<ParameterListSyntax> _multilineParameterLists = [];
+    int _lineVersion;
+    bool _lastTokenStartedLine;
 
     readonly record struct InitializerFrame(SyntaxNode Initializer, string Indent);
 
@@ -118,7 +122,9 @@ sealed class SinglePassEmitter
 
             RememberContentIndents(piece.Token);
             EnterOrLeave(piece.Token);
+            _lastTokenStartedLine = _column == _lineIndent.Length;
             Append(_indentation.RebaseTokenText(piece.Token, _sourceIndents[piece.Token], _lineIndent));
+            RememberParameterListLine(piece.Token);
         }
 
         if (_pieces.Length > 0)
@@ -233,6 +239,24 @@ sealed class SinglePassEmitter
             return;
         }
 
+        if (MultilineParameterCloseBreak(right) is { } parameterCloseBreak)
+        {
+            if (parameterCloseBreak)
+            {
+                if (_syntaxWrapping.GapBefore(index) is { } wrappingGap)
+                    EmitWrappingGap(wrappingGap, right);
+                else
+                    StartParameterCloseLine((ParameterListSyntax)right.Parent!, right);
+            }
+            return;
+        }
+
+        if (AttachesConstructorInitializer(left, right))
+        {
+            Append(" ");
+            return;
+        }
+
         if (EmbeddedStatementBreak(right) is { } embeddedStatementBreak)
         {
             if (embeddedStatementBreak)
@@ -244,7 +268,7 @@ sealed class SinglePassEmitter
 
         // New-line rules follow syntax wrapping in catalog order, so they get the last word on a
         // boundary both rules own.
-        if (ClaimsBreak(right, rightPiece.IsOriginal) is { } wantsBreak)
+        if (ClaimsBreak(left, right, rightPiece.IsOriginal) is { } wantsBreak)
         {
             if (wantsBreak)
                 StartLine(right);
@@ -394,7 +418,7 @@ sealed class SinglePassEmitter
         Copy(right.Source, right.Token.FullSpan.Start, right.Token.SpanStart);
     }
 
-    bool? ClaimsBreak(SyntaxToken token, bool original)
+    bool? ClaimsBreak(SyntaxToken left, SyntaxToken token, bool original)
     {
         if (_plan.PreserveSingleLineBlocks
             && original
@@ -404,6 +428,9 @@ sealed class SinglePassEmitter
         {
             return false;
         }
+
+        if (MultilineParameterListBraceBreak(left, token) is { } parameterListBraceBreak)
+            return parameterListBraceBreak;
 
         var candidates = _plan.NewLineTrigger(token.RawKind);
         if (candidates == 0 || _checkMalformedRegions && IsUnsafeOriginal(token))
@@ -430,6 +457,86 @@ sealed class SinglePassEmitter
         }
 
         return null;
+    }
+
+    bool? MultilineParameterCloseBreak(SyntaxToken token)
+    {
+        if (_plan.MultilineParametersClosingParenthesisPosition is not { } position
+            || !token.IsKind(SyntaxKind.CloseParenToken)
+            || token.Parent is not ParameterListSyntax { Parameters.Count: > 0 } parameters
+            || !_parameterListStartLines.TryGetValue(parameters, out var startLine)
+            || startLine == _lineVersion
+            || _checkMalformedRegions && IsUnsafeOriginal(token))
+        {
+            return null;
+        }
+
+        return position == "own_line";
+    }
+
+    bool? MultilineParameterListBraceBreak(SyntaxToken left, SyntaxToken right)
+    {
+        if (_plan.MultilineParameterListOpenBracePosition is not { } position
+            || !right.IsKind(SyntaxKind.OpenBraceToken)
+            || left.Parent is not ParameterListSyntax { Parameters.Count: > 0 } parameters
+            || left != parameters.CloseParenToken
+            || !IsDirectDeclarationBody(parameters, right)
+            || !_lastTokenStartedLine
+            || _checkMalformedRegions && IsUnsafeOriginal(right))
+        {
+            return null;
+        }
+
+        return position == "next_line";
+    }
+
+    static bool IsDirectDeclarationBody(ParameterListSyntax parameters, SyntaxToken openBrace) =>
+        openBrace.Parent switch
+        {
+            TypeDeclarationSyntax { ParameterList: { } typeParameters, BaseList: null } =>
+                parameters == typeParameters,
+            BlockSyntax { Parent: MethodDeclarationSyntax { ParameterList: { } methodParameters } } =>
+                parameters == methodParameters,
+            BlockSyntax { Parent: ConstructorDeclarationSyntax { ParameterList: { } constructorParameters, Initializer: null } } =>
+                parameters == constructorParameters,
+            _ => false
+        };
+
+    bool AttachesConstructorInitializer(SyntaxToken left, SyntaxToken right) =>
+        _plan.MultilineParametersClosingParenthesisPosition is not null
+        && right.IsKind(SyntaxKind.ColonToken)
+        && right.Parent is ConstructorInitializerSyntax { Parent: ConstructorDeclarationSyntax constructor }
+        && left == constructor.ParameterList.CloseParenToken
+        && _multilineParameterLists.Contains(constructor.ParameterList)
+        && (!_checkMalformedRegions || !IsUnsafeOriginal(right));
+
+    void StartParameterCloseLine(ParameterListSyntax parameters, SyntaxToken close)
+    {
+        Append(_context.LineEnding);
+        if (_plan.IndentBlockContents is not null)
+        {
+            _lineIndent = _indentation.ForNode(parameters.Parent);
+            Append(_lineIndent);
+        }
+        else
+        {
+            _lineIndent = _sourceIndents[parameters.OpenParenToken];
+            Append(_lineIndent);
+        }
+    }
+
+    void RememberParameterListLine(SyntaxToken token)
+    {
+        if (token.Parent is not ParameterListSyntax parameters)
+            return;
+        if (token == parameters.OpenParenToken)
+            _parameterListStartLines[parameters] = _lineVersion;
+        else if (token == parameters.CloseParenToken)
+        {
+            if (_parameterListStartLines.GetValueOrDefault(parameters, _lineVersion) != _lineVersion)
+                _multilineParameterLists.Add(parameters);
+            _parameterListStartLines.Remove(parameters);
+        }
     }
 
     bool? EmbeddedStatementBreak(SyntaxToken token)
@@ -1066,6 +1173,8 @@ sealed class SinglePassEmitter
             _column += text.Length;
             return;
         }
+
+        _lineVersion++;
 
         var currentLine = text[(lastBreak + 1)..];
         _previousLineIndent = _lineIndent;

@@ -36,7 +36,9 @@ sealed class EmitterPlan
         bool separateSingleLineStatements,
         bool?[] initializerIndentations,
         bool[] initializerLayouts,
-        EmbeddedStatementSettings embeddedStatements)
+        EmbeddedStatementSettings embeddedStatements,
+        string? multilineParametersClosingParenthesisPosition,
+        string? multilineParameterListOpenBracePosition)
     {
         Spacing = spacing;
         NewLines = newLines;
@@ -60,6 +62,8 @@ sealed class EmitterPlan
         _initializerIndentations = initializerIndentations;
         _initializerLayouts = initializerLayouts;
         EmbeddedStatements = embeddedStatements;
+        MultilineParametersClosingParenthesisPosition = multilineParametersClosingParenthesisPosition;
+        MultilineParameterListOpenBracePosition = multilineParameterListOpenBracePosition;
     }
 
     internal (TokenSpacingRule Rule, string Preference)[] Spacing { get; }
@@ -78,6 +82,8 @@ sealed class EmitterPlan
     internal bool ExpandSingleLineBlocks { get; }
     internal bool SeparateSingleLineStatements { get; }
     internal EmbeddedStatementSettings EmbeddedStatements { get; }
+    internal string? MultilineParametersClosingParenthesisPosition { get; }
+    internal string? MultilineParameterListOpenBracePosition { get; }
     internal ulong InitializerMemberBoundaryRules { get; }
 
     /// <summary>
@@ -197,13 +203,21 @@ sealed class EmitterPlan
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineStatements) == false,
             initializerIndentations,
             initializerLayouts,
-            EmbeddedStatementSettings.From(configuration));
+            EmbeddedStatementSettings.From(configuration),
+            OptionalPreference(configuration, RuleKey.DressMultilineParametersClosingParenthesisPosition),
+            OptionalPreference(configuration, RuleKey.DressMultilineParameterListOpenBracePosition));
     }
 
     static bool? OptionalBoolean(FormattingConfiguration configuration, RuleKey key) =>
         configuration.Preferences.TryGetValue(key, out var value)
         && bool.TryParse(value, out var parsed)
             ? parsed
+            : null;
+
+    static string? OptionalPreference(FormattingConfiguration configuration, RuleKey key) =>
+        configuration.Preferences.TryGetValue(key, out var value)
+        && !value.Equals("unset", StringComparison.OrdinalIgnoreCase)
+            ? value.ToLowerInvariant()
             : null;
 
     static bool? OptionalIndentation(string? value) =>

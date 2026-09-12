@@ -286,6 +286,7 @@ sealed class SyntaxWrappingDiscovery
                 Delimited(attributes.Attributes, attributes.CloseBracketToken);
                 break;
             case BaseListSyntax baseList:
+                AddBoundary(baseList.ColonToken, GapStyle.SeparatedFirst);
                 for (var index = 0; index < baseList.Types.Count; index++)
                 {
                     var right = baseList.Types[index].GetFirstToken();
@@ -293,7 +294,8 @@ sealed class SyntaxWrappingDiscovery
                         right,
                         index == 0 || !right.GetPreviousToken().IsKind(SyntaxKind.CommaToken)
                             ? GapStyle.SeparatedFirst
-                            : GapStyle.SeparatedLater);
+                            : GapStyle.SeparatedLater,
+                        breakWhenMulti: index != 0);
                 }
 
                 break;
@@ -444,8 +446,8 @@ sealed class SyntaxWrappingDiscovery
             AddBoundary(clause.GetFirstToken(), GapStyle.Item);
     }
 
-    void AddBoundary(SyntaxToken right, GapStyle style) =>
-        _boundaries.Add(new(_stream.IndexOf(right, _currentSegmentIndex), style));
+    void AddBoundary(SyntaxToken right, GapStyle style, bool breakWhenMulti = true) =>
+        _boundaries.Add(new(_stream.IndexOf(right, _currentSegmentIndex), style, BreakWhenMulti: breakWhenMulti));
 
     void AddBoundary(int rightIndex, GapStyle style) =>
         _boundaries.Add(new(rightIndex, style));

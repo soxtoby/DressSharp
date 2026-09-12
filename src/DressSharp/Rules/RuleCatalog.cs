@@ -8,7 +8,7 @@ namespace DressSharp.Rules;
 
 sealed class RuleCatalog
 {
-    const int CurrentVersion = 2;
+    const int CurrentVersion = 3;
 
     RuleCatalog()
     {
@@ -182,6 +182,8 @@ sealed class RuleCatalog
             .Append(new BinaryExpressionIndentationRule())
             .Append(new NestedConditionalStyleRule())
             .Append(new OperatorPlacementRule())
+            .Append(new MultilineParametersClosingParenthesisPositionRule())
+            .Append(new MultilineParameterListOpenBracePositionRule())
             .Concat(newLineRules)
             .Concat(indentationRules)
             .Append(new SwitchExpressionIndentationRule())

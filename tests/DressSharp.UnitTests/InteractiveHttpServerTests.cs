@@ -86,7 +86,7 @@ public sealed class InteractiveHttpServerTests : IDisposable
 
         using var document = JsonDocument.Parse(await bootstrap.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
         document.RootElement.GetProperty("requestedConfig").GetString().ShouldBe(Path.Combine(_directory, ".editorconfig"));
-        document.RootElement.GetProperty("catalog").GetProperty("version").GetInt32().ShouldBe(2);
+        document.RootElement.GetProperty("catalog").GetProperty("version").GetInt32().ShouldBe(3);
         document.RootElement.GetProperty("catalog").GetProperty("rules").GetArrayLength().ShouldBeGreaterThan(0);
         var catalog = RuleCatalog.BuiltIn.Rules.ToDictionary(rule => rule.Metadata.RuleKey.ToName(), rule => rule.Metadata);
         foreach (var rule in document.RootElement.GetProperty("catalog").GetProperty("rules").EnumerateArray())
