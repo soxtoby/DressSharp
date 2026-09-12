@@ -1,12 +1,176 @@
 using DressSharp.Architecture;
 using DressSharp.Configuration;
 using EasyAssertions;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace DressSharp.UnitTests;
 
 public class SyntaxWrappingRuleTests
 {
+    [Theory]
+    [InlineData("\n", "MultipleChoice([\n    \"accessors\",\n    \"types\"\n], \"all\", \"none\");")]
+    [InlineData("\r\n", "MultipleChoice([\n    \"accessors\",\n    \"types\"\n], \"all\", \"none\");")]
+    [InlineData("\n", "MultipleChoice([\"accessors\", \"types\"], \"all\", \"none\");")]
+    public void Auto_expands_arguments_when_a_collection_argument_spans_lines(string lineEnding, string source)
+    {
+        var preferences = new[]
+        {
+            ("dress_arguments_layout", "auto"),
+            ("dress_collection_expressions_layout", "always_multi"),
+            ("csharp_indent_block_contents", "true"),
+            ("max_line_length", "500")
+        };
+        var result = Format(source.ReplaceLineEndings(lineEnding), preferences);
+        result.ShouldContain(lineEnding + "    \"all\"," + lineEnding + "    \"none\"");
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_separates_items_in_a_multiline_collection_argument(string lineEnding)
+    {
+        var source = """
+            NewLineRule[] newLineRules =
+                [
+                    new NewLineRule(RuleKey.CSharpNewLineBeforeOpenBrace, "Before open brace", "Newlines",
+                          NewLineKind.OpenBrace,
+                          RuleValues.MultipleChoice([
+                              "accessors", "anonymous_methods", "anonymous_types", "control_blocks", "events", "indexers", "lambdas", "local_functions", "methods",
+                              "object_collection_array_initializers", "properties", "types"
+                          ], "all", "none"), "all")
+                ];
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+        var result = Format(source, preferences);
+        var root = CSharpSyntaxTree.ParseText(result, cancellationToken: TestContext.Current.CancellationToken)
+            .GetRoot(TestContext.Current.CancellationToken);
+        var collection = root.DescendantNodes().OfType<CollectionExpressionSyntax>()
+            .Single(item => item.Elements.Count == 12);
+        var previousLine = collection.OpenBracketToken.GetLocation().GetLineSpan().StartLinePosition.Line;
+        foreach (var element in collection.Elements)
+        {
+            var line = element.GetLocation().GetLineSpan().StartLinePosition.Line;
+            (line > previousLine).ShouldBe(true);
+            previousLine = line;
+        }
+        var arguments = ((ArgumentSyntax)collection.Parent!).Parent as ArgumentListSyntax;
+        previousLine = arguments!.OpenParenToken.GetLocation().GetLineSpan().StartLinePosition.Line;
+        foreach (var argument in arguments.Arguments)
+        {
+            var span = argument.GetLocation().GetLineSpan();
+            (span.StartLinePosition.Line > previousLine).ShouldBe(true);
+            previousLine = span.EndLinePosition.Line;
+        }
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_normalizes_mixed_collection_items_and_preserves_fitting_single_line_collections(string lineEnding)
+    {
+        var preferences = new[] { ("dress_collection_expressions_layout", "auto"), ("max_line_length", "160") };
+        var source = "int[] values = [1, 2,\n    3];".ReplaceLineEndings(lineEnding);
+        var expected = "int[] values = [\n    1,\n    2,\n    3];".ReplaceLineEndings(lineEnding);
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+        Format("int[] values = [1, 2, 3];", preferences).ShouldBe("int[] values = [1, 2, 3];");
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_aligns_existing_constructor_arguments_with_default_preferences(string lineEnding)
+    {
+        var source = """
+            IFormattingRule[] embeddedStatementRules =
+                [
+                        new EmbeddedStatementPreferenceRule(
+                                RuleKey.DressEmbeddedStatementPlacement, "Control statement body placement", "Embedded statements",
+                                ["same_line", "next_line"],
+                                "next_line",
+                            "the boundary before brace-optional embedded statements",
+                            "Only boundary whitespace changes",
+                            description: "Place the body of if, else, loops, using, lock, and fixed on the same line or a new line. "
+                                + "For example: if (condition) return false;. Applies with or without braces. "
+                                + "Embedded statement placement: single-line if, inline return, return new line.",
+                            expandedCaption: "Control statement body placement")
+                ];
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+        var result = Format(source, preferences);
+        var root = CSharpSyntaxTree.ParseText(result, cancellationToken: TestContext.Current.CancellationToken)
+            .GetRoot(TestContext.Current.CancellationToken);
+        var constructor = root.DescendantNodes()
+            .OfType<ObjectCreationExpressionSyntax>().Single();
+        var owner = constructor.GetLocation().GetLineSpan().StartLinePosition;
+        var previousLine = owner.Line;
+        foreach (var argument in constructor.ArgumentList!.Arguments)
+        {
+            var position = argument.GetLocation().GetLineSpan().StartLinePosition;
+            position.Character.ShouldBe(owner.Character + 4);
+            (position.Line > previousLine).ShouldBe(true);
+            previousLine = position.Line;
+        }
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_separates_constructor_arguments_inside_a_collection(string lineEnding)
+    {
+        var source = """
+            IFormattingRule[] rules =
+            [
+                new EmbeddedStatementPreferenceRule(
+                    RuleKey.DressEmbeddedStatementPlacement, "Control statement body placement", "Embedded statements",
+                    ["same_line", "next_line"],
+                    "next_line",
+                    description: "Place the body on the same line or a new line. "
+                        + "Applies with or without braces.",
+                    expandedCaption: "Control statement body placement")
+            ];
+            """.ReplaceLineEndings(lineEnding);
+        var expected = source.Replace(
+            "RuleKey.DressEmbeddedStatementPlacement, \"Control statement body placement\", \"Embedded statements\",",
+            "RuleKey.DressEmbeddedStatementPlacement," + lineEnding
+                + "        \"Control statement body placement\"," + lineEnding
+                + "        \"Embedded statements\",", StringComparison.Ordinal);
+        var preferences = new[]
+        {
+            ("dress_arguments_layout", "auto"),
+            ("dress_collection_expressions_layout", "auto"),
+            ("csharp_indent_block_contents", "true"),
+            ("max_line_length", "160")
+        };
+        source = source
+            .Replace("        RuleKey.", "            RuleKey.", StringComparison.Ordinal)
+            .Replace("        [\"same_line\"", "            [\"same_line\"", StringComparison.Ordinal)
+            .Replace("        \"next_line\",", "            \"next_line\",", StringComparison.Ordinal);
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n", "dress_arguments_layout", "M(alpha, beta,\n    gamma);", "M(\n    alpha,\n    beta,\n    gamma);")]
+    [InlineData("\r\n", "dress_arguments_layout", "M(alpha, beta,\n    gamma);", "M(\n    alpha,\n    beta,\n    gamma);")]
+    [InlineData("\n", "dress_arguments_layout", "new C(alpha, beta,\n    gamma);", "new C(\n    alpha,\n    beta,\n    gamma);")]
+    [InlineData("\n", "dress_parameters_layout", "void M(int alpha, int beta,\n    int gamma) {}", "void M(\n    int alpha,\n    int beta,\n    int gamma) {}")]
+    [InlineData("\r\n", "dress_parameters_layout", "void M(int alpha, int beta,\n    int gamma) {}", "void M(\n    int alpha,\n    int beta,\n    int gamma) {}")]
+    public void Auto_puts_each_item_of_a_multiline_list_on_its_own_line(string lineEnding, string key, string source, string expected)
+    {
+        var preferences = new[] { (key, "auto"), ("max_line_length", "500") };
+        var result = Format(source.ReplaceLineEndings(lineEnding), preferences);
+        result.ShouldBe(expected.ReplaceLineEndings(lineEnding));
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]

@@ -64,6 +64,7 @@ sealed class SyntaxWrappingSolver
                 continue;
 
             var conditionDepth = MultilineConditionDepth(occurrence, gapMap);
+            var existingMultilineList = IsExistingMultilineList(occurrence);
             var indent = occurrence.Multi ? Indent(occurrenceIndex, 1 + conditionDepth) : "";
             var baseIndent = occurrence.Multi ? Indent(occurrenceIndex, 0) : "";
             var ladder = occurrence.Multi && CanUseDecisionLadder(occurrence, gapMap);
@@ -86,6 +87,10 @@ sealed class SyntaxWrappingSolver
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
+                if (existingMultilineList
+                    && (boundary.Style == GapStyle.DelimitedClose
+                        || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex)))
+                    continue;
                 var multi = BoundaryBreak(occurrence, offset);
                 var boundaryIndent = indent;
                 if (multi && occurrence is { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { Mode: WrappingMode.Auto, IndentationStyle: null } }
@@ -174,15 +179,17 @@ sealed class SyntaxWrappingSolver
         {
             var occurrence = _occurrences[occurrenceIndex];
             var initializerLayout = SyntaxWrappingRule.InitializerKindFor(occurrence.Kind) is not null;
+            var itemPerLineLayout = occurrence.Kind is SyntaxWrappingKind.Arguments or SyntaxWrappingKind.Parameters or SyntaxWrappingKind.CollectionExpressions;
             var hasLineBreak = HasLineBreak(occurrence);
-            var hasNestedLineBreak = initializerLayout && HasUnownedLineBreak(occurrence);
+            var hasNestedLineBreak = (initializerLayout || occurrence.Node is BaseArgumentListSyntax { Arguments.Count: > 1 })
+                && HasUnownedLineBreak(occurrence);
             if (occurrence.Setting.ShapesOperators && HasCommentedOperator(occurrence))
                 continue;
             if (occurrence.Setting.Mode == WrappingMode.Preserve && !hasLineBreak)
                 continue;
             if (occurrence.Setting.Mode == WrappingMode.Auto
                 && (hasLineBreak || hasNestedLineBreak)
-                && !initializerLayout && !occurrence.Setting.ShapesOperators
+                && !initializerLayout && !itemPerLineLayout && !occurrence.Setting.ShapesOperators
                 && occurrence.Node is not BaseListSyntax)
                 continue;
 
@@ -190,7 +197,7 @@ sealed class SyntaxWrappingSolver
                 || occurrence.Setting.ShapesOperators && hasLineBreak
                 && occurrence.Setting.Mode is WrappingMode.Auto or WrappingMode.Preserve
                 || occurrence.Setting.Mode == WrappingMode.Auto
-                && initializerLayout
+                && (initializerLayout || itemPerLineLayout)
                 && (hasLineBreak || hasNestedLineBreak)
                 || occurrence.Setting.Mode == WrappingMode.Compact
                 && initializerLayout
@@ -247,9 +254,14 @@ sealed class SyntaxWrappingSolver
             _occurrences[occurrenceIndex] = occurrence;
             if (_plannedWidths is null)
                 continue;
+            var existingMultilineList = IsExistingMultilineList(occurrence);
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
+                if (existingMultilineList
+                    && (boundary.Style == GapStyle.DelimitedClose
+                        || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex)))
+                    continue;
                 var boundaryMulti = BoundaryBreak(occurrence, offset);
                 if (boundaryMulti)
                 {
@@ -451,6 +463,11 @@ sealed class SyntaxWrappingSolver
             }
         }
     }
+
+    bool IsExistingMultilineList(Occurrence occurrence) =>
+        occurrence.Setting.Mode == WrappingMode.Auto
+        && occurrence.Kind is SyntaxWrappingKind.Arguments or SyntaxWrappingKind.Parameters or SyntaxWrappingKind.CollectionExpressions
+        && HasLineBreak(occurrence);
 
     bool HasLineBreak(Occurrence occurrence)
     {

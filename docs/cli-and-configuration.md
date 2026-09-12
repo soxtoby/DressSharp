@@ -42,6 +42,14 @@ Known invalid effective values and malformed EditorConfig fail preflight before 
 
 `dotnet dress init` writes every supported key with its Default value. The versioned rule catalog is the authoritative source for supported values and interactive documentation.
 
+### Argument and parameter layout
+
+`dress_arguments_layout = auto` and `dress_parameters_layout = auto` keep fitting single-line lists compact. Once a list wraps between items, each argument or parameter starts on its own line. Existing multiline lists gain any missing item breaks while retaining their closing-delimiter placement. A multiline argument also expands its enclosing list when there are multiple arguments. A sole multiline argument, such as a lambda, can remain attached to the call.
+
+`always_multi` always expands the list; `always_single` requests a single-line list.
+
+`dress_collection_expressions_layout = auto` follows the same item-per-line behavior for multiline collection expressions (`[...]`), including collections passed as arguments. Fitting single-line collections stay compact.
+
 ### Initializer layout
 
 Object, collection, array, and `with` initializers have independent layout preferences:

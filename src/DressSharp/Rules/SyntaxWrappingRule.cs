@@ -16,7 +16,10 @@ sealed class SyntaxWrappingRule(
         ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
         GroupName = "Wrapping",
         SubgroupName = subgroupName,
-        Description = $"Controls {kind}. Only whitespace owned by syntax wrapping changes.",
+        Description = $"Controls {kind}. Only whitespace owned by syntax wrapping changes."
+            + (kind is SyntaxWrappingKind.Arguments or SyntaxWrappingKind.Parameters or SyntaxWrappingKind.CollectionExpressions
+                ? " Auto puts each item in a multiline list on its own line and keeps fitting single-line lists compact."
+                : ""),
         Values = RuleValues.From(InitializerKindFor(kind) is not null
             ? ["compact", "auto", "expanded"]
             : ["always_single", "auto", "always_multi"]),
