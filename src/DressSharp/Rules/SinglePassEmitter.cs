@@ -193,7 +193,7 @@ sealed class SinglePassEmitter
         // Inside an interpolated string the characters between tokens are content, not trivia, and
         // the braces that open a hole are not the braces the layout rules mean. Editing either
         // rewrites the string.
-        if (InsideInterpolatedString(left) || InsideInterpolatedString(right))
+        if (InsideInterpolatedString(left, afterToken: true) || InsideInterpolatedString(right, afterToken: false))
         {
             CopyGap(index);
             return;
@@ -1134,14 +1134,16 @@ sealed class SinglePassEmitter
             || trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
             || trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia));
 
-    static bool InsideInterpolatedString(SyntaxToken token)
+    static bool InsideInterpolatedString(SyntaxToken token, bool afterToken)
     {
         for (var node = token.Parent; node is not null; node = node.Parent)
         {
             switch (node)
             {
-                case InterpolatedStringExpressionSyntax:
-                    return true;
+                case InterpolatedStringExpressionSyntax interpolated:
+                    if (token != (afterToken ? interpolated.GetLastToken() : interpolated.GetFirstToken()))
+                        return true;
+                    break;
                 case StatementSyntax or MemberDeclarationSyntax:
                     return false;
             }

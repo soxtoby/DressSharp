@@ -6,6 +6,68 @@ namespace DressSharp.UnitTests;
 
 public sealed class InitializerLayoutRuleTests
 {
+    [Fact]
+    public void Expanded_collection_formats_interpolated_string_boundaries_without_changing_contents()
+    {
+        const string source = """var items = new[] { $"{ $"{value  +  1}" }", $"{other  +  2}" };""";
+        const string expected = """
+            var items = new[]
+            {
+                $"{ $"{value  +  1}" }",
+                $"{other  +  2}"
+            };
+            """;
+        (string, string)[] preferences =
+        [
+            ("dress_array_initializer_layout", "expanded"),
+            ("dress_array_initializer_indentation", "not_indented"),
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_space_around_binary_operators", "before_and_after")
+        ];
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_collection_initializer_puts_each_interpolated_string_on_its_own_line(string lineEnding)
+    {
+        const string source = """
+            void M()
+            {
+                var markdown = new List<string> { $"# Benchmark {timestamp:u}", "", $"Mode: {mode}  ", $"Corpus: {manifest["corpusHash"]}", "", "| Workers | DressSharp median | DressSharp p95 | dotnet format median | Ratio |", "| ---: | ---: | ---: | ---: | ---: |" };
+            }
+            """;
+        const string expected = """
+            void M()
+            {
+                var markdown = new List<string>
+                    {
+                        $"# Benchmark {timestamp:u}",
+                        "",
+                        $"Mode: {mode}  ",
+                        $"Corpus: {manifest["corpusHash"]}",
+                        "",
+                        "| Workers | DressSharp median | DressSharp p95 | dotnet format median | Ratio |",
+                        "| ---: | ---: | ---: | ---: | ---: |"
+                    };
+            }
+            """;
+        (string, string)[] preferences =
+        [
+            ("dress_collection_initializer_layout", "auto"),
+            ("dress_collection_initializer_indentation", "indented"),
+            ("csharp_indent_block_contents", "true"),
+            ("max_line_length", "160"),
+            ("end_of_line", lineEnding == "\n" ? "lf" : "crlf")
+        ];
+        var result = Format(source.ReplaceLineEndings(lineEnding), preferences);
+        result.ShouldBe(expected.ReplaceLineEndings(lineEnding));
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Theory]
     [InlineData(
         "dress_object_initializer_layout",
