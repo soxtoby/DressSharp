@@ -73,19 +73,22 @@ sealed class DocumentFormatter
         CancellationToken cancellationToken)
     {
         var transformStart = Stopwatch.GetTimestamp();
-        BraceEmission? braceEmission = null;
-        var transformed = TransformOnce(root, source, options, ref braceEmission, cancellationToken);
+        var reuse = new EmissionReuse();
+        var transformed = TransformOnce(root, source, options, reuse, cancellationToken);
         if (_stabilizeWrapping && transformed.Text != source)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var stabilizedRoot = braceEmission is { } previous && previous.Source == transformed.Text
-                ? previous.Root
-                : ParseCandidate(transformed.Text, options, cancellationToken);
+            var stabilizedRoot = ParseCandidate(
+                transformed.Text,
+                reuse.Braces?.Root ?? root,
+                reuse.Braces?.Source ?? source,
+                options,
+                cancellationToken);
             transformed = TransformOnce(
                 stabilizedRoot,
                 transformed.Text,
                 options,
-                ref braceEmission,
+                reuse,
                 cancellationToken);
         }
 
@@ -97,12 +100,12 @@ sealed class DocumentFormatter
         SyntaxNode root,
         string source,
         CSharpParseOptions options,
-        ref BraceEmission? braceEmission,
+        EmissionReuse reuse,
         CancellationToken cancellationToken)
     {
         var structural = ApplyFileScopedRules(root);
         var text = ReferenceEquals(structural.Root, root) ? source : structural.Root.ToFullString();
-        var emitted = Emit(structural.Root, text, options, ref braceEmission, cancellationToken);
+        var emitted = Emit(structural.Root, text, options, reuse, cancellationToken);
         return new(
             emitted.Text,
             structural.SkippedOccurrences + emitted.SkippedOccurrences);
@@ -122,12 +125,12 @@ sealed class DocumentFormatter
         SyntaxNode root,
         string text,
         CSharpParseOptions options,
-        ref BraceEmission? braceEmission,
+        EmissionReuse reuse,
         CancellationToken cancellationToken)
     {
         if (!_embeddedStatements.NeedsBracePlanning)
         {
-            var only = EmitStage(root, text, _memberRules);
+            var only = EmitStage(root, text, _memberRules, reuse);
             return new(only.Text, only.RewriteSkippedOccurrences + only.LayoutSkippedOccurrences);
         }
 
@@ -135,15 +138,16 @@ sealed class DocumentFormatter
             root,
             text,
             _memberRules,
+            reuse,
             _embeddedStatements.NeedsBraceFreeCandidate
                 ? EmbeddedStatementBraces.MinimizeMember
                 : null);
         // Stabilization often produces the same brace-free candidate again. Its parsed tree and
         // completed brace emission are reusable within this document and parse context.
         cancellationToken.ThrowIfCancellationRequested();
-        if (braceEmission is null || braceEmission.Source != candidate.Text)
-            braceEmission = EmitBraces(candidate.Text, options, cancellationToken);
-        var final = braceEmission.Result;
+        if (reuse.Braces is null || reuse.Braces.Source != candidate.Text)
+            reuse.Braces = EmitBraces(candidate.Text, root, text, options, reuse, cancellationToken);
+        var final = reuse.Braces.Result;
         return new(
             final.Text,
             candidate.RewriteSkippedOccurrences
@@ -151,13 +155,20 @@ sealed class DocumentFormatter
                 + final.LayoutSkippedOccurrences);
     }
 
-    BraceEmission EmitBraces(string source, CSharpParseOptions options, CancellationToken cancellationToken)
+    BraceEmission EmitBraces(
+        string source,
+        SyntaxNode previousRoot,
+        string previousSource,
+        CSharpParseOptions options,
+        EmissionReuse reuse,
+        CancellationToken cancellationToken)
     {
-        var candidateRoot = ParseCandidate(source, options, cancellationToken);
+        var candidateRoot = ParseCandidate(source, previousRoot, previousSource, options, cancellationToken);
         var final = EmitStage(
             candidateRoot,
             source,
             MemberRuleSet.Empty,
+            reuse,
             (member, context) => EmbeddedStatementBraces.ApplyMember(
                 member,
                 _embeddedStatements,
@@ -165,8 +176,18 @@ sealed class DocumentFormatter
         return new(source, candidateRoot, final);
     }
 
-    SyntaxNode ParseCandidate(string text, CSharpParseOptions options, CancellationToken cancellationToken)
+    SyntaxNode ParseCandidate(
+        string text,
+        SyntaxNode previousRoot,
+        string previousSource,
+        CSharpParseOptions options,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (text == previousSource && !previousRoot.ContainsAnnotations
+            && previousRoot.SyntaxTree.Options.Equals(options))
+            return previousRoot;
+
         var parseStart = Stopwatch.GetTimestamp();
         var root = CSharpSyntaxTree.ParseText(
                 text,
@@ -181,6 +202,7 @@ sealed class DocumentFormatter
         SyntaxNode root,
         string text,
         MemberRuleSet memberRules,
+        EmissionReuse reuse,
         Func<SyntaxNode, RuleContext, SyntaxNode>? finishMember = null)
     {
         // The rest are scoped to the member they change, so a member no rule wants
@@ -192,6 +214,15 @@ sealed class DocumentFormatter
             ruleContext,
             finishMember is null ? null : member => finishMember(member, ruleContext));
         var rewriteSkipped = ruleContext.TakeSkippedOccurrences();
+        // A pass with no member replacements has exactly the same layout inputs when it revisits
+        // this tree and source. Keep running rewrite decisions, but reuse layout and emission.
+        var unchanged = rewrites.Replacements.Count == 0;
+        if (unchanged && reuse.Layout is { } previous
+            && ReferenceEquals(previous.Root, root) && previous.Source == text)
+        {
+            return new(previous.Text, rewriteSkipped, previous.SkippedOccurrences);
+        }
+
         var layout = _layoutPlanner.Plan(
             root,
             text,
@@ -203,10 +234,13 @@ sealed class DocumentFormatter
             ruleContext,
             text,
             layout);
+        var layoutSkipped = layout.SkippedOccurrences + ruleContext.TakeSkippedOccurrences();
+        if (unchanged)
+            reuse.Layout = new(root, text, formatted, layoutSkipped);
         return new(
             formatted,
             rewriteSkipped,
-            layout.SkippedOccurrences + ruleContext.TakeSkippedOccurrences());
+            layoutSkipped);
     }
 
     ReadOnlyMemory<byte> Encode(SourceDocument document, string formatted)
@@ -244,6 +278,14 @@ sealed class DocumentFormatter
     static bool? Boolean(string? value) => bool.TryParse(value, out var parsed) ? parsed : null;
 
     sealed record BraceEmission(string Source, SyntaxNode Root, EmissionStage Result);
+
+    sealed record LayoutEmission(SyntaxNode Root, string Source, string Text, int SkippedOccurrences);
+
+    sealed class EmissionReuse
+    {
+        internal BraceEmission? Braces;
+        internal LayoutEmission? Layout;
+    }
 }
 
 sealed record TransformedDocument(string Text, int SkippedOccurrences);

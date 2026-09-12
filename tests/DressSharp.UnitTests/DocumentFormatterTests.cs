@@ -1,5 +1,6 @@
 using DressSharp.Architecture;
 using DressSharp.Execution;
+using DressSharp.IO;
 using EasyAssertions;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,6 +10,38 @@ namespace DressSharp.UnitTests;
 
 public class DocumentFormatterTests
 {
+    [Theory]
+    [InlineData("\n", false)]
+    [InlineData("\n", true)]
+    [InlineData("\r\n", false)]
+    [InlineData("\r\n", true)]
+    public async Task Reused_layout_preserves_malformed_occurrence_counts(string lineEnding, bool needsFormatting)
+    {
+        var preferences = new Dictionary<RuleKey, string>
+            {
+                [RuleKey.DressEmbeddedStatementBraces] = "balanced",
+                [RuleKey.DressArgumentsLayout] = "auto",
+                [RuleKey.MaxLineLength] = "40",
+                [RuleKey.CSharpIndentBlockContents] = "true",
+                [RuleKey.CSharpNewLineBeforeOpenBrace] = "all"
+            };
+        var formatter = new DocumentFormatter(new(preferences), new BenchmarkTiming());
+        var expected = "class C\n{\n    void M()\n    {\n        Broken(,);\n        Run();\n    }\n}".ReplaceLineEndings(lineEnding);
+        var source = needsFormatting ? expected.Replace("void M()" + lineEnding + "    {", "void M() {") : expected;
+
+        var result = await Format(source);
+        var text = SourceDocument.Decode(result.Content, result.Encoding);
+
+        text.ShouldBe(expected);
+        result.SkippedOccurrences.ShouldBe(1);
+        var repeated = await Format(text);
+        SourceDocument.Decode(repeated.Content, repeated.Encoding).ShouldBe(expected);
+        repeated.SkippedOccurrences.ShouldBe(1);
+
+        ValueTask<FormattedDocument> Format(string input) => formatter.Format(
+            SourceDocument.FromText("test.cs", input), CSharpParseOptions.Default, TestContext.Current.CancellationToken);
+    }
+
     [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
