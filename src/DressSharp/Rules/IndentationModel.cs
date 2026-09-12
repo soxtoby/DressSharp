@@ -154,6 +154,13 @@ sealed class IndentationModel
     {
         if (_braces.TryGetValue(owner, out var indent))
             return indent;
+        if (!owner.ContainsDiagnostics
+            && !owner.ContainsDirectives
+            && InitializerIndentationRule.KindOf(owner) is { } initializerKind
+            && _plan.InitializerIndentation(initializerKind) is { } indentInitializer)
+        {
+            return ForNode(owner) + Unit(indentInitializer);
+        }
         if (owner is BlockSyntax { Parent: LambdaExpressionSyntax function })
             return ForNode(function) + Unit(_plan.IndentLambdaBlock ?? _plan.IndentBraces ?? false);
         if (owner is BlockSyntax { Parent: SwitchSectionSyntax section })

@@ -790,6 +790,59 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_arguments_indent_from_object_initializer_member(string lineEnding)
+    {
+        const string source = """
+            sealed class ModifierOrderRule
+            {
+                public RuleMetadata Metadata { get; } = new()
+                {
+                    Description = "Controls member modifier lists. Only modifier token order changes.",
+                    Values = RuleValues.Permutation("public", "protected", "internal", "private", "file", "new", "static", "abstract", "virtual", "sealed", "override", "readonly", "unsafe", "required", "volatile", "async")
+                };
+            }
+            """;
+        const string expected = """
+            sealed class ModifierOrderRule
+            {
+                public RuleMetadata Metadata { get; } = new()
+                    {
+                        Description = "Controls member modifier lists. Only modifier token order changes.",
+                        Values = RuleValues.Permutation(
+                            "public",
+                            "protected",
+                            "internal",
+                            "private",
+                            "file",
+                            "new",
+                            "static",
+                            "abstract",
+                            "virtual",
+                            "sealed",
+                            "override",
+                            "readonly",
+                            "unsafe",
+                            "required",
+                            "volatile",
+                            "async"
+                        )
+                    };
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults
+            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .ToArray();
+
+        var input = source.ReplaceLineEndings(lineEnding);
+        var result = Format(input, preferences);
+
+        result.ShouldBe(expected.ReplaceLineEndings(lineEnding));
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData(160, false)]
     [InlineData(161, true)]
     public void Auto_arguments_measure_the_lambda_header_line(int width, bool wraps)
