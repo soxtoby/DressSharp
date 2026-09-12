@@ -9,6 +9,47 @@ namespace DressSharp.UnitTests;
 public class IndentationOwnershipTests
 {
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Wrapped_constructor_arguments_follow_the_collection_element(string lineEnding)
+    {
+        var source = """
+            class C
+            {
+                void M()
+                {
+                    SingleLinePreservationRule[] preservationRules =
+                    [
+                        new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineBlocks, "Blocks", "Preserve single line", SingleLinePreservationKind.Blocks),
+                        new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineStatements, "Statements", "Preserve single line", SingleLinePreservationKind.Statements)
+                    ];
+                }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var expected = source.Replace(
+            "new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineStatements, \"Statements\", \"Preserve single line\", SingleLinePreservationKind.Statements)",
+            "new SingleLinePreservationRule(" + lineEnding
+                + "                RuleKey.CSharpPreserveSingleLineStatements," + lineEnding
+                + "                \"Statements\"," + lineEnding
+                + "                \"Preserve single line\"," + lineEnding
+                + "                SingleLinePreservationKind.Statements" + lineEnding
+                + "            )", StringComparison.Ordinal);
+        (string Key, string Value)[] preferences =
+        [
+            ("indent_style", "space"),
+            ("indent_size", "4"),
+            ("csharp_indent_block_contents", "true"),
+            ("dress_arguments_layout", "auto"),
+            ("dress_collection_expressions_layout", "auto"),
+            ("max_line_length", "160")
+        ];
+
+        var result = Format(source, preferences);
+        result.ShouldBe(expected, result);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData("flat", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;")]
     [InlineData("precedence", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n        && _safetyContext?.IsUnsafe(node) == true;")]
     public void Binary_indentation_can_follow_operator_precedence(string indentation, string expected)

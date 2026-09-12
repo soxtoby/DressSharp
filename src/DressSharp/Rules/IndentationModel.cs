@@ -143,6 +143,7 @@ sealed class IndentationModel
             NamespaceDeclarationSyntax ns => Contents(ns),
             AccessorListSyntax accessors => Contents(accessors),
             InitializerExpressionSyntax initializer => Contents(initializer),
+            CollectionExpressionSyntax collection when node is CollectionElementSyntax => Contents(collection),
             AnonymousObjectCreationExpressionSyntax anonymous => Contents(anonymous),
             SwitchExpressionSyntax expression when node is SwitchExpressionArmSyntax => Contents(expression),
             PropertyPatternClauseSyntax pattern => Contents(pattern),
