@@ -9,6 +9,29 @@ namespace DressSharp.UnitTests;
 public sealed class InitializerIndentationEmitterTests
 {
     [Theory]
+    [InlineData("new[]", "{", "}", "dress_array_initializer_indentation", "\n")]
+    [InlineData("new List<int>", "{", "}", "dress_collection_initializer_indentation", "\r\n")]
+    [InlineData("", "[", "]", "dress_collection_expression_indentation", "\n")]
+    public void Large_initializers_keep_each_direct_item_indented(
+        string creation, string open, string close, string preference, string lineEnding)
+    {
+        var items = string.Join(lineEnding, Enumerable.Range(0, 512).Select(index => $"            {index},"));
+        var source = string.Join(lineEnding,
+            "class C", "{", $"    object Values = {creation}".TrimEnd(),
+            "        " + open, items, "        " + close + ";", "}");
+        (string, string)[] preferences =
+        [
+            (preference, "indented"),
+            ("csharp_indent_block_contents", "true")
+        ];
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
     public void Non_indented_collection_expression_arguments_keep_the_argument_indent(string lineEnding)

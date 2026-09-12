@@ -69,6 +69,8 @@ sealed class SinglePassEmitter
         _root = root;
         _checkMalformedRegions = checkMalformedRegions;
         _pieces = layout.Stream.Pieces;
+        _sourceIndents.EnsureCapacity(_pieces.Length);
+        _originalTokens.EnsureCapacity(_pieces.Length);
         var segmentStarts = new Dictionary<int, int>();
         foreach (var piece in _pieces)
         {
@@ -1087,16 +1089,24 @@ sealed class SinglePassEmitter
         return null;
     }
 
-    static bool StartsDirectInitializerItem(SyntaxNode initializer, SyntaxToken token) => initializer switch
+    static bool StartsDirectInitializerItem(SyntaxNode initializer, SyntaxToken token)
     {
-        AnonymousObjectCreationExpressionSyntax anonymousObject =>
-            anonymousObject.Initializers.Any(item => item.GetFirstToken() == token),
-        InitializerExpressionSyntax expression =>
-            expression.Expressions.Any(item => item.GetFirstToken() == token),
-        CollectionExpressionSyntax collection =>
-            collection.Elements.Any(item => item.GetFirstToken() == token),
-        _ => false
-    };
+        // Find the owning item from the token. Scanning every item for each token makes large
+        // initializers quadratic, even though only one ancestor can be the direct item.
+        for (var item = token.Parent; item is not null && item != initializer; item = item.Parent)
+        {
+            if (item.Parent != initializer)
+                continue;
+
+            return (initializer, item) is
+                (AnonymousObjectCreationExpressionSyntax, AnonymousObjectMemberDeclaratorSyntax)
+                or (InitializerExpressionSyntax, ExpressionSyntax)
+                or (CollectionExpressionSyntax, CollectionElementSyntax)
+                && item.GetFirstToken() == token;
+        }
+
+        return false;
+    }
 
     bool? DesiredSpace(TokenPair pair, bool boundaryBeforeLeft, bool originalOccurrence)
     {
