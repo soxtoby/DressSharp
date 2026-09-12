@@ -15,13 +15,21 @@ sealed class BlankLineRule(RuleKey key, string caption, string? subgroupName, Bl
         Description = "Controls line breaks at structural boundaries. Only whitespace trivia changes.",
         Values = RuleValues.Integer(0),
         DefaultValue = defaultValue,
-        Example = """
+        Example = kind switch
+        {
+            BlankLineKind.AroundNamespaces => "namespace First { }\nnamespace Second { }",
+            BlankLineKind.BetweenMembers => "class Example\n{\n    void First() { }\n    void Second() { }\n}",
+            BlankLineKind.BetweenUsingGroups => "using System;\nusing static System.Math;\nusing Alias = System.String;\nclass Value { }",
+            BlankLineKind.BetweenMemberCategories => "class Example\n{\n    int value;\n    void Run() { }\n}",
+            BlankLineKind.Maximum => "class First { }\n\n\n\n\nclass Second { }",
+            _ => """
             namespace Example
             {
                 class First { }
                 class Second { }
             }
-            """,
+            """
+        },
         OwnedSyntax = "line breaks at structural boundaries",
         Invariant = "Only whitespace trivia changes"
     };

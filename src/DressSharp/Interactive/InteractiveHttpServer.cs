@@ -258,6 +258,8 @@ sealed class InteractiveHttpServer : IInteractiveServer
                 subgroup = rule.Metadata.SubgroupName,
                 caption = rule.Metadata.Caption,
                 description = rule.Metadata.Description,
+                example = rule.Metadata.Example,
+                examplePreferences = rule.Metadata.ExamplePreferences.ToDictionary(pair => pair.Key.ToName(), pair => pair.Value),
                 defaultValue = rule.Metadata.DefaultValue,
                 valueKind = rule.Metadata.Values.Kind.ToString().ToLowerInvariant(),
                 values = rule.Metadata.Values.Options.Select(option => new

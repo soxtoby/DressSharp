@@ -26,20 +26,23 @@ sealed class SyntaxWrappingRule(
             ? ["compact", "auto", "expanded"]
             : ["always_single", "auto", "always_multi"]),
         DefaultValue = defaultValue,
-        Example = InitializerKindFor(kind) is not null
-            ? """
-                class Example
-                {
-                    Example Value = new Example { Number = 1 };
-                    int Number { get; set; }
-                }
-                """
-            : """
-                class Example
-                {
-                    void Run() { Call(firstArgument, secondArgument, thirdArgument); }
-                }
-                """,
+        Example = kind switch
+        {
+            SyntaxWrappingKind.Parameters => "class Example { void Run(int first, int second, int third) { } }",
+            SyntaxWrappingKind.ObjectInitializers => "var value = new Example { First = 1, Second = 2 };",
+            SyntaxWrappingKind.CollectionInitializers => "var values = new List<int> { 1, 2, 3 };",
+            SyntaxWrappingKind.ArrayInitializers => "var values = new[] { 1, 2, 3 };",
+            SyntaxWrappingKind.WithInitializers => "var value = original with { First = 1, Second = 2 };",
+            SyntaxWrappingKind.CollectionExpressions => "int[] values = [1, 2, 3];",
+            SyntaxWrappingKind.BaseTypeLists => "class Example : Base, IFirst, ISecond { }",
+            SyntaxWrappingKind.ConstraintClauses => "class Example<T, U> where T : class where U : new() { }",
+            SyntaxWrappingKind.MemberAccessChains => "var value = source.Where(predicate).Select(selector).ToList();",
+            SyntaxWrappingKind.BinaryExpressions => "var value = first + second + third;",
+            SyntaxWrappingKind.ConditionalExpressions => "var value = condition ? first : second;",
+            SyntaxWrappingKind.QueryClauses => "var result = from item in items where item.Active select item.Name;",
+            SyntaxWrappingKind.Attributes => "[First, Second, Third] class Example { }",
+            _ => "Call(firstArgument, secondArgument, thirdArgument);"
+        },
         OwnedSyntax = kind.ToString(),
         Invariant = "Only whitespace owned by syntax wrapping changes"
     };

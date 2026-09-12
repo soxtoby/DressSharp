@@ -15,13 +15,25 @@ sealed class IndentationRule(RuleKey key, string caption, string? subgroupName, 
         Description = "Controls syntax indentation. Only indentation whitespace changes.",
         Values = RuleValues.From(values),
         DefaultValue = defaultValue,
-        Example = """
+        Example = key == RuleKey.CSharpIndentLabels
+            ? "class Example\n{\n    void Run()\n    {\n        label:\n        Work();\n    }\n}"
+            : """
             class Example
             {
             void Run()
             {
-            if (true)
+            label:
+            switch (value)
+            {
+            case 1:
             Work();
+            break;
+            case 2:
+            {
+            Work();
+            break;
+            }
+            }
             }
             void Work() { }
             }

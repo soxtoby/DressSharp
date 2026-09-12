@@ -20,6 +20,7 @@ sealed class UsingOrderRule(RuleKey ruleKey, RuleValueDefinition values, string 
         Values = values,
         DefaultValue = defaultValue,
         Example = """
+            global using Alpha;
             using Zeta;
             using static System.Math;
             using Alias = System.String;
@@ -92,7 +93,7 @@ sealed class ModifierOrderRule : ISyntaxFormattingRule
         Description = "Controls member modifier lists. Only modifier token order changes.",
         Values = RuleValues.Permutation("public", "protected", "internal", "private", "file", "new", "static", "abstract", "virtual", "sealed", "override", "readonly", "unsafe", "required", "volatile", "async"),
         DefaultValue = "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async",
-        Example = new("static public class Example { }"),
+        Example = "class Example { readonly public static int Value; }",
         OwnedSyntax = "member modifier lists",
         Invariant = "Only modifier token order changes"
     };

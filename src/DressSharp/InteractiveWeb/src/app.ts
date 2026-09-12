@@ -1,7 +1,9 @@
 import {desiredAssignment, matchesRule, setEdit, validValue, type Assignment, type ConfigurationSnapshot, type PendingEdits, type PreferenceSnapshot} from "./state";
 import {Preview} from "./preview";
+import {RuleExamples, type ExampleRule} from "./rule-examples";
+import {icon} from "./icons";
 
-type Rule = {key: string; expandedCaption: string; group: string; subgroup: string | null; caption: string; description: string; defaultValue: string; valueKind: string; values: Array<{value: string; label: string}>; minimum: number | null; specialValues: string[]};
+type Rule = ExampleRule & {group: string; subgroup: string | null; caption: string};
 type Bootstrap = {csrfToken: string; catalog: {version: number; rules: Rule[]}};
 
 const root = document.querySelector<HTMLElement>("#app")!;
@@ -20,6 +22,7 @@ let selectionRules: Set<string> | null = null;
 let selectionLabel = "";
 const touched = new Set<string>();
 const expanded = new Set<string>();
+const examples = new RuleExamples();
 
 start().catch(fatal);
 
@@ -169,25 +172,32 @@ function ruleRow(rule: Rule, preference: PreferenceSnapshot) {
     remove.setAttribute("aria-label", remove.title);
     setDisabled(remove, desired.kind === "absent" || saving);
     remove.addEventListener("click", () => change(preference, {kind: "absent", value: null}));
-    const unset = el("button", "icon unset", ["∅"]);
+    const unset = el("button", "icon unset", [icon("unset")]);
     unset.title = `Set ${rule.expandedCaption} to unset`;
     unset.setAttribute("aria-label", unset.title);
     setDisabled(unset, desired.kind === "unset" || saving);
     unset.addEventListener("click", () => change(preference, {kind: "unset", value: null}));
-    const copy = el("button", "icon copy", ["⧉"]);
+    const copy = el("button", "icon copy", [icon("copy")]);
     copy.title = `Copy ${rule.key}`;
     copy.setAttribute("aria-label", copy.title);
     copy.addEventListener("click", async () => {
         try {
             await navigator.clipboard.writeText(rule.key);
-            copy.textContent = "✓";
+            copy.replaceChildren(icon("check"));
             copy.setAttribute("aria-label", `Copied ${rule.key}`);
-            window.setTimeout(() => { copy.textContent = "⧉"; copy.setAttribute("aria-label", copy.title); }, 1200);
+            window.setTimeout(() => { copy.replaceChildren(icon("copy")); copy.setAttribute("aria-label", copy.title); }, 1200);
         } catch { copy.setAttribute("aria-label", `Could not copy ${rule.key}`); }
     });
     const invalid = desired.kind === "explicit" && touched.has(rule.key) && !validValue(desired.value ?? "", rule);
+    const example = el("button", "icon rule-example", [icon("example")]);
+    example.title = `Show example for ${rule.expandedCaption}`;
+    example.id = `example-${rule.key}`;
+    example.setAttribute("aria-label", example.title);
+    example.setAttribute("aria-haspopup", "dialog");
+    example.setAttribute("aria-controls", examples.element.id);
+    example.addEventListener("click", () => examples.show(rule, example.id));
     return el("article", `rule-row${changed ? " changed" : ""}`, [
-        el("div", "rule-copy", [el("div", "rule-title", [name, copy])]),
+        el("div", "rule-copy", [el("div", "rule-title", [name, copy, example])]),
         el("div", `rule-control${["boolean", "choice"].includes(rule.valueKind) ? " enum-control" : ""}`, [
             control,
             ...(["boolean", "choice"].includes(rule.valueKind) ? [] : [unset]),

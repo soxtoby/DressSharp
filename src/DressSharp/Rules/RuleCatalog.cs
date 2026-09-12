@@ -244,12 +244,25 @@ sealed class RuleCatalog
                 Description = description,
                 Values = values,
                 DefaultValue = defaultValue,
-                Example = """
+                ExamplePreferences = key switch
+                {
+                    RuleKey.IndentStyle => ImmutableDictionary<RuleKey, string>.Empty.Add(RuleKey.CSharpIndentBlockContents, "true"),
+                    RuleKey.IndentSize => ImmutableDictionary<RuleKey, string>.Empty.Add(RuleKey.CSharpIndentBlockContents, "true").Add(RuleKey.IndentStyle, "space"),
+                    RuleKey.TabWidth => ImmutableDictionary<RuleKey, string>.Empty.Add(RuleKey.CSharpIndentBlockContents, "true").Add(RuleKey.IndentStyle, "space").Add(RuleKey.IndentSize, "tab"),
+                    RuleKey.MaxLineLength => ImmutableDictionary<RuleKey, string>.Empty.Add(RuleKey.DressArgumentsLayout, "auto"),
+                    _ => ImmutableDictionary<RuleKey, string>.Empty
+                },
+                Example = key switch
+                {
+                    RuleKey.TrimTrailingWhitespace => "class Example { }   \n",
+                    RuleKey.MaxLineLength => "Call(firstArgument, secondArgument, thirdArgument);",
+                    _ => """
                     class Example
                     {
                         string Text = "DressSharp";
                     }
-                    """,
+                    """
+                },
                 OwnedSyntax = "file representation or shared layout settings",
                 Invariant = "The configured value is applied by its owning formatter stage"
             });

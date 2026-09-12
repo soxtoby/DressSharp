@@ -26,13 +26,23 @@ abstract class TokenSpacingRule(
         Description = $"Controls {ownedSyntax}. Only same-line whitespace changes.",
         Values = values,
         DefaultValue = defaultValue,
-        Example = example ?? """
+        Example = example ?? (ruleKey switch
+        {
+            RuleKey.CSharpSpaceAfterCast => "var value = (int)number;",
+            RuleKey.CSharpSpaceBetweenMethodCallEmptyParameterListParentheses => "Work();",
+            RuleKey.CSharpSpaceAfterDot or RuleKey.CSharpSpaceBeforeDot => "var value = item.Name;",
+            RuleKey.CSharpSpaceAfterSemicolonInForStatement or RuleKey.CSharpSpaceBeforeSemicolonInForStatement => "for (int i = 0;i < 10;i++) { Work(); }",
+            RuleKey.CSharpSpaceAroundDeclarationStatements => "int value=1;",
+            RuleKey.CSharpSpaceBeforeOpenSquareBrackets or RuleKey.CSharpSpaceBetweenSquareBrackets => "var value = items[0];",
+            RuleKey.CSharpSpaceBetweenEmptySquareBrackets => "int[] values;",
+            _ => """
             class Example : Base
             {
                 int Add(int left,int right) => left+right;
                 void Run() { if(true) Add(1,2); }
             }
-            """,
+            """
+        }),
         OwnedSyntax = ownedSyntax,
         Invariant = "Only same-line whitespace changes"
     };

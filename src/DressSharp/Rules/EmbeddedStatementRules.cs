@@ -52,7 +52,9 @@ sealed class EmbeddedStatementPreferenceRule(
         Description = description ?? $"Controls {ownedSyntax}. {invariant}.",
         Values = RuleValues.From(values),
         DefaultValue = defaultValue,
-        Example = """
+        Example = key == RuleKey.DressBracesForMultilineStatementHeader
+            ? "if (firstCondition\n    && secondCondition)\n    Work();"
+            : """
             class Example
             {
                 void Run() { if (true) Work(); }

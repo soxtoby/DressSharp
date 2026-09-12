@@ -18,7 +18,13 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
         Description = "Controls owned token boundaries. Only boundary whitespace changes.",
         Values = values,
         DefaultValue = defaultValue,
-        Example = """
+        Example = kind switch
+        {
+            NewLineKind.Catch or NewLineKind.Finally => "try { Work(); } catch (Exception) { Recover(); } finally { CleanUp(); }",
+            NewLineKind.ObjectInitializerMembers => "var value = new Example { First = 1, Second = 2 };",
+            NewLineKind.AnonymousTypeMembers => "var value = new { First = 1, Second = 2 };",
+            NewLineKind.QueryClauses => "var result = from item in items where item.Active select item.Name;",
+            _ => """
             class Example
             {
                 void Run()
@@ -31,7 +37,8 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
                     }
                 }
             }
-            """,
+            """
+        },
         OwnedSyntax = "owned token boundaries",
         Invariant = "Only boundary whitespace changes"
     };

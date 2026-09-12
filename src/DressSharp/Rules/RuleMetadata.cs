@@ -101,6 +101,7 @@ sealed record RuleMetadata
     public required RuleValueDefinition Values { get; init; }
     public required string DefaultValue { get; init; }
     public required string Example { get; init; }
+    public ImmutableDictionary<RuleKey, string> ExamplePreferences { get; init; } = ImmutableDictionary<RuleKey, string>.Empty;
     public required string OwnedSyntax { get; init; }
     public required string Invariant { get; init; }
 

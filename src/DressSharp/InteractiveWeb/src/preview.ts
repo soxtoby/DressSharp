@@ -1,4 +1,5 @@
-import {FileDiff, parseDiffFromFile, preloadHighlighter, type FileDiffOptions, type FileContents} from "@pierre/diffs";
+import {diffWithContext} from "./diff-context";
+import {FileDiff, preloadHighlighter, type FileDiffOptions, type FileContents} from "@pierre/diffs";
 import {Editor} from "@pierre/diffs/edit";
 import {DiffsContainerLoaded} from "../node_modules/@pierre/diffs/dist/components/web-components.js";
 import {cursorPosition, PreviewRevision, previewPreferences, whitespaceMarkers} from "./preview-state";
@@ -43,21 +44,7 @@ class PreviewDiff extends FileDiff {
         // Pierre edits additions. Reverse the comparison and visually place source left.
         const oldFile: FileContents = {name: "Preview.cs", lang: "csharp", contents: output};
         const newFile: FileContents = {name: "Preview.cs", lang: "csharp", contents: source};
-        const fileDiff = parseDiffFromFile(oldFile, newFile);
-        // An identical pair has no patch hunks; retain its full editable context.
-        if (source === output && source.length > 0) {
-            const lines = fileDiff.additionLines.length;
-            fileDiff.hunks = [{
-                collapsedBefore: 0, additionStart: 1, deletionStart: 1,
-                additionCount: lines, deletionCount: lines, additionLines: 0, deletionLines: 0,
-                additionLineIndex: 0, deletionLineIndex: 0,
-                hunkContent: [{type: "context", lines, additionLineIndex: 0, deletionLineIndex: 0}],
-                splitLineStart: 0, unifiedLineStart: 0, splitLineCount: lines, unifiedLineCount: lines,
-                noEOFCRAdditions: !source.endsWith("\n"), noEOFCRDeletions: !source.endsWith("\n"),
-            }];
-            fileDiff.splitLineCount = lines;
-            fileDiff.unifiedLineCount = lines;
-        }
+        const fileDiff = diffWithContext(oldFile, newFile);
         this.hunksRenderer.clearRenderCache();
         if (source.length === 0) {
             this.hunksRenderer.hydrate(fileDiff);

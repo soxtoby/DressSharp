@@ -94,6 +94,11 @@ public sealed class InteractiveHttpServerTests : IDisposable
             var metadata = catalog[rule.GetProperty("key").GetString()!];
             rule.GetProperty("caption").GetString().ShouldBe(metadata.Caption);
             rule.GetProperty("expandedCaption").GetString().ShouldBe(metadata.ExpandedCaption);
+            rule.GetProperty("example").GetString().ShouldBe(metadata.Example);
+            var examplePreferences = rule.GetProperty("examplePreferences");
+            examplePreferences.EnumerateObject().Count().ShouldBe(metadata.ExamplePreferences.Count);
+            foreach (var preference in metadata.ExamplePreferences)
+                examplePreferences.GetProperty(preference.Key.ToName()).GetString().ShouldBe(preference.Value);
             rule.GetProperty("subgroup").GetString().ShouldBe(metadata.SubgroupName);
         }
         var token = document.RootElement.GetProperty("csrfToken").GetString()!;

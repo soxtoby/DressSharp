@@ -24,6 +24,9 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
         DefaultValue = defaultValue,
         Example = kind switch
         {
+            InitializerKind.Collection => "var values = new List<int>\n{\n    1,\n    2\n};",
+            InitializerKind.Array => "var values = new[]\n{\n    1,\n    2\n};",
+            InitializerKind.With => "var value = original with\n{\n    First = 1,\n    Second = 2\n};",
             InitializerKind.CollectionExpression => """
                 class Example
                 {

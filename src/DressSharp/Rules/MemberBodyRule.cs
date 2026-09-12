@@ -18,12 +18,15 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
         Description = $"Controls {kind.ToString().ToLowerInvariant()} bodies. The selected body form preserves the represented statement or returned expression.",
         Values = RuleValues.From(["block", "expression"]),
         DefaultValue = defaultValue,
-        Example = """
-            class Example
-            {
-                int Value() { return 1; }
-            }
-            """,
+        Example = kind switch
+        {
+            MemberBodyKind.Constructor => "class Example { int value; public Example(int value) { this.value = value; } }",
+            MemberBodyKind.Operator => "class Example { public static Example operator +(Example a, Example b) { return a; } }",
+            MemberBodyKind.Property => "class Example { int Value { get { return 1; } } }",
+            MemberBodyKind.Indexer => "class Example { int this[int index] { get { return index; } } }",
+            MemberBodyKind.Accessor => "class Example { int Value { get { return 1; } set { Store(value); } } }",
+            _ => "class Example { int Value() { return 1; } }"
+        },
         OwnedSyntax = $"{kind.ToString().ToLowerInvariant()} bodies",
         Invariant = "The selected body form preserves the represented statement or returned expression."
     };
