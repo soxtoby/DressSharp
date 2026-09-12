@@ -88,7 +88,8 @@ sealed class RuleCatalog
             new BracketSpacingRule(RuleKey.CSharpSpaceBeforeOpenSquareBrackets, "Before open square brackets", null, BracketSpacingKind.BeforeOpening),
             new BracketSpacingRule(RuleKey.CSharpSpaceBetweenEmptySquareBrackets, "Between empty square brackets", null, BracketSpacingKind.EmptyContents),
             new BracketSpacingRule(RuleKey.CSharpSpaceBetweenSquareBrackets, "Between square brackets", null, BracketSpacingKind.Contents),
-            new CollectionSpreadSpacingRule()
+            new CollectionSpreadSpacingRule(),
+            new AttributeTargetSpacingRule()
         ];
         NewLineRule[] newLineRules =
         [

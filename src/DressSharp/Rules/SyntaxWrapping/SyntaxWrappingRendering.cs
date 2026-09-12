@@ -12,7 +12,8 @@ static class SyntaxWrappingRendering
             || item.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia));
     }
 
-    internal readonly record struct Boundary(int RightIndex, GapStyle Style, int OperatorIndex = -1, bool BreakWhenMulti = true);
+    internal readonly record struct Boundary(int RightIndex, GapStyle Style, int OperatorIndex = -1, bool BreakWhenMulti = true,
+        string? SingleLineGap = null);
 
     internal enum GapStyle
     {
@@ -69,6 +70,8 @@ static class SyntaxWrappingRendering
         string baseIndent,
         string lineEnding)
     {
+        if (!multi && boundary.SingleLineGap is { } singleLineGap)
+            return singleLineGap;
         var leftTrailing = trivia.Trailing(boundary.RightIndex - 1);
         var rightLeading = trivia.Leading(boundary.RightIndex);
         if (!HasSignificantTrivia(leftTrailing)
@@ -149,6 +152,8 @@ static class SyntaxWrappingRendering
         string lineEnding,
         int tabWidth)
     {
+        if (!multi && boundary.SingleLineGap is { } singleLineGap)
+            return CollapsedWidth(singleLineGap, tabWidth);
         var leftTrailing = trivia.Trailing(boundary.RightIndex - 1);
         var rightLeading = trivia.Leading(boundary.RightIndex);
         if (!HasSignificantTrivia(leftTrailing)

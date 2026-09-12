@@ -111,6 +111,10 @@ var result = first ? one :
 
 Operator position alone moves existing operator breaks without introducing new ones. Commented operator boundaries are preserved. Missing or `unset` style/position preferences leave the existing layout behavior in control.
 
+### Attribute target spacing
+
+Use `dress_space_after_attribute_target_colon = true` (Default) for `[assembly: Example]`, or `false` for `[assembly:Example]`. It applies to all attribute targets, including `module` and `return`. Missing or `unset` preserves horizontal spacing, including when attribute layout is enabled.
+
 ### Collection spread spacing
 
 Use `dress_space_after_collection_spread_operator = true` (Default) for `[.. values]`, or `false` for `[..values]`. It applies only to collection-expression spread elements, not range expressions such as `values[..end]`. Missing or `unset` preserves existing spacing.

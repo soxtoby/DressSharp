@@ -53,6 +53,7 @@ enum RuleKey
     CSharpSpaceBetweenEmptySquareBrackets,
     CSharpSpaceBetweenSquareBrackets,
     DressSpaceAfterCollectionSpreadOperator,
+    DressSpaceAfterAttributeTargetColon,
     CSharpPreserveSingleLineBlocks,
     CSharpPreserveSingleLineStatements,
     DotnetSortSystemDirectivesFirst,

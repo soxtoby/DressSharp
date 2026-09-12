@@ -53,6 +53,28 @@ sealed class SyntaxWrappingSolver
     internal SyntaxWrappingPlan Finish(TriviaLayoutPlan trivia)
     {
         _trivia = trivia;
+        // The first attribute can follow a target colon rather than the opening bracket.
+        // Its horizontal gap belongs to spacing; wrapping still owns multiline placement.
+        for (var index = 0; index < _boundaries.Length; index++)
+        {
+            var boundary = _boundaries[index];
+            var left = _stream.Pieces[boundary.RightIndex - 1].Token;
+            if (left.Parent is not AttributeTargetSpecifierSyntax target || left != target.ColonToken)
+                continue;
+
+            var right = _stream.Pieces[boundary.RightIndex].Token;
+            var original = trivia.Trailing(boundary.RightIndex - 1).ToFullString()
+                + trivia.Leading(boundary.RightIndex).ToFullString();
+            var gap = trivia.HasMeaningfulGap(boundary.RightIndex)
+                ? original
+                : _emitterPlan.DesiredSpace(left, right) switch
+                {
+                    true => " ",
+                    false => "",
+                    _ => trivia.HasLineBreak(boundary.RightIndex) ? " " : original
+                };
+            _boundaries[index] = boundary with { SingleLineGap = gap };
+        }
         if (_needsWidths)
             _plannedWidths = new(_boundaries);
         Decide();
