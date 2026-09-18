@@ -75,9 +75,12 @@ enum EmbeddedStatementBraceMode
 
 static class EmbeddedStatements
 {
-    internal static bool StartsBody(SyntaxToken token, out StatementSyntax statement)
+    /// <summary>
+    /// Whether <paramref name="candidate"/>, the statement starting at the token in hand, is the
+    /// body a statement header owns.
+    /// </summary>
+    internal static bool StartsBody(StatementSyntax? candidate, out StatementSyntax statement)
     {
-        var candidate = StartingAt(token);
         if (candidate is null)
         {
             statement = null!;
@@ -103,33 +106,49 @@ static class EmbeddedStatements
             FixedStatementSyntax scope when ReferenceEquals(scope.Statement, statement) => scope,
             _ => null
         };
-
-    static StatementSyntax? StartingAt(SyntaxToken token)
-    {
-        for (var node = token.Parent; node is not null; node = node.Parent)
-        {
-            switch (node)
-            {
-                case StatementSyntax statement:
-                    return token == statement.GetFirstToken() ? statement : null;
-                case MemberDeclarationSyntax:
-                    return null;
-            }
-        }
-
-        return null;
-    }
 }
 
 static class EmbeddedStatementBraces
 {
     internal static SyntaxNode MinimizeMember(SyntaxNode member, RuleContext context) =>
-        new MinimizeRewriter(context).Visit(member)!;
+        OwnsAnEmbeddedStatement(member) ? new MinimizeRewriter(context).Visit(member)! : member;
 
     internal static SyntaxNode ApplyMember(
         SyntaxNode member,
         EmbeddedStatementSettings settings,
-        RuleContext context) => new ApplyRewriter(settings, context).Visit(member)!;
+        RuleContext context) =>
+        OwnsAnEmbeddedStatement(member) ? new ApplyRewriter(settings, context).Visit(member)! : member;
+
+    /// <summary>
+    /// Whether the member contains a statement that owns an embedded body.
+    /// </summary>
+    /// <remarks>
+    /// Both rewriters visit only these nine statements, so a member without one is returned
+    /// unchanged. Every member is offered to them on each brace pass, and a rewriter walk dispatches
+    /// through every node in the member; looking first for the kinds that matter is cheaper, and
+    /// members with no statements at all — fields, auto-properties, signatures — are most of a file.
+    /// </remarks>
+    static bool OwnsAnEmbeddedStatement(SyntaxNode member)
+    {
+        foreach (var node in member.DescendantNodes())
+        {
+            switch (node.Kind())
+            {
+                case SyntaxKind.IfStatement:
+                case SyntaxKind.WhileStatement:
+                case SyntaxKind.DoStatement:
+                case SyntaxKind.ForStatement:
+                case SyntaxKind.ForEachStatement:
+                case SyntaxKind.ForEachVariableStatement:
+                case SyntaxKind.UsingStatement:
+                case SyntaxKind.LockStatement:
+                case SyntaxKind.FixedStatement:
+                    return true;
+            }
+        }
+
+        return false;
+    }
 
     sealed class MinimizeRewriter(RuleContext context) : CSharpSyntaxRewriter
     {

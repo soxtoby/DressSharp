@@ -563,8 +563,12 @@ sealed class TriviaLayoutPlan
             var boundaryEnd = 0;
             while (boundaryEnd < leading.Count && IsWhitespaceOrEndOfLine(leading[boundaryEnd]))
                 boundaryEnd++;
-            if (leading.Skip(boundaryEnd).Any(item => !item.IsComment()))
-                return leading;
+            for (var index = boundaryEnd; index < leading.Count; index++)
+            {
+                if (!leading[index].IsComment())
+                    return leading;
+            }
+
             var trailingBreaks = tokenIndex == 0 ? 0 : EndingLineBreaks(Trailing(tokenIndex - 1));
             var breaks = Math.Max(0, RequiredLineBreaks(count) - trailingBreaks);
             var current = 0;

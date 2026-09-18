@@ -27,6 +27,7 @@ sealed class SinglePassEmitter
     readonly bool _checkMalformedRegions;
     readonly StringBuilder _output;
     readonly EffectiveTokenStream.Piece[] _pieces;
+    readonly int[] _precedingStarts;
 
     int _column;
     string _lineIndent = "";
@@ -44,12 +45,25 @@ sealed class SinglePassEmitter
     readonly Stack<string> _braceIndents = new();
     readonly Stack<InitializerFrame> _initializerFrames = new();
     readonly IndentationModel _indentation;
-    readonly Dictionary<SyntaxToken, string> _sourceIndents = [];
-    readonly HashSet<SyntaxToken> _originalTokens = [];
+    /// <summary>
+    /// Each piece's source-line indentation, by piece index. Tokens are visited in that order, so
+    /// the hot reads are positional; hashing a <see cref="SyntaxToken"/> costs an identity hash on
+    /// two objects and the stream has one entry per token in the file.
+    /// </summary>
+    readonly string[] _sourceIndents;
+    Dictionary<SyntaxToken, int>? _piecesByToken;
     readonly Dictionary<ParameterListSyntax, int> _parameterListStartLines = [];
     readonly HashSet<ParameterListSyntax> _multilineParameterLists = [];
     int _lineVersion;
     bool _lastTokenStartedLine;
+
+    /// <summary>
+    /// The token being written, with the position needed to answer "does this node begin here?".
+    /// </summary>
+    TokenStart _current;
+    int _index;
+    SyntaxNode? _lastContent;
+    string? _lastContentIndent;
 
     readonly record struct InitializerFrame(SyntaxNode Initializer, string Indent);
 
@@ -69,22 +83,22 @@ sealed class SinglePassEmitter
         _root = root;
         _checkMalformedRegions = checkMalformedRegions;
         _pieces = layout.Stream.Pieces;
-        _sourceIndents.EnsureCapacity(_pieces.Length);
-        _originalTokens.EnsureCapacity(_pieces.Length);
+        _precedingStarts = layout.Stream.PrecedingContentStarts();
         var segmentStarts = new Dictionary<int, int>();
         foreach (var piece in _pieces)
         {
             if (!piece.IsOriginal)
                 segmentStarts.TryAdd(piece.SegmentIndex, piece.Token.FullSpan.Start);
         }
-        foreach (var piece in _pieces)
+
+        _sourceIndents = new string[_pieces.Length];
+        for (var index = 0; index < _pieces.Length; index++)
         {
-            if (piece.IsOriginal)
-                _originalTokens.Add(piece.Token);
+            var piece = _pieces[index];
             var position = piece.IsOriginal
                 ? piece.Token.SpanStart
                 : piece.Token.SpanStart - segmentStarts[piece.SegmentIndex];
-            _sourceIndents.TryAdd(piece.Token, SourceIndent(piece.Source, position));
+            _sourceIndents[index] = SourceIndent(piece.Source, position);
         }
         _output = new StringBuilder(capacity);
     }
@@ -109,6 +123,8 @@ sealed class SinglePassEmitter
         for (var index = 0; index < _pieces.Length; index++)
         {
             var piece = _pieces[index];
+            _index = index;
+            _current = new(piece.Token, _precedingStarts[index]);
             if (index == 0)
             {
                 if (_triviaLayout.HasLeadingEdit(index))
@@ -125,7 +141,7 @@ sealed class SinglePassEmitter
             RememberContentIndents(piece.Token);
             EnterOrLeave(piece.Token);
             _lastTokenStartedLine = _column == _lineIndent.Length;
-            Append(_indentation.RebaseTokenText(piece.Token, _sourceIndents[piece.Token], _lineIndent));
+            Append(_indentation.RebaseTokenText(piece.Token, _sourceIndents[index], _lineIndent));
             RememberParameterListLine(piece.Token);
         }
 
@@ -522,7 +538,7 @@ sealed class SinglePassEmitter
         }
         else
         {
-            _lineIndent = _sourceIndents[parameters.OpenParenToken];
+            _lineIndent = SourceIndentAt(parameters.OpenParenToken);
             Append(_lineIndent);
         }
     }
@@ -546,7 +562,7 @@ sealed class SinglePassEmitter
         var placement = _plan.EmbeddedStatements.Placement;
         return placement is null
             || _checkMalformedRegions && IsUnsafeOriginal(token)
-            || !EmbeddedStatements.StartsBody(token, out _)
+            || !EmbeddedStatements.StartsBody(FirstStatementAt(token), out _)
                 ? null
                 : placement == "next_line";
     }
@@ -593,7 +609,7 @@ sealed class SinglePassEmitter
 
         if (_plan.IndentSwitchLabels is not null
             && token.Parent is SwitchLabelSyntax label
-            && token == label.GetFirstToken()
+            && BeginsAt(label, token)
             && (!_checkMalformedRegions || !IsUnsafeOriginal(label)))
         {
             return _indentation.SwitchLabel((SwitchSectionSyntax)label.Parent!);
@@ -615,7 +631,7 @@ sealed class SinglePassEmitter
             return BraceBaseIndent(token) + (indentBrace ? _plan.IndentUnit : "");
         }
 
-        if (EmbeddedStatements.StartsBody(token, out var embeddedStatement)
+        if (EmbeddedStatements.StartsBody(FirstStatementAt(token), out var embeddedStatement)
             && (!_checkMalformedRegions || !IsUnsafeOriginal(embeddedStatement)))
         {
             return _indentation.ForNode(embeddedStatement);
@@ -696,7 +712,7 @@ sealed class SinglePassEmitter
             var owner = token.Parent is BlockSyntax or AccessorListSyntax ? token.Parent.Parent : token.Parent;
             if (owner is not null && _indentation.TryGet(owner, out var ownerIndent))
                 return ownerIndent;
-            if (owner is not null && _sourceIndents.TryGetValue(owner.GetFirstToken(), out var sourceIndent))
+            if (owner is not null && SourceIndentOf(owner.GetFirstToken()) is { } sourceIndent)
                 return sourceIndent;
         }
 
@@ -717,13 +733,13 @@ sealed class SinglePassEmitter
             : null;
     }
 
-    static SwitchSectionSyntax? DirectSwitchSectionStatement(SyntaxToken token)
+    SwitchSectionSyntax? DirectSwitchSectionStatement(SyntaxToken token)
     {
         for (var node = token.Parent; node is not null; node = node.Parent)
         {
             if (node is not StatementSyntax statement)
                 continue;
-            return statement.Parent is SwitchSectionSyntax section && token == statement.GetFirstToken()
+            return statement.Parent is SwitchSectionSyntax section && BeginsAt(statement, token)
                 ? section
                 : null;
         }
@@ -852,12 +868,12 @@ sealed class SinglePassEmitter
         node.GetLocation().GetLineSpan().StartLinePosition.Line
         == node.GetLocation().GetLineSpan().EndLinePosition.Line;
 
-    static StatementSyntax? FirstStatementAt(SyntaxToken token)
+    StatementSyntax? FirstStatementAt(SyntaxToken token)
     {
         for (var node = token.Parent; node is not null; node = node.Parent)
         {
             if (node is StatementSyntax statement)
-                return token == statement.GetFirstToken() ? statement : null;
+                return BeginsAt(statement, token) ? statement : null;
             if (node is MemberDeclarationSyntax)
                 return null;
         }
@@ -865,12 +881,12 @@ sealed class SinglePassEmitter
         return null;
     }
 
-    static MemberDeclarationSyntax? FirstMemberAt(SyntaxToken token)
+    MemberDeclarationSyntax? FirstMemberAt(SyntaxToken token)
     {
         for (var node = token.Parent; node is not null; node = node.Parent)
         {
             if (node is MemberDeclarationSyntax member)
-                return token == member.GetFirstToken() ? member : null;
+                return BeginsAt(member, token) ? member : null;
         }
 
         return null;
@@ -905,7 +921,7 @@ sealed class SinglePassEmitter
 
         if (_plan.IndentSwitchLabels is not null
             && token.Parent is SwitchLabelSyntax switchLabel
-            && token == switchLabel.GetFirstToken())
+            && BeginsAt(switchLabel, token))
         {
             return _checkMalformedRegions && IsUnsafeOriginal(switchLabel);
         }
@@ -944,23 +960,23 @@ sealed class SinglePassEmitter
         if (token.Parent is ElseClauseSyntax or CatchClauseSyntax or FinallyClauseSyntax or SwitchLabelSyntax
             || token.IsKind(SyntaxKind.WhileKeyword) && token.Parent is DoStatementSyntax
             || IndentationModel.DirectContentFor(token) is not { } content
-            || content.GetFirstToken() == token
+            || BeginsAt(content, token)
             || token.Parent?.FirstAncestorOrSelf<StatementSyntax>() is { } nestedStatement
             && nestedStatement != content
-            && nestedStatement.GetFirstToken() == token
+            && BeginsAt(nestedStatement, token)
             || !ReferenceEquals(content.SyntaxTree, token.Parent?.SyntaxTree))
         {
             return null;
         }
 
-        if (!_sourceIndents.TryGetValue(content.GetFirstToken(), out var contentIndent)
-            || !_sourceIndents.TryGetValue(token, out var tokenIndent))
+        if (ContentIndentOf(content) is not { } contentIndent
+            || TokenIndentOf(token) is not { } tokenIndent)
         {
             return null;
         }
         if (!_indentation.TryGet(content, out var emittedContentIndent))
             return null;
-        if (!_originalTokens.Contains(token)
+        if (!IsOriginalToken(token)
             && contentIndent.Length == 0
             && tokenIndent.StartsWith(emittedContentIndent, StringComparison.Ordinal))
         {
@@ -969,12 +985,68 @@ sealed class SinglePassEmitter
         return IndentationModel.Rebase(contentIndent, emittedContentIndent, tokenIndent);
     }
 
+    /// <summary>
+    /// Whether <paramref name="node"/>, which contains <paramref name="token"/>, begins at it.
+    /// </summary>
+    /// <remarks>
+    /// Equivalent to <c>node.GetFirstToken() == token</c>. The token being written answers from its
+    /// recorded predecessor; anything else falls back to the walk.
+    /// </remarks>
+    bool BeginsAt(SyntaxNode node, SyntaxToken token) =>
+        token == _current.Token ? _current.Begins(node) : node.GetFirstToken() == token;
+
+    /// <summary>
+    /// Source indentation where <paramref name="content"/> begins, remembering the last answer.
+    /// </summary>
+    /// <remarks>
+    /// Consecutive tokens usually sit in the same statement, and resolving a node's first token
+    /// walks its left spine, so one cached owner removes nearly every one of those walks.
+    /// </remarks>
+    string? ContentIndentOf(SyntaxNode content)
+    {
+        if (!ReferenceEquals(_lastContent, content))
+        {
+            _lastContent = content;
+            _lastContentIndent = SourceIndentOf(content.GetFirstToken());
+        }
+
+        return _lastContentIndent;
+    }
+
+    string? TokenIndentOf(SyntaxToken token) =>
+        token == _current.Token ? _sourceIndents[_index] : SourceIndentOf(token);
+
+    bool IsOriginalToken(SyntaxToken token) =>
+        (token == _current.Token ? _index : PieceOf(token)) is { } index && _pieces[index].IsOriginal;
+
+    string? SourceIndentOf(SyntaxToken token) =>
+        PieceOf(token) is { } index ? _sourceIndents[index] : null;
+
+    string SourceIndentAt(SyntaxToken token) =>
+        SourceIndentOf(token)
+        ?? throw new KeyNotFoundException($"Token '{token}' is absent from the effective stream.");
+
+    /// <summary>
+    /// The stream position of a token the walk is not currently on, or null when it has none.
+    /// </summary>
+    int? PieceOf(SyntaxToken token)
+    {
+        if (_piecesByToken is null)
+        {
+            _piecesByToken = new(_pieces.Length);
+            for (var index = 0; index < _pieces.Length; index++)
+                _piecesByToken.TryAdd(_pieces[index].Token, index);
+        }
+
+        return _piecesByToken.TryGetValue(token, out var found) ? found : null;
+    }
+
     void RememberContentIndents(SyntaxToken token)
     {
-        if (IndentationModel.DirectContentFor(token) is { } content && content.GetFirstToken() == token)
+        if (IndentationModel.DirectContentFor(token) is { } content && BeginsAt(content, token))
             _indentation.Remember(content, _lineIndent);
 
-        for (var node = token.Parent; node is not null && node.GetFirstToken() == token; node = node.Parent)
+        for (var node = token.Parent; node is not null && BeginsAt(node, token); node = node.Parent)
         {
             if (node is AnonymousFunctionExpressionSyntax)
                 _indentation.Remember(node, _lineIndent);
@@ -990,7 +1062,7 @@ sealed class SinglePassEmitter
         return source[start..end];
     }
 
-    static bool StartsBlockContent(SyntaxToken token)
+    bool StartsBlockContent(SyntaxToken token)
     {
         if (token.IsKind(SyntaxKind.OpenBraceToken)
             && token.Parent is BlockSyntax or AccessorListSyntax or BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax or SwitchStatementSyntax)
@@ -999,12 +1071,12 @@ sealed class SinglePassEmitter
         }
 
         if (token.Parent?.FirstAncestorOrSelf<StatementSyntax>() is { } statement
-            && statement.GetFirstToken() == token)
+            && BeginsAt(statement, token))
         {
             return true;
         }
 
-        for (var node = token.Parent; node is not null && node.GetFirstToken() == token; node = node.Parent)
+        for (var node = token.Parent; node is not null && BeginsAt(node, token); node = node.Parent)
         {
             if (node is MemberDeclarationSyntax && node.Parent is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax
                 || node is AccessorDeclarationSyntax && node.Parent is AccessorListSyntax
@@ -1089,7 +1161,7 @@ sealed class SinglePassEmitter
         return null;
     }
 
-    static bool StartsDirectInitializerItem(SyntaxNode initializer, SyntaxToken token)
+    bool StartsDirectInitializerItem(SyntaxNode initializer, SyntaxToken token)
     {
         // Find the owning item from the token. Scanning every item for each token makes large
         // initializers quadratic, even though only one ancestor can be the direct item.
@@ -1102,7 +1174,7 @@ sealed class SinglePassEmitter
                 (AnonymousObjectCreationExpressionSyntax, AnonymousObjectMemberDeclaratorSyntax)
                 or (InitializerExpressionSyntax, ExpressionSyntax)
                 or (CollectionExpressionSyntax, CollectionElementSyntax)
-                && item.GetFirstToken() == token;
+                && BeginsAt(item, token);
         }
 
         return false;
@@ -1135,14 +1207,21 @@ sealed class SinglePassEmitter
         return ReferenceEquals(node, _root);
     }
 
-    bool CanRewritePreservingTrivia(SyntaxNode node) =>
-        !IsUnsafeOriginal(node)
-        && node.DescendantTrivia(descendIntoTrivia: true).None(trivia =>
-            trivia.IsDirective
-            || trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
-            || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)
-            || trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
-            || trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia));
+    bool CanRewritePreservingTrivia(SyntaxNode node)
+    {
+        if (IsUnsafeOriginal(node))
+            return false;
+        foreach (var token in node.DescendantTokens())
+        {
+            if (SyntaxRuleSafety.HasSignificantTrivia(token.LeadingTrivia)
+                || SyntaxRuleSafety.HasSignificantTrivia(token.TrailingTrivia))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     static bool InsideInterpolatedString(SyntaxToken token, bool afterToken)
     {

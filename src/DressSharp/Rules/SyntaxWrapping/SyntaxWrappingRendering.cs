@@ -7,9 +7,18 @@ static class SyntaxWrappingRendering
 {
     internal static bool ContainsLineComment(SyntaxTriviaList trivia)
     {
-        return trivia.Any(item =>
-            item.IsKind(SyntaxKind.SingleLineCommentTrivia)
-            || item.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia));
+        // Indexed rather than LINQ: the solver asks this for every token of every occurrence it
+        // measures, and the list's interface enumerator boxes on each call.
+        for (var index = 0; index < trivia.Count; index++)
+        {
+            if (trivia[index].IsKind(SyntaxKind.SingleLineCommentTrivia)
+                || trivia[index].IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal readonly record struct Boundary(int RightIndex, GapStyle Style, int OperatorIndex = -1, bool BreakWhenMulti = true,

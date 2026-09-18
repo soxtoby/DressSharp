@@ -125,6 +125,50 @@ sealed class EffectiveTokenStream
             triggerIndices?.ToArray() ?? []);
     }
 
+    /// <summary>
+    /// For each piece, the full-span start of the nearest token before it that has width and shares
+    /// its tree, or -1 when nothing precedes it there. <see cref="TokenStart"/> turns this into
+    /// "does this node begin at this token?" without descending the node.
+    /// </summary>
+    /// <remarks>
+    /// Pieces taken from a rewritten member carry that member's own tree, so they restart at its
+    /// first token. An original piece after a rewritten member is preceded, in the original tree, by
+    /// the tokens the member replaced; the replaced span's start stands in for them, because a node
+    /// beginning at or before that span contains them.
+    /// </remarks>
+    internal int[] PrecedingContentStarts()
+    {
+        var starts = new int[Pieces.Length];
+        var original = -1;
+        var segment = -1;
+        var segmentIndex = -1;
+        for (var index = 0; index < Pieces.Length; index++)
+        {
+            var piece = Pieces[index];
+            if (piece.IsOriginal)
+            {
+                segmentIndex = -1;
+                starts[index] = original;
+                if (piece.Token.Span.Length != 0)
+                    original = piece.Token.FullSpan.Start;
+                continue;
+            }
+
+            if (piece.SegmentIndex != segmentIndex)
+            {
+                segmentIndex = piece.SegmentIndex;
+                segment = -1;
+                original = piece.OriginalPosition;
+            }
+
+            starts[index] = segment;
+            if (piece.Token.Span.Length != 0)
+                segment = piece.Token.FullSpan.Start;
+        }
+
+        return starts;
+    }
+
     internal int IndexOf(SyntaxToken token, int segmentIndex)
     {
         if (segmentIndex < 0)
