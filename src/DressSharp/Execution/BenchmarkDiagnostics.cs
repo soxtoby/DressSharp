@@ -7,9 +7,12 @@ static class BenchmarkDiagnostics
     const string WorkerEnvironmentVariable = "DRESSSHARP_BENCHMARK_WORKERS";
     const string TimingEnvironmentVariable = "DRESSSHARP_BENCHMARK_TIMING";
 
+    // Formatting a file is processor-bound and independent of every other file, so a run has as
+    // much of the machine as it can keep busy. The cap is for memory: each worker holds a file's
+    // trees and its emitted text, and past a point more of those in flight buys nothing.
     internal static int WorkerCount => int.TryParse(Environment.GetEnvironmentVariable(WorkerEnvironmentVariable), out var count) && count > 0
         ? count
-        : Math.Min(Math.Max(Environment.ProcessorCount / 2, 1), 16);
+        : Math.Min(Math.Max(Environment.ProcessorCount, 1), 32);
 
     internal static async Task WriteAsync(BenchmarkTiming timing, CancellationToken cancellationToken)
     {

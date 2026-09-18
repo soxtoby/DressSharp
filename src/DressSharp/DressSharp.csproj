@@ -15,6 +15,15 @@
          measured at roughly a third of active CPU under the workstation collector. -->
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- A run is one short burst of allocation across every processor. Letting the collector
+         discover that shape costs more than the memory holding every heap open saves: a thousand
+         files finish in about nine tenths of the time with the adaptation turned off. -->
+    <GarbageCollectionAdaptationMode>0</GarbageCollectionAdaptationMode>
+    <!-- Guided optimization watches code run so that it can compile it better the second time. A
+         run reads each file once and exits, so the watching is paid for and the better code is
+         barely reached: a thousand files finish in about five sixths of the time without it, and
+         three files finish faster too. -->
+    <TieredPGO>false</TieredPGO>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="editorconfig" />
