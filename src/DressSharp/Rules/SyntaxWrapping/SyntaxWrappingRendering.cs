@@ -151,8 +151,44 @@ static class SyntaxWrappingRendering
                 break;
         }
 
-        return left.ToFullString() + right.ToFullString();
+        // Whatever the style asked for, a gap may not end inside a line comment: the token written
+        // after it would land in the comment and disappear from the file. Styles that place the
+        // following token on a new line pass an empty whitespace list here, so this is the one
+        // place that can see the finished gap and close the comment.
+        return EndsInsideLineComment(left, right)
+            ? left.ToFullString() + right.ToFullString() + lineEnding + ClosingIndent(boundary.Style, indent, baseIndent)
+            : left.ToFullString() + right.ToFullString();
     }
+
+    static string ClosingIndent(GapStyle style, string indent, string baseIndent) =>
+        style is GapStyle.DelimitedClose or GapStyle.DelimitedSpacedClose or GapStyle.InitializerOpen
+            ? baseIndent
+            : indent;
+
+    static bool EndsInsideLineComment(SyntaxTriviaList left, SyntaxTriviaList right)
+    {
+        for (var index = right.Count - 1; index >= 0; index--)
+        {
+            if (right[index].IsKind(SyntaxKind.EndOfLineTrivia))
+                return false;
+            if (IsLineComment(right[index]))
+                return true;
+        }
+
+        for (var index = left.Count - 1; index >= 0; index--)
+        {
+            if (left[index].IsKind(SyntaxKind.EndOfLineTrivia))
+                return false;
+            if (IsLineComment(left[index]))
+                return true;
+        }
+
+        return false;
+    }
+
+    static bool IsLineComment(SyntaxTrivia trivia) =>
+        trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
+        || trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia);
 
     internal static int PlannedWidth(
         Boundary boundary,

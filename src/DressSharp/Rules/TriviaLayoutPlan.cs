@@ -491,14 +491,15 @@ sealed class TriviaLayoutPlan
             if (!CouldChangeXmlElementLayout(trivia))
                 return trivia;
 
+            // The whole list is rewritten as one text, so the whole list is the occurrence. Disabled
+            // text and the directives around it are malformed regions, and rewriting across them
+            // would drop them, so one unsafe trivium skips the list.
             var found = false;
             foreach (var item in trivia)
             {
-                if (!IsDocumentationComment(item))
-                    continue;
-                found = true;
                 if (Unsafe(tokenIndex, item))
                     return trivia;
+                found |= IsDocumentationComment(item);
             }
 
             if (!found)
@@ -507,7 +508,14 @@ sealed class TriviaLayoutPlan
             var text = trivia.ToFullString();
             var lineEnding = FirstLineEnding(text) ?? _context.LineEnding;
             var rewritten = RewriteXmlElementLayout(text, preference == "multi_line", lineEnding);
-            return rewritten == text ? trivia : SyntaxFactory.ParseLeadingTrivia(rewritten);
+            if (rewritten == text)
+                return trivia;
+
+            // ParseLeadingTrivia stops at the first thing that is not trivia and drops the rest
+            // silently. It has no preprocessor symbols, so a disabled region reads as code to it.
+            // Refuse any parse that does not give back the text it was handed.
+            var parsed = SyntaxFactory.ParseLeadingTrivia(rewritten);
+            return parsed.ToFullString() == rewritten ? parsed : trivia;
         }
 
         bool Unsafe(int tokenIndex, SyntaxToken token) =>
