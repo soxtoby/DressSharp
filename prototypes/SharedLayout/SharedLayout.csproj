@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>DressSharp.UnitTests</AssemblyName>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/DressSharp/DressSharp.csproj" />
+    <Compile Include="../../.benchmarks/results/shared-layout/PrototypeTokenLayoutResolver.cs" />
+  </ItemGroup>
+  <Target Name="GeneratePrototypeResolver" BeforeTargets="BeforeCompile">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/Generate.ps1&quot;" />
+  </Target>
+</Project>

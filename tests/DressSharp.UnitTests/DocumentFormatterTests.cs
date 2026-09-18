@@ -1,4 +1,5 @@
 using DressSharp.Architecture;
+using DressSharp.Configuration;
 using DressSharp.Execution;
 using DressSharp.IO;
 using EasyAssertions;
@@ -40,6 +41,56 @@ public class DocumentFormatterTests
 
         ValueTask<FormattedDocument> Format(string input) => formatter.Format(
             SourceDocument.FromText("test.cs", input), CSharpParseOptions.Default, TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData("class C { void M() { var x = new Options { Callback = () => { if (a) Work(); }, Name = \"n\" }; } }")]
+    [InlineData("class C { object M(int[] xs) { var q = from x in xs where x > 0 select x; return q; } }")]
+    public void Default_preferences_settle_a_layout_another_rule_moved(string source)
+    {
+        // Placing the body on its own line makes the lambda span lines, which is what the auto
+        // initializer around it measures; the written text has to reflect that on the first run.
+        var preferences = PreferenceCatalog.Defaults
+            .Select(preference => (preference.Key.ToName(), preference.Default))
+            .ToArray();
+        var first = EmitterTestHarness.Format(source, preferences);
+        EmitterTestHarness.Format(first, preferences).ShouldBe(first);
+    }
+
+    [Fact]
+    public void A_nested_list_is_indented_from_where_its_item_stands_without_a_maximum()
+    {
+        // No maximum means no width is measured, but the item a list puts on its own line still
+        // has to be known to the list nested inside it, or that list is indented from the wrong
+        // place and moves again on the next run.
+        var preferences = PreferenceCatalog.Defaults
+            .Where(preference => preference.Key is not (RuleKey.MaxLineLength or RuleKey.DressArgumentsLayout))
+            .Select(preference => (preference.Key.ToName(), preference.Default))
+            .Append(("max_line_length", "unset"))
+            .Append(("dress_arguments_layout", "always_multi"))
+            .ToArray();
+        var first = EmitterTestHarness.Format("""
+            class C
+            {
+                void M()
+                {
+                    Call([First(a, b), c], d);
+                }
+            }
+            """, preferences);
+        first.ShouldBe("""
+            class C
+            {
+                void M() => Call(
+                    [First(
+                            a,
+                            b
+                        ), c],
+                    d
+                );
+            }
+            """);
+        EmitterTestHarness.Format(first, preferences).ShouldBe(first);
     }
 
     [Theory]

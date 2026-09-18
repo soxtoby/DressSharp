@@ -234,10 +234,11 @@ public class SyntaxWrappingRuleTests
         const string source = """
             bool M() => firstCondition && longComparisonOperand != anotherLongComparisonOperand;
             """;
+        // Default binary indentation is "flat", which adds no level for a step in precedence.
         const string expected = """
             bool M() => firstCondition
                 && longComparisonOperand
-                    != anotherLongComparisonOperand;
+                != anotherLongComparisonOperand;
             """;
         (string Key, string Value)[] preferences =
         [
@@ -361,6 +362,37 @@ public class SyntaxWrappingRuleTests
         multi.ShouldNotBe(single);
         Format(multi, (key, "always_single")).ShouldBe(single);
         Format(multi, (key, "always_multi")).ShouldBe(multi);
+    }
+
+    [Fact]
+    public void Auto_measures_a_line_from_the_indentation_it_keeps()
+    {
+        // With no indentation preference the call stays where its author put it, twenty columns
+        // in, and that is the column its width is measured from.
+        Format("""
+                class C
+                {
+                    void M()
+                    {
+                                        Call(alpha, beta, gamma);
+                    }
+                }
+                """,
+                ("dress_arguments_layout", "auto"),
+                ("max_line_length", "30"))
+            .ShouldBe("""
+                class C
+                {
+                    void M()
+                    {
+                                        Call(
+                                            alpha,
+                                            beta,
+                                            gamma
+                                        );
+                    }
+                }
+                """);
     }
 
     [Fact]
@@ -695,9 +727,9 @@ public class SyntaxWrappingRuleTests
         "class C { object M() => N(firstArgument, secondArgument).First.Second; }",
         """
         class C { object M() => N(
-                firstArgument,
-                secondArgument
-            )
+            firstArgument,
+            secondArgument
+        )
             .First
             .Second; }
         """)]
@@ -705,20 +737,20 @@ public class SyntaxWrappingRuleTests
         "class C { int M() => N(firstArgument, secondArgument) + thirdArgument; }",
         """
         class C { int M() => N(
-                firstArgument,
-                secondArgument
-            )
+            firstArgument,
+            secondArgument
+        )
             + thirdArgument; }
         """)]
     [InlineData("dress_conditional_expressions_layout",
         "class C { int M() => N(firstArgument, secondArgument) ? firstArgument : secondArgument; }",
         """
         class C { int M() => N(
-                firstArgument,
-                secondArgument
-            )
-                    ? firstArgument
-                    : secondArgument; }
+            firstArgument,
+            secondArgument
+        )
+                ? firstArgument
+                : secondArgument; }
         """)]
     [InlineData("dress_query_clauses_layout",
         "class C { object M(int[] xs) => from x in xs where N(firstArgument, secondArgument) select x; }",

@@ -26,6 +26,8 @@ sealed class SinglePassEmitter
     readonly SyntaxNode _root;
     readonly bool _checkMalformedRegions;
     readonly StringBuilder _output;
+    readonly ClaimedBreaks _claims;
+    readonly EffectiveTokenStream _stream;
     readonly EffectiveTokenStream.Piece[] _pieces;
     readonly int[] _precedingStarts;
 
@@ -35,8 +37,6 @@ sealed class SinglePassEmitter
     bool _previousGapHadMeaningfulTrivia;
     SwitchSectionSyntax? _lastCaseBlockSection;
     bool _lastCaseBlockSectionIsSafe;
-    SyntaxNode? _lastPreservationContainer;
-    bool _lastPreservationContainerIsSafe;
 
     /// <summary>
     /// The active brace contents, innermost last, resolved by the shared indentation model.
@@ -73,9 +73,12 @@ sealed class SinglePassEmitter
         RuleContext context,
         SyntaxNode root,
         bool checkMalformedRegions,
-        int capacity)
+        int capacity,
+        bool writes)
     {
         _plan = plan;
+        _claims = layout.Claims;
+        _stream = layout.Stream;
         _indentation = layout.Indentation;
         _syntaxWrapping = layout.Wrapping;
         _triviaLayout = layout.Trivia;
@@ -84,6 +87,15 @@ sealed class SinglePassEmitter
         _checkMalformedRegions = checkMalformedRegions;
         _pieces = layout.Stream.Pieces;
         _precedingStarts = layout.Stream.PrecedingContentStarts();
+        _output = new StringBuilder(capacity);
+        if (!writes)
+        {
+            // Reading the line structure never restates a column, so the indentation every token
+            // started its source line with is a cost only a run that writes the file has to pay.
+            _sourceIndents = [];
+            return;
+        }
+
         var segmentStarts = new Dictionary<int, int>();
         foreach (var piece in _pieces)
         {
@@ -100,7 +112,6 @@ sealed class SinglePassEmitter
                 : piece.Token.SpanStart - segmentStarts[piece.SegmentIndex];
             _sourceIndents[index] = SourceIndent(piece.Source, position);
         }
-        _output = new StringBuilder(capacity);
     }
 
     internal static string Emit(
@@ -115,7 +126,18 @@ sealed class SinglePassEmitter
             context,
             root,
             root.ContainsDiagnostics,
-            source.Length).Run();
+            source.Length,
+            writes: true).Run();
+
+    /// <summary>
+    /// An emitter that answers where the lines will fall without writing the file.
+    /// </summary>
+    internal static SinglePassEmitter ForReading(
+        SyntaxNode root,
+        EmitterPlan plan,
+        RuleContext context,
+        EmissionLayoutPlan layout) =>
+        new(plan, layout, context, root, root.ContainsDiagnostics, capacity: 0, writes: false);
 
     string Run()
     {
@@ -196,6 +218,135 @@ sealed class SinglePassEmitter
         return _lineIndent;
     }
 
+    static bool OpensOrClosesGeneratedBlock(
+        EffectiveTokenStream.Piece leftPiece,
+        EffectiveTokenStream.Piece rightPiece) =>
+        !leftPiece.IsOriginal
+            && leftPiece.Token.IsKind(SyntaxKind.OpenBraceToken)
+            && leftPiece.Token.Parent is BlockSyntax leftBlock
+            && leftBlock.HasAnnotation(GeneratedSyntax.Block)
+        || !rightPiece.IsOriginal
+            && rightPiece.Token.IsKind(SyntaxKind.CloseBraceToken)
+            && rightPiece.Token.Parent is BlockSyntax rightBlock
+            && rightBlock.HasAnnotation(GeneratedSyntax.Block);
+
+    /// <summary>
+    /// Whether the planned layout puts a line break anywhere inside <paramref name="node"/>.
+    /// </summary>
+    /// <remarks>
+    /// Answered for a node of the tree the plan was built from, or of the member the rewrite plan
+    /// put in its place, named by <paramref name="segment"/>. A node the stream never saw — one a
+    /// rule has just built — falls back to the lines its own text is written over.
+    /// </remarks>
+    internal bool SpansLines(SyntaxNode node, int segment)
+    {
+        if (SpansLines(node.GetFirstToken(), node.GetLastToken(), segment) is { } planned)
+            return planned;
+
+        var span = node.GetLocation().GetLineSpan();
+        return span.StartLinePosition.Line != span.EndLinePosition.Line;
+    }
+
+    /// <summary>
+    /// Whether the planned layout puts a line break between these two tokens, or null when either
+    /// is absent from the stream.
+    /// </summary>
+    internal bool? SpansLines(SyntaxToken first, SyntaxToken last, int segment)
+    {
+        if (!_stream.TryIndexOf(first, segment, out var start)
+            || !_stream.TryIndexOf(last, segment, out var end))
+        {
+            return null;
+        }
+
+        for (var index = start; index <= end; index++)
+        {
+            _index = index;
+            _current = new(_pieces[index].Token, _precedingStarts[index]);
+            if (index > start && BreaksBefore(index))
+                return true;
+            if (_pieces[index].Token.Text.AsSpan().IndexOfAny(LineBreaks) >= 0)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether the gap before this token will hold a line break, in the order
+    /// <see cref="EmitGap"/> settles gaps in.
+    /// </summary>
+    /// <remarks>
+    /// Only the reading emitter asks, and only until the first break it finds, so the branches
+    /// <see cref="EmitGap"/> reaches through a parameter list that has already been seen to span
+    /// lines cannot be reached here: they need a break this walk would have stopped at.
+    /// </remarks>
+    bool BreaksBefore(int index)
+    {
+        var leftPiece = _pieces[index - 1];
+        var rightPiece = _pieces[index];
+        var left = leftPiece.Token;
+        var right = rightPiece.Token;
+
+        if (InsideInterpolatedString(left, afterToken: true)
+            || InsideInterpolatedString(right, afterToken: false))
+        {
+            return GapBreaks(index);
+        }
+
+        if (_triviaLayout.HasMeaningfulGap(index))
+        {
+            return _syntaxWrapping.GapBefore(index) is { } commentGap
+                ? commentGap.AsSpan().IndexOfAny(LineBreaks) >= 0
+                : GapBreaks(index);
+        }
+
+        if (_syntaxWrapping.GapBefore(index - 1) is not null
+            && _syntaxWrapping.GapBefore(index) is null
+            && IsWrappedExpressionOperator(left))
+        {
+            return false;
+        }
+
+        if (OpensOrClosesGeneratedBlock(leftPiece, rightPiece))
+            return true;
+
+        if (ClaimsBreak(left, right) is { } claimed)
+            return claimed;
+
+        if (_syntaxWrapping.GapBefore(index) is { } gap)
+            return gap.AsSpan().IndexOfAny(LineBreaks) >= 0;
+
+        if ((_plan.ExpandSingleLineBlocks || _plan.SeparateSingleLineStatements)
+            && PreservationBreaks(left, right) != 0)
+        {
+            return true;
+        }
+
+        // Whatever is left keeps the gap it had, whether that is copied whole or restated down to
+        // its last break.
+        return GapBreaks(index);
+    }
+
+    bool GapBreaks(int index) =>
+        Breaks(_triviaLayout.Trailing(index - 1)) || Breaks(_triviaLayout.Leading(index));
+
+    static bool Breaks(SyntaxTriviaList trivia)
+    {
+        foreach (var item in trivia)
+        {
+            if (item.IsKind(SyntaxKind.EndOfLineTrivia))
+                return true;
+            if (!item.IsKind(SyntaxKind.WhitespaceTrivia)
+                && item.ToFullString().AsSpan().IndexOfAny(LineBreaks) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Writes whatever belongs between the previous token and this one.
     /// </summary>
@@ -244,14 +395,7 @@ sealed class SinglePassEmitter
             return;
         }
 
-        if ((!leftPiece.IsOriginal
-                && left.IsKind(SyntaxKind.OpenBraceToken)
-                && left.Parent is BlockSyntax leftBlock
-                && leftBlock.HasAnnotation(GeneratedSyntax.Block))
-            || (!rightPiece.IsOriginal
-                && right.IsKind(SyntaxKind.CloseBraceToken)
-                && right.Parent is BlockSyntax rightBlock
-                && rightBlock.HasAnnotation(GeneratedSyntax.Block)))
+        if (OpensOrClosesGeneratedBlock(leftPiece, rightPiece))
         {
             StartLine(right);
             return;
@@ -275,18 +419,9 @@ sealed class SinglePassEmitter
             return;
         }
 
-        if (EmbeddedStatementBreak(right) is { } embeddedStatementBreak)
-        {
-            if (embeddedStatementBreak)
-                StartLine(right);
-            else
-                Append(" ");
-            return;
-        }
-
-        // New-line rules follow syntax wrapping in catalog order, so they get the last word on a
-        // boundary both rules own.
-        if (ClaimsBreak(left, right, rightPiece.IsOriginal) is { } wantsBreak)
+        // Embedded statement placement and the new-line rules follow syntax wrapping in catalog
+        // order, so they get the last word on a boundary both rules own.
+        if (ClaimsBreak(left, right) is { } wantsBreak)
         {
             if (wantsBreak)
                 StartLine(right);
@@ -436,47 +571,6 @@ sealed class SinglePassEmitter
         Copy(right.Source, right.Token.FullSpan.Start, right.Token.SpanStart);
     }
 
-    bool? ClaimsBreak(SyntaxToken left, SyntaxToken token, bool original)
-    {
-        if (_plan.PreserveSingleLineBlocks
-            && original
-            && token.IsKind(SyntaxKind.OpenBraceToken)
-            && SingleLineBraceOwner(token, true) is { } owner
-            && IsSafeSingleLine(owner))
-        {
-            return false;
-        }
-
-        if (MultilineParameterListBraceBreak(left, token) is { } parameterListBraceBreak)
-            return parameterListBraceBreak;
-
-        var candidates = _plan.NewLineTrigger(token.RawKind);
-        if (candidates == 0 || _checkMalformedRegions && IsUnsafeOriginal(token))
-            return null;
-        var initializerAtMemberBoundary = (candidates & _plan.InitializerMemberBoundaryRules) != 0
-            ? NewLineRule.InitializerAtMemberBoundary(token)
-            : null;
-        var initializer = token.Parent is AnonymousObjectCreationExpressionSyntax or InitializerExpressionSyntax
-            ? token.Parent
-            : initializerAtMemberBoundary;
-        if (initializer is not null
-            && InitializerIndentationRule.KindOf(initializer) is { } kind
-            && _plan.HasInitializerLayout(kind))
-        {
-            return null;
-        }
-
-        var rules = _plan.NewLines;
-        for (var index = 0; index < rules.Length; index++)
-        {
-            if ((candidates & (1UL << index)) != 0
-                && rules[index].Rule.ClaimsBreakBefore(token, rules[index].Categories, initializerAtMemberBoundary) is { } claim)
-                return claim;
-        }
-
-        return null;
-    }
-
     bool? MultilineParameterCloseBreak(SyntaxToken token)
     {
         if (_plan.MultilineParametersClosingParenthesisPosition is not { } position
@@ -491,34 +585,6 @@ sealed class SinglePassEmitter
 
         return position == "own_line";
     }
-
-    bool? MultilineParameterListBraceBreak(SyntaxToken left, SyntaxToken right)
-    {
-        if (_plan.MultilineParameterListOpenBracePosition is not { } position
-            || !right.IsKind(SyntaxKind.OpenBraceToken)
-            || left.Parent is not ParameterListSyntax { Parameters.Count: > 0 } parameters
-            || left != parameters.CloseParenToken
-            || !IsDirectDeclarationBody(parameters, right)
-            || !_lastTokenStartedLine
-            || _checkMalformedRegions && IsUnsafeOriginal(right))
-        {
-            return null;
-        }
-
-        return position == "next_line";
-    }
-
-    static bool IsDirectDeclarationBody(ParameterListSyntax parameters, SyntaxToken openBrace) =>
-        openBrace.Parent switch
-        {
-            TypeDeclarationSyntax { ParameterList: { } typeParameters, BaseList: null } =>
-                parameters == typeParameters,
-            BlockSyntax { Parent: MethodDeclarationSyntax { ParameterList: { } methodParameters } } =>
-                parameters == methodParameters,
-            BlockSyntax { Parent: ConstructorDeclarationSyntax { ParameterList: { } constructorParameters, Initializer: null } } =>
-                parameters == constructorParameters,
-            _ => false
-        };
 
     bool AttachesConstructorInitializer(SyntaxToken left, SyntaxToken right) =>
         _plan.MultilineParametersClosingParenthesisPosition is not null
@@ -555,16 +621,6 @@ sealed class SinglePassEmitter
                 _multilineParameterLists.Add(parameters);
             _parameterListStartLines.Remove(parameters);
         }
-    }
-
-    bool? EmbeddedStatementBreak(SyntaxToken token)
-    {
-        var placement = _plan.EmbeddedStatements.Placement;
-        return placement is null
-            || _checkMalformedRegions && IsUnsafeOriginal(token)
-            || !EmbeddedStatements.StartsBody(FirstStatementAt(token), out _)
-                ? null
-                : placement == "next_line";
     }
 
     void StartLine(SyntaxToken token)
@@ -807,33 +863,6 @@ sealed class SinglePassEmitter
         return 0;
     }
 
-    static SyntaxNode? SingleLineBraceOwner(SyntaxToken token, bool opening) => token.Parent switch
-    {
-        BlockSyntax block when token == (opening ? block.OpenBraceToken : block.CloseBraceToken) => block,
-        AccessorListSyntax accessors when token == (opening ? accessors.OpenBraceToken : accessors.CloseBraceToken) => accessors,
-        BaseTypeDeclarationSyntax type when token == (opening ? type.OpenBraceToken : type.CloseBraceToken) => type,
-        NamespaceDeclarationSyntax @namespace when token == (opening ? @namespace.OpenBraceToken : @namespace.CloseBraceToken) => @namespace,
-        SwitchStatementSyntax @switch when token == (opening ? @switch.OpenBraceToken : @switch.CloseBraceToken) => @switch,
-        _ => null
-    };
-
-    bool IsSafeSingleLine(SyntaxNode container)
-    {
-        if (!IsSingleLine(container))
-            return false;
-        return IsSafePreservationContainer(container);
-    }
-
-    bool IsSafePreservationContainer(SyntaxNode container)
-    {
-        if (ReferenceEquals(_lastPreservationContainer, container))
-            return _lastPreservationContainerIsSafe;
-
-        _lastPreservationContainer = container;
-        _lastPreservationContainerIsSafe = CanRewritePreservingTrivia(container);
-        return _lastPreservationContainerIsSafe;
-    }
-
     static StatementSyntax? PreviousStatementIn(SyntaxNode parent, StatementSyntax statement)
     {
         for (var node = statement.GetFirstToken().GetPreviousToken().Parent; node is not null; node = node.Parent)
@@ -863,10 +892,6 @@ sealed class SinglePassEmitter
     static bool SharesLine(SyntaxNode left, SyntaxNode right) =>
         left.GetLocation().GetLineSpan().EndLinePosition.Line
         == right.GetLocation().GetLineSpan().StartLinePosition.Line;
-
-    static bool IsSingleLine(SyntaxNode node) =>
-        node.GetLocation().GetLineSpan().StartLinePosition.Line
-        == node.GetLocation().GetLineSpan().EndLinePosition.Line;
 
     StatementSyntax? FirstStatementAt(SyntaxToken token)
     {
@@ -959,7 +984,7 @@ sealed class SinglePassEmitter
     {
         if (token.Parent is ElseClauseSyntax or CatchClauseSyntax or FinallyClauseSyntax or SwitchLabelSyntax
             || token.IsKind(SyntaxKind.WhileKeyword) && token.Parent is DoStatementSyntax
-            || IndentationModel.DirectContentFor(token) is not { } content
+            || _indentation.DirectContentFor(token) is not { } content
             || BeginsAt(content, token)
             || token.Parent?.FirstAncestorOrSelf<StatementSyntax>() is { } nestedStatement
             && nestedStatement != content
@@ -1043,7 +1068,7 @@ sealed class SinglePassEmitter
 
     void RememberContentIndents(SyntaxToken token)
     {
-        if (IndentationModel.DirectContentFor(token) is { } content && BeginsAt(content, token))
+        if (_indentation.DirectContentFor(token) is { } content && BeginsAt(content, token))
             _indentation.Remember(content, _lineIndent);
 
         for (var node = token.Parent; node is not null && BeginsAt(node, token); node = node.Parent)
@@ -1078,15 +1103,16 @@ sealed class SinglePassEmitter
 
         for (var node = token.Parent; node is not null && BeginsAt(node, token); node = node.Parent)
         {
-            if (node is MemberDeclarationSyntax && node.Parent is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax
-                || node is AccessorDeclarationSyntax && node.Parent is AccessorListSyntax
-                || node is EnumMemberDeclarationSyntax && node.Parent is EnumDeclarationSyntax
+            var parent = _indentation.ParentOf(node);
+            if (node is MemberDeclarationSyntax && parent is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax
+                || node is AccessorDeclarationSyntax && parent is AccessorListSyntax
+                || node is EnumMemberDeclarationSyntax && parent is EnumDeclarationSyntax
                 || node is SwitchExpressionArmSyntax
                 || node is SwitchLabelSyntax
-                || node is AnonymousObjectMemberDeclaratorSyntax && node.Parent is AnonymousObjectCreationExpressionSyntax
-                || node is SubpatternSyntax && node.Parent is PropertyPatternClauseSyntax
-                || node is UsingDirectiveSyntax && node.Parent is BaseNamespaceDeclarationSyntax
-                || node is ExternAliasDirectiveSyntax && node.Parent is BaseNamespaceDeclarationSyntax)
+                || node is AnonymousObjectMemberDeclaratorSyntax && parent is AnonymousObjectCreationExpressionSyntax
+                || node is SubpatternSyntax && parent is PropertyPatternClauseSyntax
+                || node is UsingDirectiveSyntax && parent is BaseNamespaceDeclarationSyntax
+                || node is ExternAliasDirectiveSyntax && parent is BaseNamespaceDeclarationSyntax)
             {
                 return true;
             }
@@ -1194,34 +1220,21 @@ sealed class SinglePassEmitter
         return _plan.DesiredSpace(pair.Left, pair.Right);
     }
 
-    bool IsUnsafeOriginal(SyntaxNode node) =>
-        IsFromOriginalRoot(node) && _context.IsUnsafe(node);
+    bool? ClaimsBreak(SyntaxToken left, SyntaxToken token) =>
+        _claims.Before(left, token, _lastTokenStartedLine);
 
-    bool IsUnsafeOriginal(SyntaxToken token) =>
-        token.Parent is { } parent && IsFromOriginalRoot(parent) && _context.IsUnsafe(token);
+    static SyntaxNode? SingleLineBraceOwner(SyntaxToken token, bool opening) =>
+        ClaimedBreaks.SingleLineBraceOwner(token, opening);
 
-    bool IsFromOriginalRoot(SyntaxNode node)
-    {
-        while (node.Parent is { } parent)
-            node = parent;
-        return ReferenceEquals(node, _root);
-    }
+    bool IsSafeSingleLine(SyntaxNode container) => _claims.IsSafeSingleLine(container);
 
-    bool CanRewritePreservingTrivia(SyntaxNode node)
-    {
-        if (IsUnsafeOriginal(node))
-            return false;
-        foreach (var token in node.DescendantTokens())
-        {
-            if (SyntaxRuleSafety.HasSignificantTrivia(token.LeadingTrivia)
-                || SyntaxRuleSafety.HasSignificantTrivia(token.TrailingTrivia))
-            {
-                return false;
-            }
-        }
+    bool IsSafePreservationContainer(SyntaxNode container) => _claims.IsSafePreservationContainer(container);
 
-        return true;
-    }
+    bool CanRewritePreservingTrivia(SyntaxNode node) => _claims.CanRewritePreservingTrivia(node);
+
+    bool IsUnsafeOriginal(SyntaxNode node) => _claims.IsUnsafeOriginal(node);
+
+    bool IsUnsafeOriginal(SyntaxToken token) => _claims.IsUnsafeOriginal(token);
 
     static bool InsideInterpolatedString(SyntaxToken token, bool afterToken)
     {

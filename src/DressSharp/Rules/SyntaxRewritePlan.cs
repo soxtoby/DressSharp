@@ -61,6 +61,36 @@ sealed class SyntaxRewritePlan
     }
 
     /// <summary>
+    /// The same members again, each offered to a rule that runs after the ones this plan holds.
+    /// </summary>
+    /// <remarks>
+    /// A member already rewritten is handed on in its rewritten form, together with the index of
+    /// the stream segment its tokens were laid out as, so a rule that has to ask the plan where a
+    /// line falls can name the tokens it is looking at.
+    /// </remarks>
+    internal SyntaxRewritePlan Then(SyntaxNode root, Func<SyntaxNode, int, SyntaxNode> transform)
+    {
+        List<Replacement>? replacements = null;
+        var next = 0;
+        foreach (var member in Members(root))
+        {
+            var replaced = next < Replacements.Count && Replacements[next].Original == member.FullSpan;
+            var current = replaced ? Replacements[next].Rewritten : member;
+            var transformed = transform(current, replaced ? next : -1);
+            if (replaced)
+                next++;
+            if (ReferenceEquals(transformed, member))
+                continue;
+
+            (replacements ??= []).Add(ReferenceEquals(transformed, current) && replaced
+                ? Replacements[next - 1]
+                : new(member.FullSpan, transformed, transformed.ToFullString()));
+        }
+
+        return replacements is null ? Empty : new(replacements);
+    }
+
+    /// <summary>
     /// The members a rewrite is scoped to: declarations that are not themselves containers. A local
     /// function inside a method is covered by rewriting the method, so the walk stops at the member.
     /// </summary>
@@ -175,6 +205,4 @@ sealed class MemberRuleSet
 
         return new(prepared, kindBits, allWanted);
     }
-
-    internal static MemberRuleSet Empty { get; } = new([], [], 0);
 }

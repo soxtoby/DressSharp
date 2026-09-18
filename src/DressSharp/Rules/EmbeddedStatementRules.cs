@@ -113,11 +113,19 @@ static class EmbeddedStatementBraces
     internal static SyntaxNode MinimizeMember(SyntaxNode member, RuleContext context) =>
         OwnsAnEmbeddedStatement(member) ? new MinimizeRewriter(context).Visit(member)! : member;
 
+    /// <summary>
+    /// Braces the embedded statements in a member, asking <paramref name="lines"/> where the
+    /// planned layout breaks rather than reading the file back once it has been written.
+    /// </summary>
     internal static SyntaxNode ApplyMember(
         SyntaxNode member,
+        int segment,
         EmbeddedStatementSettings settings,
-        RuleContext context) =>
-        OwnsAnEmbeddedStatement(member) ? new ApplyRewriter(settings, context).Visit(member)! : member;
+        RuleContext context,
+        SinglePassEmitter lines) =>
+        OwnsAnEmbeddedStatement(member)
+            ? new ApplyRewriter(settings, context, lines, segment).Visit(member)!
+            : member;
 
     /// <summary>
     /// Whether the member contains a statement that owns an embedded body.
@@ -199,25 +207,35 @@ static class EmbeddedStatementBraces
         }
     }
 
-    sealed class ApplyRewriter(EmbeddedStatementSettings settings, RuleContext context) : CSharpSyntaxRewriter
+    sealed class ApplyRewriter(
+        EmbeddedStatementSettings settings,
+        RuleContext context,
+        SinglePassEmitter lines,
+        int segment) : CSharpSyntaxRewriter
     {
         public override SyntaxNode? VisitIfStatement(IfStatementSyntax node)
         {
-            if (!SyntaxRuleSafety.CanRewrite(node, context))
+            if (!SyntaxRuleSafety.CanRewrite(node, context, segment < 0))
                 return node;
-            var current = (IfStatementSyntax)base.VisitIfStatement(node)!;
 
-            if (settings.Braces == EmbeddedStatementBraceMode.Balanced
-                && ChainBranches(current).Any(branch => RequiresBraces(branch.Owner, branch.Body)))
-            {
-                return BraceChain(current);
-            }
+            // Every question about lines is put to the statement as the plan laid it out, before
+            // this pass has changed anything inside it.
+            var shape = ShapeOf(node, node.Statement);
+            var alternativeShape = node.Else is { Statement: not IfStatementSyntax } original
+                ? ShapeOf(node.Else, original.Statement)
+                : default;
+            var bracesTheChain = settings.Braces == EmbeddedStatementBraceMode.Balanced
+                && ChainBranches(node).Any(branch =>
+                    RequiresBraces(ShapeOf(branch.Owner, branch.Body), branch.Body));
+            var current = (IfStatementSyntax)base.VisitIfStatement(node)!;
+            if (bracesTheChain)
+                return BraceChain(current, node);
 
             var danglingElse = current.Else is not null
                 && HasUnmatchedIf(Unwrapped(current.Statement));
-            var statement = CanonicalBody(current, current.Statement, !danglingElse);
+            var statement = CanonicalBody(current.Statement, shape, !danglingElse);
             var alternative = current.Else is { Statement: not IfStatementSyntax } clause
-                ? clause.WithStatement(CanonicalBody(clause, clause.Statement, true))
+                ? clause.WithStatement(CanonicalBody(clause.Statement, alternativeShape, true))
                 : current.Else;
             return current.WithStatement(statement).WithElse(alternative);
         }
@@ -248,63 +266,71 @@ static class EmbeddedStatementBraces
 
         T Rewrite<T>(T original, Func<T, SyntaxNode?> visit, Func<T, StatementSyntax, T> replace) where T : StatementSyntax
         {
-            if (!SyntaxRuleSafety.CanRewrite(original, context))
+            if (!SyntaxRuleSafety.CanRewrite(original, context, segment < 0))
                 return original;
+            var shape = ShapeOf(original, Body(original));
             var current = (T)visit(original)!;
-            return replace(current, CanonicalBody(current, Body(current), true));
+            return replace(current, CanonicalBody(Body(current), shape, true));
         }
 
-        StatementSyntax CanonicalBody(SyntaxNode owner, StatementSyntax body, bool removable)
+        StatementSyntax CanonicalBody(StatementSyntax body, Shape shape, bool removable)
         {
-            if (RequiresBraces(owner, body))
-                return Brace(body);
+            if (RequiresBraces(shape, body))
+                return Brace(body, shape.Body);
             return settings.Braces is null ? body : Unbrace(body, removable, context);
         }
 
-        bool RequiresBraces(SyntaxNode owner, StatementSyntax body)
+        bool RequiresBraces(Shape shape, StatementSyntax body)
         {
             if (settings.Braces == EmbeddedStatementBraceMode.Always)
                 return true;
             if (body is BlockSyntax { Statements.Count: > 1 })
                 return true;
             if (settings.Braces is EmbeddedStatementBraceMode.Compact or EmbeddedStatementBraceMode.Balanced
-                && BodyIsMultiline(body))
+                && shape.Body)
             {
                 return true;
             }
 
-            return settings.BracesForMultilineStatementHeader && HeaderIsMultiline(owner);
+            return settings.BracesForMultilineStatementHeader && shape.Header;
         }
 
-        static bool BodyIsMultiline(StatementSyntax body) => body switch
+        /// <summary>
+        /// How a statement header and the body it owns are about to be laid out.
+        /// </summary>
+        readonly record struct Shape(bool Header, bool Body);
+
+        Shape ShapeOf(SyntaxNode owner, StatementSyntax body) =>
+            new(HeaderSpansLines(owner), BodySpansLines(body));
+
+        bool BodySpansLines(StatementSyntax body) => body switch
             {
                 BlockSyntax { Statements.Count: 0 } => false,
-                BlockSyntax { Statements: [var only] } => IsMultiline(only),
-                _ => IsMultiline(body)
+                BlockSyntax { Statements: [var only] } => SpansLines(only),
+                _ => SpansLines(body)
             };
 
-        static bool HeaderIsMultiline(SyntaxNode owner) => owner switch
+        bool HeaderSpansLines(SyntaxNode owner) => owner switch
             {
-                IfStatementSyntax statement => IsMultiline(statement.IfKeyword, statement.CloseParenToken),
-                WhileStatementSyntax statement => IsMultiline(statement.WhileKeyword, statement.CloseParenToken),
-                DoStatementSyntax statement => IsMultiline(statement.WhileKeyword, statement.CloseParenToken),
-                ForStatementSyntax statement => IsMultiline(statement.ForKeyword, statement.CloseParenToken),
-                CommonForEachStatementSyntax statement => IsMultiline(statement.ForEachKeyword, statement.CloseParenToken),
-                UsingStatementSyntax statement => IsMultiline(statement.UsingKeyword, statement.CloseParenToken),
-                LockStatementSyntax statement => IsMultiline(statement.LockKeyword, statement.CloseParenToken),
-                FixedStatementSyntax statement => IsMultiline(statement.FixedKeyword, statement.CloseParenToken),
+                IfStatementSyntax statement => SpansLines(statement.IfKeyword, statement.CloseParenToken),
+                WhileStatementSyntax statement => SpansLines(statement.WhileKeyword, statement.CloseParenToken),
+                DoStatementSyntax statement => SpansLines(statement.WhileKeyword, statement.CloseParenToken),
+                ForStatementSyntax statement => SpansLines(statement.ForKeyword, statement.CloseParenToken),
+                CommonForEachStatementSyntax statement => SpansLines(statement.ForEachKeyword, statement.CloseParenToken),
+                UsingStatementSyntax statement => SpansLines(statement.UsingKeyword, statement.CloseParenToken),
+                LockStatementSyntax statement => SpansLines(statement.LockKeyword, statement.CloseParenToken),
+                FixedStatementSyntax statement => SpansLines(statement.FixedKeyword, statement.CloseParenToken),
                 _ => false
             };
 
-        static bool IsMultiline(SyntaxNode node) =>
-            node.GetLocation().GetLineSpan() is var span
-            && span.StartLinePosition.Line != span.EndLinePosition.Line;
+        bool SpansLines(SyntaxNode node) => lines.SpansLines(node, segment);
 
-        static bool IsMultiline(SyntaxToken first, SyntaxToken last) =>
-            first.GetLocation().GetLineSpan().StartLinePosition.Line
-            != last.GetLocation().GetLineSpan().EndLinePosition.Line;
+        bool SpansLines(SyntaxToken first, SyntaxToken last) =>
+            lines.SpansLines(first, last, segment)
+            ?? first.GetLocation().GetLineSpan().StartLinePosition.Line
+                != last.GetLocation().GetLineSpan().EndLinePosition.Line;
 
-        StatementSyntax Brace(StatementSyntax statement)
+        StatementSyntax Brace(StatementSyntax statement, bool spansLines)
         {
             if (statement is BlockSyntax)
                 return statement;
@@ -316,7 +342,7 @@ static class EmbeddedStatementBraces
                     .WithTrailingTrivia(trailing);
             var inner = statement.WithoutLeadingTrivia().WithoutTrailingTrivia();
             var block = GeneratedSyntax.Mark(SyntaxFactory.Block(inner));
-            if (IsMultiline(statement))
+            if (spansLines)
             {
                 var lineEnding = SyntaxFactory.EndOfLine(context.LineEnding);
                 // Keep the source anchor for continuation lines; emission will reindent the body.
@@ -337,15 +363,18 @@ static class EmbeddedStatementBraces
             return block.WithLeadingTrivia(leading).WithTrailingTrivia(trailing);
         }
 
-        IfStatementSyntax BraceChain(IfStatementSyntax node)
+        IfStatementSyntax BraceChain(IfStatementSyntax node, IfStatementSyntax original)
         {
-            var statement = Brace(node.Statement);
-            var alternative = node.Else switch
-                {
-                        { Statement: IfStatementSyntax nested } clause => clause.WithStatement(BraceChain(nested)),
-                        { } clause => clause.WithStatement(Brace(clause.Statement)),
-                    _ => null
-                };
+            var statement = Brace(node.Statement, BodySpansLines(original.Statement));
+            ElseClauseSyntax? alternative = null;
+            if (node.Else is { } clause && original.Else is { } originalClause)
+            {
+                alternative = clause.Statement is IfStatementSyntax nested
+                    && originalClause.Statement is IfStatementSyntax originalNested
+                        ? clause.WithStatement(BraceChain(nested, originalNested))
+                        : clause.WithStatement(Brace(clause.Statement, BodySpansLines(originalClause.Statement)));
+            }
+
             return node.WithStatement(statement).WithElse(alternative);
         }
 
@@ -387,8 +416,33 @@ static class EmbeddedStatementBraces
         }
 
         return block.Statements[0]
-            .WithLeadingTrivia(block.GetLeadingTrivia())
+            .WithLeadingTrivia(Rebased(block.GetLeadingTrivia(), block.Statements[0].GetLeadingTrivia()))
             .WithTrailingTrivia(block.GetTrailingTrivia());
+    }
+
+    /// <summary>
+    /// The trivia that stood before a pair of braces, ending at the column the statement inside
+    /// them began in.
+    /// </summary>
+    /// <remarks>
+    /// A statement taken out of its braces still carries the lines its own continuations were
+    /// written against. Starting it where the brace was, without moving those, would lose the
+    /// offsets between them, and with them every column later measured from where it begins.
+    /// </remarks>
+    static SyntaxTriviaList Rebased(SyntaxTriviaList before, SyntaxTriviaList inside)
+    {
+        var indent = inside.Count;
+        while (indent > 0 && inside[indent - 1].IsKind(SyntaxKind.WhitespaceTrivia))
+            indent--;
+        // Nothing to rebase when the statement began on the brace's own line: whatever stood
+        // between them is the brace's trailing trivia, not an indent of the statement's.
+        if (indent == inside.Count)
+            return before;
+
+        var kept = before.Count;
+        while (kept > 0 && before[kept - 1].IsKind(SyntaxKind.WhitespaceTrivia))
+            kept--;
+        return SyntaxFactory.TriviaList(before.Take(kept).Concat(inside.Skip(indent)));
     }
 
     static StatementSyntax Unwrapped(StatementSyntax statement) =>

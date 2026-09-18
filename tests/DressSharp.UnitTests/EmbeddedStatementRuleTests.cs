@@ -255,6 +255,17 @@ public class EmbeddedStatementRuleTests
     }
 
     [Fact]
+    public void Malformed_occurrences_in_a_rewritten_member_are_unchanged()
+    {
+        // Rewriting the safe conditional must not vouch for the malformed one beside it.
+        Format(
+                "class C { void M() { if (\n) Work(); if (ok) { Other(); } } }",
+                ("dress_embedded_statement_braces", "balanced"),
+                ("dress_braces_for_multiline_statement_header", "true"))
+            .ShouldBe("class C { void M() { if (\n) Work(); if (ok) Other(); } }");
+    }
+
+    [Fact]
     public void Unset_preferences_make_no_change()
     {
         Format(

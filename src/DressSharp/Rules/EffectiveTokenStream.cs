@@ -169,13 +169,18 @@ sealed class EffectiveTokenStream
         return starts;
     }
 
-    internal int IndexOf(SyntaxToken token, int segmentIndex)
+    internal int IndexOf(SyntaxToken token, int segmentIndex) =>
+        TryIndexOf(token, segmentIndex, out var index)
+            ? index
+            : throw new InvalidOperationException($"Token '{token}' is absent from the effective stream.");
+
+    internal bool TryIndexOf(SyntaxToken token, int segmentIndex, out int index)
     {
         if (segmentIndex < 0)
         {
-            var index = OriginalIndex(token);
+            index = OriginalIndex(token);
             if (index >= 0)
-                return index;
+                return true;
         }
         else if (segmentIndex < _replacementSegments.Length)
         {
@@ -191,17 +196,38 @@ sealed class EffectiveTokenStream
                     high = middle;
             }
 
-            for (var index = low;
-                index < segment.Start + segment.Length
-                    && Pieces[index].Token.SpanStart == token.SpanStart;
-                index++)
+            for (var candidate = low;
+                candidate < segment.Start + segment.Length
+                    && Pieces[candidate].Token.SpanStart == token.SpanStart;
+                candidate++)
             {
-                if (Pieces[index].Token == token)
-                    return index;
+                if (Pieces[candidate].Token == token)
+                {
+                    index = candidate;
+                    return true;
+                }
             }
         }
 
-        throw new InvalidOperationException($"Token '{token}' is absent from the effective stream.");
+        index = -1;
+        return false;
+    }
+
+    /// <summary>
+    /// The index of a token from the file's tree or from any member rewritten in its place,
+    /// found without knowing which.
+    /// </summary>
+    internal bool TryFind(SyntaxToken token, out int index)
+    {
+        if (TryIndexOf(token, -1, out index))
+            return true;
+        for (var segment = 0; segment < _replacementSegments.Length; segment++)
+        {
+            if (TryIndexOf(token, segment, out index))
+                return true;
+        }
+
+        return false;
     }
 
     internal bool TryIndexOfOriginalTarget(SyntaxToken token, out int index)

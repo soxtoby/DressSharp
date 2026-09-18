@@ -10,6 +10,20 @@ static class SyntaxRuleSafety
         !context.IsUnsafe(node)
         && HasNoSignificantTrivia(node);
 
+    /// <summary>
+    /// Whether a rule may rewrite this node, where <paramref name="original"/> says the node still
+    /// belongs to the file's own tree.
+    /// </summary>
+    /// <remarks>
+    /// The spans the file's malformed regions are measured in no longer describe where a node sits
+    /// once another rule has rewritten the member around it, so such a node answers for itself: it
+    /// is malformed if it still carries a parser diagnostic. Disabled text needs no separate check,
+    /// because it only ever follows a directive, and a directive is significant trivia.
+    /// </remarks>
+    internal static bool CanRewrite(SyntaxNode node, RuleContext context, bool original) =>
+        (original ? !context.IsUnsafe(node) : !context.IsMalformed(node))
+        && HasNoSignificantTrivia(node);
+
     internal static bool CanRewriteWithoutCounting(SyntaxNode node, RuleContext context) =>
         !context.IsUnsafeWithoutCounting(node)
         && HasNoSignificantTrivia(node);

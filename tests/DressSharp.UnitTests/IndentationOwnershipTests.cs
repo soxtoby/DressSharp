@@ -251,15 +251,15 @@ public class IndentationOwnershipTests
     [InlineData("\r\n", false)]
     [InlineData("\n", true)]
     [InlineData("\r\n", true)]
-    public void Parenthesized_conditions_preserve_relative_continuation_indentation(string lineEnding, bool reindent)
+    public void Parenthesized_conditions_indent_each_group_from_where_it_opens(string lineEnding, bool reindent)
     {
         var source = """
             if (BelongsToOccurrence(token, occurrence)
                 && (token.IsKind(SyntaxKind.QuestionToken)
-                && token.Parent is ConditionalAccessExpressionSyntax
-                || (token.IsKind(SyntaxKind.DotToken)
-                    && !token.GetPreviousToken().IsKind(SyntaxKind.QuestionToken))
-                || token.IsKind(SyntaxKind.MinusGreaterThanToken)))
+                    && token.Parent is ConditionalAccessExpressionSyntax
+                    || (token.IsKind(SyntaxKind.DotToken)
+                        && !token.GetPreviousToken().IsKind(SyntaxKind.QuestionToken))
+                    || token.IsKind(SyntaxKind.MinusGreaterThanToken)))
             {
                 AddBoundary(index, GapStyle.CompactItem);
             }
@@ -550,6 +550,42 @@ public class IndentationOwnershipTests
         };
         var result = Format(source, preferences);
         result.ShouldBe(source);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Arguments_of_a_chained_call_indent_from_their_link(string lineEnding)
+    {
+        var source = """
+            class C
+            {
+                void M()
+                {
+                    return _connection.Read<(int Id, string Text, DateTime CreationDate, DateTime LastChangeDate, int? Counter1, int? Counter2)>("select * from Posts where Id = @Id", i).First();
+                }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var expected = """
+            class C
+            {
+                void M()
+                {
+                    return _connection
+                        .Read<(int Id, string Text, DateTime CreationDate, DateTime LastChangeDate, int? Counter1, int? Counter2)>(
+                            "select * from Posts where Id = @Id",
+                            i
+                        )
+                        .First();
+                }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults
+            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .ToArray();
+        var result = Format(source, preferences);
+        result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
     }
 }

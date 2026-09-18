@@ -77,6 +77,23 @@ sealed class RuleContext
     internal bool IsUnsafe(SyntaxToken token) => IsUnsafe(token.FullSpan);
     internal bool IsUnsafeWithoutCounting(SyntaxNode node) => MalformedRegions.Intersects(node.FullSpan);
 
+    /// <summary>
+    /// Whether a node that no longer sits in the file's tree is malformed in itself.
+    /// </summary>
+    /// <remarks>
+    /// A rewritten node keeps the diagnostics of the source it was built from, so a syntax error
+    /// inside it still shows. Only the file's own tree can say whether a region beside it is
+    /// malformed; the rule that rewrote the member already answered that before it did.
+    /// </remarks>
+    internal bool IsMalformed(SyntaxNode node)
+    {
+        if (!node.ContainsDiagnostics)
+            return false;
+
+        _skippedOccurrences++;
+        return true;
+    }
+
     internal bool IsUnsafe(TextSpan occurrence)
     {
         // The overwhelmingly common case is a file with no malformed regions at all, and rules ask

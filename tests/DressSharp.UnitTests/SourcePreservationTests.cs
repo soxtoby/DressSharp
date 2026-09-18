@@ -37,6 +37,32 @@ public class SourcePreservationTests
     }
 
     [Fact]
+    public void A_rewritten_member_is_indented_by_where_it_sits()
+    {
+        // A member a syntax rule rewrites becomes its own detached root, so the walk up from its
+        // tokens used to find no containing type and fall back to the indentation the source had.
+        Format(
+                """
+                class C
+                {
+                        public void M()
+                        {
+                            Work();
+                        }
+                }
+                """,
+                ("csharp_indent_block_contents", "true"),
+                ("dress_method_body", "expression"))
+            .ShouldBe(
+                """
+                class C
+                {
+                    public void M() => Work();
+                }
+                """);
+    }
+
+    [Fact]
     public void Xml_element_layout_keeps_disabled_text_and_its_directives()
     {
         const string source = """

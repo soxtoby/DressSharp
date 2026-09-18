@@ -6,13 +6,14 @@ using WrappingMode = DressSharp.Rules.SyntaxWrappingSettings.WrappingMode;
 
 namespace DressSharp.Rules;
 
-sealed class SyntaxWrappingSolver
+sealed class SyntaxWrappingSolver : IWrappedItems
 {
     readonly string _source;
     readonly EffectiveTokenStream _stream;
     readonly RuleSettings _settings;
     readonly EmitterPlan _emitterPlan;
     readonly IndentationModel _indentation;
+    readonly ClaimedBreaks _claims;
     readonly string _lineEnding;
     readonly bool _needsWidths;
     readonly Occurrence[] _occurrences;
@@ -24,6 +25,11 @@ sealed class SyntaxWrappingSolver
     Dictionary<int, int>? _baseGapWidths;
     readonly Dictionary<int, bool> _chainBoundaryBreaks = [];
     readonly Dictionary<int, string> _plannedLineBreaks = [];
+    readonly Dictionary<int, string> _plannedBases = [];
+    readonly HashSet<int> _settledBreaks = [];
+    readonly Dictionary<int, bool> _settledBoundaries = [];
+    Dictionary<SyntaxNode, int>? _occurrencesByNode;
+    readonly Dictionary<int, string?> _lineIndents = [];
     internal SyntaxWrappingSolver(
         string source,
         EffectiveTokenStream stream,
@@ -32,13 +38,15 @@ sealed class SyntaxWrappingSolver
         EmitterPlan emitterPlan,
         IndentationModel indentation,
         RuleContext context,
-        SyntaxWrappingDiscovery.Result discovery)
+        SyntaxWrappingDiscovery.Result discovery,
+        ClaimedBreaks claims)
     {
         _source = source;
         _stream = stream;
         _settings = settings;
         _emitterPlan = emitterPlan;
         _indentation = indentation;
+        _claims = claims;
         _lineEnding = context.LineEnding;
         _occurrences = discovery.Occurrences;
         _boundaries = discovery.Boundaries;
@@ -53,6 +61,13 @@ sealed class SyntaxWrappingSolver
     internal SyntaxWrappingPlan Finish(TriviaLayoutPlan trivia)
     {
         _trivia = trivia;
+        // A block asked whether it stays on one line sees the breaks decided so far. A construct
+        // is decided after the one holding it, so what it holds may still change; the answer is
+        // not remembered until this pass is done.
+        _claims.Follows(
+            index => _settledBreaks.Contains(index)
+                || _plannedLineBreaks.TryGetValue(index, out var placed) && placed.Contains('\n'),
+            settled: false);
         // The first attribute can follow a target colon rather than the opening bracket.
         // Its horizontal gap belongs to spacing; wrapping still owns multiline placement.
         for (var index = 0; index < _boundaries.Length; index++)
@@ -77,6 +92,7 @@ sealed class SyntaxWrappingSolver
         }
         if (_needsWidths)
             _plannedWidths = new(_boundaries);
+        FindSettledBreaks();
         Decide();
         var gapMap = new Dictionary<int, string>(_boundaries.Length);
         for (var occurrenceIndex = _occurrences.Length - 1; occurrenceIndex >= 0; occurrenceIndex--)
@@ -87,16 +103,12 @@ sealed class SyntaxWrappingSolver
 
             var conditionDepth = MultilineConditionDepth(occurrenceIndex, gapMap);
             var existingMultilineList = IsExistingMultilineList(occurrence);
-            var indent = occurrence.Multi ? Indent(occurrenceIndex, 1 + conditionDepth) : "";
+            var indentIndex = occurrence.Kind == SyntaxWrappingKind.BinaryExpressions
+                ? PrecedenceGroupRoot(occurrenceIndex)
+                : occurrenceIndex;
+            var indent = occurrence.Multi ? Indent(indentIndex, 1 + conditionDepth) : "";
             var baseIndent = occurrence.Multi ? Indent(occurrenceIndex, 0) : "";
             var ladder = occurrence.Multi && CanUseDecisionLadder(occurrence, gapMap);
-            var flatBinaryIndent = occurrence is
-                {
-                    Kind: SyntaxWrappingKind.BinaryExpressions,
-                    Setting: { Mode: WrappingMode.Auto or WrappingMode.Preserve, IndentationStyle: "flat" }
-                }
-                ? ExistingFlatBinaryIndent(occurrence)
-                : null;
             var precedenceOperandIndent = occurrence is
                 {
                     Kind: SyntaxWrappingKind.BinaryExpressions,
@@ -115,16 +127,6 @@ sealed class SyntaxWrappingSolver
                     continue;
                 var multi = BoundaryBreak(occurrence, offset);
                 var boundaryIndent = indent;
-                if (multi && occurrence is { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { Mode: WrappingMode.Auto, IndentationStyle: null } }
-                    && _trivia!.HasLineBreak(boundary.RightIndex))
-                {
-                    boundaryIndent = _indentation.ExistingContinuation(_stream.Pieces[boundary.RightIndex].Token) ?? indent;
-                }
-                if (multi && flatBinaryIndent is not null
-                    && occurrence.Setting.IndentationStyle == "flat")
-                {
-                    boundaryIndent = flatBinaryIndent;
-                }
                 if (multi && occurrence is
                     { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { IndentationStyle: "precedence" } })
                 {
@@ -174,6 +176,37 @@ sealed class SyntaxWrappingSolver
         foreach (var (tokenIndex, text) in gapMap)
             gaps[tokenIndex] = text;
         return new(gaps, _skippedOccurrences);
+    }
+
+    /// <inheritdoc />
+    public bool? StartsItsOwnLine(SyntaxNode list, SyntaxNode item)
+    {
+        _occurrencesByNode ??= OccurrencesByNode();
+        if (!_occurrencesByNode.TryGetValue(list, out var index))
+            return null;
+
+        var occurrence = _occurrences[index];
+        var first = item.GetFirstToken(includeZeroWidth: true);
+        for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+        {
+            var boundary = _boundaries[occurrence.BoundaryStart + offset];
+            if (_stream.Pieces[boundary.RightIndex].Token == first)
+            {
+                return _settledBoundaries.TryGetValue(boundary.RightIndex, out var breaks)
+                    ? breaks
+                    : null;
+            }
+        }
+
+        return null;
+    }
+
+    Dictionary<SyntaxNode, int> OccurrencesByNode()
+    {
+        var byNode = new Dictionary<SyntaxNode, int>(_occurrences.Length);
+        for (var index = 0; index < _occurrences.Length; index++)
+            byNode.TryAdd(_occurrences[index].Node, index);
+        return byNode;
     }
 
     int MultilineConditionDepth(int occurrenceIndex, IReadOnlyDictionary<int, string> childGaps)
@@ -289,8 +322,6 @@ sealed class SyntaxWrappingSolver
 
             occurrence = occurrence with { Applies = true, Multi = multi };
             _occurrences[occurrenceIndex] = occurrence;
-            if (_plannedWidths is null)
-                continue;
             var existingMultilineList = IsExistingMultilineList(occurrence);
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
@@ -300,6 +331,11 @@ sealed class SyntaxWrappingSolver
                         || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex)))
                     continue;
                 var boundaryMulti = BoundaryBreak(occurrence, offset);
+                // Where an item is about to stand is a decision, not a measurement: a list asks
+                // it to indent what its items contain whether or not any width is being counted.
+                _settledBoundaries[boundary.RightIndex] = boundaryMulti;
+                if (_plannedWidths is null)
+                    continue;
                 if (boundaryMulti)
                 {
                     _plannedLineBreaks[boundary.RightIndex] = Render(
@@ -393,21 +429,6 @@ sealed class SyntaxWrappingSolver
                 return true;
         }
         return false;
-    }
-
-    string? ExistingFlatBinaryIndent(Occurrence occurrence)
-    {
-        if (_trivia!.HasLineBreak(occurrence.FirstToken))
-            return _indentation.ExistingContinuation(_stream.Pieces[occurrence.FirstToken].Token);
-
-        for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
-        {
-            var boundary = _boundaries[occurrence.BoundaryStart + offset];
-            if (_trivia.HasLineBreak(boundary.RightIndex))
-                return _indentation.ExistingContinuation(_stream.Pieces[boundary.RightIndex].Token);
-        }
-
-        return null;
     }
 
     string? ExistingBinaryOperandIndent(Occurrence occurrence) =>
@@ -512,11 +533,55 @@ sealed class SyntaxWrappingSolver
         {
             var boundary = _boundaries[occurrence.BoundaryStart + offset];
             if ((boundary.RightIndex != occurrence.FirstToken || boundary.BreakWhenMulti)
-                && _trivia!.HasLineBreak(boundary.RightIndex))
+                && BreaksAt(boundary.RightIndex))
                 return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Whether the file will hold a line break at this gap.
+    /// </summary>
+    /// <remarks>
+    /// Not every break in the finished file was in the source: a brace rule can put one before a
+    /// block, a query clause rule before each clause. A construct is laid out around what will be
+    /// inside it, so the breaks those rules are about to claim count as much as the ones already
+    /// there.
+    /// </remarks>
+    bool BreaksAt(int index) =>
+        _trivia!.HasLineBreak(index)
+        || _settledBreaks.Contains(index)
+        || _claims.Before(
+            _stream.Pieces[index - 1].Token,
+            _stream.Pieces[index].Token,
+            leftOpenedItsLine: false) == true;
+
+    /// <summary>
+    /// Finds the boundaries the settings break whatever anything measures.
+    /// </summary>
+    /// <remarks>
+    /// A construct configured to be laid out one item per line spans lines before a column has
+    /// been counted, so the construct holding it can be laid out around that without waiting for
+    /// it to be decided — which it is not, because a construct is decided after the one holding it.
+    /// </remarks>
+    void FindSettledBreaks()
+    {
+        foreach (var occurrence in _occurrences)
+        {
+            if (occurrence.Setting.Mode != WrappingMode.Multi
+                || occurrence.Setting.ShapesOperators && HasCommentedOperator(occurrence))
+            {
+                continue;
+            }
+
+            for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+            {
+                var boundary = _boundaries[occurrence.BoundaryStart + offset];
+                if (boundary.BreakWhenMulti)
+                    _settledBreaks.Add(boundary.RightIndex);
+            }
+        }
     }
 
     bool HasUnownedLineBreak(Occurrence occurrence)
@@ -525,9 +590,11 @@ sealed class SyntaxWrappingSolver
         // than searching the whole list for every line break in a large initializer or call.
         var boundaryIndex = occurrence.BoundaryStart;
         var boundaryEnd = boundaryIndex + occurrence.BoundaryCount;
-        for (var index = occurrence.FirstToken; index <= occurrence.LastToken; index++)
+        // The break before the first token placed the construct; it is not inside it. Counting it
+        // would expand a list only because the line it landed on was given to it.
+        for (var index = occurrence.FirstToken + 1; index <= occurrence.LastToken; index++)
         {
-            if (!_trivia!.HasLineBreak(index))
+            if (!BreaksAt(index))
                 continue;
 
             while (boundaryIndex < boundaryEnd && _boundaries[boundaryIndex].RightIndex < index)
@@ -618,6 +685,11 @@ sealed class SyntaxWrappingSolver
             }
         }
 
+        if (PlannedBreakIndent(first) is { } placed)
+            column = placed;
+        else if (PlannedLineIndent(first) is { } planned)
+            column = VisualWidth(planned, _settings.TabWidth);
+
         for (var index = first; index < firstToken; index++)
         {
             column = AdvanceColumn(pieces[index].Token.Text, column, _settings.TabWidth);
@@ -625,6 +697,56 @@ sealed class SyntaxWrappingSolver
         }
 
         return column;
+    }
+
+    /// <summary>
+    /// The column a break this pass has already decided leaves the token after it in, or null
+    /// when no decided break puts that token at the start of a line.
+    /// </summary>
+    /// <remarks>
+    /// A token later in the line has its gap walked by the loop that measures up to the list, so
+    /// a break there already moves the column. The gap before the line's own first token is the
+    /// one nothing else reads, and it is the one that decides where the whole line begins.
+    /// </remarks>
+    int? PlannedBreakIndent(int first)
+    {
+        if (_plannedLineBreaks.Count == 0
+            || !_plannedLineBreaks.TryGetValue(first, out var placement)
+            || !placement.Contains('\n'))
+        {
+            return null;
+        }
+
+        return AdvanceColumn(placement, 0, _settings.TabWidth);
+    }
+
+    /// <summary>
+    /// The indentation this file is about to be written with at the token that opens a line, or
+    /// null when nothing but the source says where that line starts.
+    /// </summary>
+    /// <remarks>
+    /// Measuring a line against the column its author left it in measures a line this pass is
+    /// about to move, and a length decided that way has to be taken again once the file is written.
+    /// A token that opens a piece of content its owner lays out already knows where it is going.
+    /// With no indentation preference the emitter leaves every line where its author put it, and
+    /// the source column is the one the line will be written at.
+    /// </remarks>
+    string? PlannedLineIndent(int index)
+    {
+        if (_emitterPlan.IndentBlockContents is null)
+            return null;
+        if (_lineIndents.TryGetValue(index, out var cached))
+            return cached;
+
+        var token = _stream.Pieces[index].Token;
+        // A node starts where its first token with width does, so asking the node is a field read
+        // rather than a walk down its left spine.
+        var indent = _indentation.DirectContentFor(token) is { } content
+            && content.SpanStart == token.SpanStart
+                ? _indentation.ForNode(content)
+                : null;
+        _lineIndents[index] = indent;
+        return indent;
     }
 
     int AdvancePrefixGap(int rightIndex, int column)
@@ -676,61 +798,160 @@ sealed class SyntaxWrappingSolver
     {
         if (position == 0)
             return 0;
-        var carriageReturn = source.LastIndexOf('\r', position - 1);
-        var lineFeed = source.LastIndexOf('\n', position - 1);
-        return Math.Max(carriageReturn, lineFeed) + 1;
+        return source.AsSpan(0, position).LastIndexOfAny('\r', '\n') + 1;
     }
 
-    string Indent(int occurrenceIndex, int extra)
+    string Indent(int occurrenceIndex, int extra) =>
+        PlannedBase(occurrenceIndex) + string.Concat(Enumerable.Repeat(_emitterPlan.IndentUnit, extra));
+
+    /// <summary>
+    /// The indent of the line this occurrence starts on, as this plan lays it out.
+    /// </summary>
+    /// <remarks>
+    /// A construct indents what it holds one level in from the line it starts on, so the only thing
+    /// its contents need to know is where that line begins. Asking the source instead answers about
+    /// a layout this plan is replacing, and asking the syntax answers about a statement that may be
+    /// several breaks away; asking the break that placed this occurrence answers about the line it
+    /// will actually sit on, which is the question. Nothing is enclosed by a break that comes after
+    /// it, so the walk terminates at the outermost construct that owns its own line.
+    /// </remarks>
+    string PlannedBase(int occurrenceIndex)
+    {
+        if (_plannedBases.TryGetValue(occurrenceIndex, out var planned))
+            return planned;
+
+        var structural = StructuralBase(occurrenceIndex);
+        _plannedBases[occurrenceIndex] = structural;
+        var placed = PlacingOccurrence(occurrenceIndex);
+        if (placed < 0)
+        {
+            // Sharing a line with the construct that holds it would give a parenthesized group the
+            // same column as that construct's own continuations, so the group opens a level of its
+            // own. A break already gave it a line of its own, and then it needs no help.
+            return _plannedBases[occurrenceIndex] = structural
+                + string.Concat(Enumerable.Repeat(
+                    _emitterPlan.IndentUnit,
+                    EnclosingParentheses(_occurrences[occurrenceIndex].Node)));
+        }
+
+        // The syntax already accounts for a break it declares, such as a brace that opens a block
+        // or a setting that indents one; the plan only knows the breaks it decided itself.
+        var placedIndent = Indent(placed, 1);
+        return _plannedBases[occurrenceIndex] =
+            VisualWidth(placedIndent, _settings.TabWidth) > VisualWidth(structural, _settings.TabWidth)
+                ? placedIndent
+                : structural;
+    }
+
+    /// <summary>
+    /// How many parenthesized groups hold <paramref name="node"/> within its own statement.
+    /// </summary>
+    static int EnclosingParentheses(SyntaxNode node)
+    {
+        var depth = 0;
+        for (var parent = node.Parent; parent is not null; parent = parent.Parent)
+        {
+            if (parent is ParenthesizedExpressionSyntax)
+                depth++;
+            if (parent is StatementSyntax or MemberDeclarationSyntax or AnonymousFunctionExpressionSyntax)
+                break;
+        }
+
+        return depth;
+    }
+
+    /// <summary>
+    /// The enclosing occurrence whose break puts <paramref name="occurrenceIndex"/> on its line.
+    /// </summary>
+    int PlacingOccurrence(int occurrenceIndex)
+    {
+        var occurrence = _occurrences[occurrenceIndex];
+        var placed = -1;
+        var placedAt = -1;
+        for (var parentIndex = occurrence.Parent; parentIndex >= 0;)
+        {
+            var parent = _occurrences[parentIndex];
+            for (var offset = 0; offset < parent.BoundaryCount; offset++)
+            {
+                var boundary = _boundaries[parent.BoundaryStart + offset];
+                if (boundary.RightIndex > occurrence.FirstToken)
+                    break;
+                if (boundary.RightIndex > placedAt
+                    && (BoundaryBreak(parent, offset) || _trivia!.HasLineBreak(boundary.RightIndex)))
+                {
+                    placedAt = boundary.RightIndex;
+                    placed = parentIndex;
+                }
+            }
+            parentIndex = parent.Parent;
+        }
+
+        return placed;
+    }
+
+    /// <summary>
+    /// Where an occurrence no break reaches sits, from the syntax that owns it.
+    /// </summary>
+    string StructuralBase(int occurrenceIndex)
     {
         var occurrence = _occurrences[occurrenceIndex];
         var node = occurrence.Node;
-        var units = extra + MultilineLayoutAncestors(occurrenceIndex);
         if (_emitterPlan.IndentBlockContents is not null)
-        {
-            return _indentation.Continuation(node, units, "");
-        }
+            return _indentation.Continuation(node, 0, "");
 
         var pieceIndex = node is InitializerExpressionSyntax or CollectionExpressionSyntax or BaseListSyntax
             ? Math.Max(0, occurrence.FirstToken - 1)
             : occurrence.FirstToken;
         var piece = _stream.Pieces[pieceIndex];
-        var position = piece.Token.SpanStart;
         var text = Microsoft.CodeAnalysis.Text.SourceText.From(piece.Source);
-        var line = text.Lines.GetLineFromPosition(position);
+        var line = text.Lines.GetLineFromPosition(piece.Token.SpanStart);
         var leading = 0;
-        while (line.Start + leading < line.End
-            && char.IsWhiteSpace(text[line.Start + leading]))
-        {
+        while (line.Start + leading < line.End && char.IsWhiteSpace(text[line.Start + leading]))
             leading++;
-        }
 
-        return _indentation.Continuation(node, units, piece.Source.Substring(line.Start, leading));
+        return _indentation.Continuation(node, 0, piece.Source.Substring(line.Start, leading));
     }
 
-    int MultilineLayoutAncestors(int occurrenceIndex)
+    /// <summary>
+    /// How many parenthesized groups stand between <paramref name="node"/> and
+    /// <paramref name="ancestor"/>.
+    /// </summary>
+    /// <remarks>
+    /// An indentation style says how far a step in precedence goes, and "flat" says nowhere.
+    /// Parentheses are not a step in precedence: they open a construct, and a construct indents
+    /// what it holds whatever the style says about precedence.
+    /// </remarks>
+    static int ParenthesisDepth(SyntaxNode? node, SyntaxNode ancestor)
     {
-        var count = 0;
-        var occurrence = _occurrences[occurrenceIndex];
-        for (var parentIndex = occurrence.Parent; parentIndex >= 0;)
+        var depth = 0;
+        for (var parent = node; parent is not null && parent != ancestor; parent = parent.Parent)
         {
-            var parent = _occurrences[parentIndex];
-            if (!StartsOnSameLine(occurrence.Node, parent.Node))
-            {
-                break;
-            }
-            if (occurrence is { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { IndentationStyle: not null } }
-                && parent.Kind == SyntaxWrappingKind.BinaryExpressions)
-            {
-                parentIndex = parent.Parent;
-                continue;
-            }
-            if (parent is { Applies: true, Multi: true })
-                count++;
-            parentIndex = parent.Parent;
+            if (parent is ParenthesizedExpressionSyntax)
+                depth++;
         }
 
-        return count;
+        return depth;
+    }
+
+    /// <summary>
+    /// The occurrence whose line a binary expression's continuations indent from.
+    /// </summary>
+    /// <remarks>
+    /// A step in precedence splits one expression into an occurrence per operator, each starting on
+    /// the line the step before it broke to. Indenting from that line would add a level per step,
+    /// which is what an indentation style of "flat" says not to do, so every step in one group
+    /// answers from where the group itself began. Parentheses end a group: they open a construct.
+    /// </remarks>
+    int PrecedenceGroupRoot(int occurrenceIndex)
+    {
+        while (_occurrences[occurrenceIndex] is { Parent: >= 0 } occurrence
+            && _occurrences[occurrence.Parent] is { Kind: SyntaxWrappingKind.BinaryExpressions } parent
+            && ParenthesisDepth(occurrence.Node, parent.Node) == 0)
+        {
+            occurrenceIndex = occurrence.Parent;
+        }
+
+        return occurrenceIndex;
     }
 
     static int BinaryPrecedenceDepth(BinaryExpressionSyntax? binary)
@@ -768,15 +989,6 @@ sealed class SyntaxWrappingSolver
         SyntaxKind.CoalesceExpression => 1,
         _ => 0
     };
-
-    static bool StartsOnSameLine(SyntaxNode node, SyntaxNode ancestor)
-    {
-        if (!ReferenceEquals(node.SyntaxTree, ancestor.SyntaxTree))
-            return false;
-        var text = node.SyntaxTree.GetText();
-        return text.Lines.GetLineFromPosition(node.SpanStart).LineNumber
-            == text.Lines.GetLineFromPosition(ancestor.SpanStart).LineNumber;
-    }
 
     readonly record struct Measurement(int Width, bool HasLineComment);
 }
