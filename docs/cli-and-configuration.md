@@ -160,6 +160,20 @@ var callback = () =>
 
 `not_indented` (Default) aligns the braces with the lambda's starting line. Both values override `csharp_indent_braces` for lambda blocks; `csharp_indent_block_contents` still controls indentation inside the braces. Indentation uses `indent_style` and `indent_size`. Missing or `unset` leaves existing indentation rules in control. This preference does not introduce line breaks or change expression lambdas or anonymous `delegate` blocks.
 
+### Comment alignment
+
+`dress_comment_align = true` (Default) gives a comment on its own line the indentation the code below it is given:
+
+```csharp
+void M()
+{
+    // Explains the call below.
+    Call();
+}
+```
+
+`false`, and a missing or `unset` value, keeps the offset the comment's author gave it and moves the comment with that code instead, so a comment written four columns in from its statement stays four columns in wherever the statement lands. `//`, `///` and `/* */` comments all follow this preference; a comment sharing its line with code is not its business. The lines inside a block comment move as far as the line that opened it, and a block comment whose lines do not all start where that line starts stays where it is. Comment text itself is never changed.
+
 ## Safety and file handling
 
 DressSharp uses syntax only—never symbols, types, or semantic models. It derives language version, preprocessor symbols, source kind, and documentation mode from MSBuild. Unsupported project language versions fail before writes. Unsafe individual occurrences intersecting malformed syntax, directives, or disabled text are skipped; safe occurrences continue.

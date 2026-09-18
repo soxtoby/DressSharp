@@ -87,6 +87,7 @@ enum RuleKey
     DressAttachedCommentPlacement,
     DressXmlCommentPlacement,
     DressXmlElementLayout,
+    DressCommentAlign,
     DressGlobalUsingOrder,
     DressUsingKindOrder,
     CSharpPreferredModifierOrder,

@@ -656,10 +656,10 @@ public class IndentationEmitterTests
                 {
                     switch (x)
                     {
-                      // label
-                      case 0:
-                      // block
-                      {
+                    // label
+                    case 0:
+                    // block
+                    {
                         return;
                     }
             #if true
@@ -667,8 +667,8 @@ public class IndentationEmitterTests
                     break;
             #endif
             }
-                  // goto label
-                  retry:
+            // goto label
+            retry:
                     return;
                 }
             }
@@ -843,6 +843,279 @@ public class IndentationEmitterTests
                         }
                     }
               }
+            """);
+    }
+
+    [Fact]
+    public void A_comment_moves_with_the_code_it_leads()
+    {
+        Format("""
+            class C
+            {
+                void M()
+                {
+                        // a note
+                        First();
+                        Second();
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                    // a note
+                    First();
+                    Second();
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void A_comment_keeps_its_offset_from_the_code_it_leads()
+    {
+        Format("""
+            class C
+            {
+                void M()
+                {
+                            // a note
+                        First();
+                        Second();
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                        // a note
+                    First();
+                    Second();
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void An_unaligned_comment_short_of_its_code_keeps_its_distance()
+    {
+        // The comment sits eight columns short of the call; the call moves out four, and the
+        // comment moves out with it.
+        Format("""
+            class C
+            {
+                void M()
+                {
+                // a note
+                        First();
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("dress_comment_align", "false")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+            // a note
+                    First();
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void An_unaligned_comment_the_code_overtakes_lands_on_the_margin()
+    {
+        Format("""
+            class C
+            {
+                void M()
+                {
+              // a note
+                        First();
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("dress_comment_align", "false")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+            // a note
+                    First();
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void An_aligned_comment_lands_where_the_code_it_leads_lands()
+    {
+        Format("""
+            class C
+            {
+                void M()
+                {
+                            // a note
+                        First();
+                        Second();
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("dress_comment_align", "true")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                    // a note
+                    First();
+                    Second();
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void An_aligned_comment_takes_the_indentation_its_code_already_has()
+    {
+        // No indentation preference is set, so the call keeps the six columns its author gave it,
+        // and the comment is aligned to that rather than to any indentation the code would be given.
+        Format("""
+            class C
+            {
+                void M()
+                {
+                        // a note
+                  First();
+                }
+            }
+            """,
+            ("dress_comment_align", "true")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                  // a note
+                  First();
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void An_aligned_comment_moves_out_to_the_code_it_leads()
+    {
+        Format("""
+            class C
+            {
+                void M()
+                {
+            // a note
+                        First();
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("dress_comment_align", "true")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                    // a note
+                    First();
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void An_aligned_documentation_comment_lands_on_the_member_it_leads()
+    {
+        Format("""
+            class C
+            {
+                    /// <summary>Works.</summary>
+                void M()
+                {
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("dress_comment_align", "true")).ShouldBe("""
+            class C
+            {
+                /// <summary>Works.</summary>
+                void M()
+                {
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void An_aligned_block_comment_keeps_its_shape()
+    {
+        Format("""
+            class C
+            {
+                void M()
+                {
+                            /* a note
+                             * and more
+                             */
+                        First();
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("dress_comment_align", "true")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                    /* a note
+                     * and more
+                     */
+                    First();
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void A_block_comment_whose_lines_share_no_start_stays_where_it_is()
+    {
+        Format("""
+            class C
+            {
+                void M()
+                {
+                            /* a note
+            and more
+                             */
+                        First();
+                }
+            }
+            """,
+            ("csharp_indent_block_contents", "true"),
+            ("dress_comment_align", "true")).ShouldBe("""
+            class C
+            {
+                void M()
+                {
+                            /* a note
+            and more
+                             */
+                    First();
+                }
+            }
             """);
     }
 }

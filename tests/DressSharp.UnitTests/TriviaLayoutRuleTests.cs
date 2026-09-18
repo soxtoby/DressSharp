@@ -315,8 +315,8 @@ public sealed class TriviaLayoutRuleTests
         "class C { /* note */ int A; }",
         """
         class C {
-         /* note */
-         int A; }
+            /* note */
+            int A; }
         """)]
     [InlineData("dress_attached_comment_placement", "auto", "class C { /* note */  int A; }", "class C { /* note */  int A; }")]
     [InlineData("dress_xml_comment_placement",
@@ -389,8 +389,8 @@ public sealed class TriviaLayoutRuleTests
 
         result.ShouldBe("""
             class C {
-             /* note */
-             int A;
+                /* note */
+                int A;
              // note
             }
             """);
@@ -415,8 +415,8 @@ public sealed class TriviaLayoutRuleTests
             """,
             ("dress_attached_comment_placement", "own_line")).ShouldBe("""
             class C { int A;
-             /* note */
-            int B; }
+                 /* note */
+                int B; }
             """);
     }
 
@@ -429,7 +429,7 @@ public sealed class TriviaLayoutRuleTests
             """,
             ("dress_attached_comment_placement", "same_line")).ShouldBe("""
             class C { int A; /* note */
-            int B; }
+                int B; }
             """);
     }
 
@@ -457,8 +457,8 @@ public sealed class TriviaLayoutRuleTests
             """,
             ("dress_attached_comment_placement", "same_line")).ShouldBe("""
             class C { int A;
-            // note
-            int B; }
+                // note
+                int B; }
             """);
     }
 
@@ -510,7 +510,7 @@ public sealed class TriviaLayoutRuleTests
     {
         FormatTwice(
             "class C { int A;/* note */int B; }",
-            ("dress_attached_comment_placement", "own_line")).ShouldBe("class C { int A;\n/* note */\nint B; }");
+            ("dress_attached_comment_placement", "own_line")).ShouldBe("class C { int A;\n    /* note */\n    int B; }");
         FormatTwice(
             "/* note */class C { }",
             ("dress_attached_comment_placement", "same_line")).ShouldBe("/* note */ class C { }");
@@ -538,6 +538,7 @@ public sealed class TriviaLayoutRuleTests
         var expected = expectedTemplate.Replace("\n", "\r\n");
         var result = FormatTwice(
             source,
+            ("indent_style", "tab"),
             ("dress_block_comment_spacing", "single"),
             ("dress_attached_comment_placement", "own_line"));
 

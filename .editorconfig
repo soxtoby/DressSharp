@@ -75,6 +75,7 @@ dress_block_comment_spacing = single
 dress_attached_comment_placement = auto
 dress_xml_comment_placement = attached
 dress_xml_element_layout = unset
+dress_comment_align = true
 dress_global_using_order = first
 dress_using_kind_order = ordinary,static,alias
 csharp_preferred_modifier_order = public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async

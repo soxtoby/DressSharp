@@ -376,7 +376,7 @@ sealed class SinglePassEmitter
             if (_syntaxWrapping.GapBefore(index) is { } wrappingGap)
                 EmitWrappingGap(wrappingGap, right);
             else
-                CopyGap(index);
+                CopyCommentGap(index, right);
             return;
         }
 
@@ -555,6 +555,323 @@ sealed class SinglePassEmitter
         Copy(leftSource, trailingStart, trailingStart + inTrailing + 1);
         return true;
     }
+
+    /// <summary>
+    /// Copies a gap holding comments, giving the indentation inside it to the token that follows.
+    /// </summary>
+    /// <remarks>
+    /// A comment has to survive exactly, but the whitespace around it is layout rather than comment,
+    /// and copying the gap whole hands that whitespace to the source. The token after the gap then
+    /// keeps its original column however far its owner moved, and its comment holds it there. A
+    /// comment describes the code below it, so alignment puts it where that code goes; without
+    /// alignment, moving every line in the gap by the same distance leaves the comment where its
+    /// author put it relative to that code while letting both follow the code's new position.
+    /// With no indentation preference the code goes where its author put it, and alignment is
+    /// the only thing that moves: the comment takes the indentation the code already has.
+    /// </remarks>
+    void CopyCommentGap(int index, SyntaxToken right)
+    {
+        if (!HoldsOnlyComments(index) || !OwnsItsLine(right))
+        {
+            CopyGap(index);
+            return;
+        }
+
+        var planned = _plan.IndentBlockContents is not null ? IndentFor(right) : null;
+        var start = _output.Length;
+        var column = _column;
+        var lineIndent = _lineIndent;
+        var previousLineIndent = _previousLineIndent;
+        var lineVersion = _lineVersion;
+        CopyGap(index);
+        if ((planned ?? KeptIndent(start)) is not { } indent
+            || (_plan.AlignComments ? AlignedGap(start, indent) : RebasedGap(start, indent)) is not { } rebased)
+        {
+            return;
+        }
+
+        _output.Length = start;
+        _column = column;
+        _lineIndent = lineIndent;
+        _previousLineIndent = previousLineIndent;
+        _lineVersion = lineVersion;
+        Append(rebased);
+    }
+
+    /// <summary>
+    /// Whether the indent <see cref="IndentFor"/> gives <paramref name="token"/> is the one it would
+    /// start a line with.
+    /// </summary>
+    /// <remarks>
+    /// Only a token that opens a piece of content its owner lays out answers here. A continuation
+    /// inside an expression starts its line too, but wrapping decides how far in it goes, and asking
+    /// this model instead would flatten it against its statement. Without an indentation
+    /// preference the line is left where it is, and only a comment being aligned to it cares.
+    /// </remarks>
+    bool OwnsItsLine(SyntaxToken token) =>
+        (_plan.IndentBlockContents is not null || _plan.AlignComments)
+        && ((_indentation.DirectContentFor(token) is { } content
+                && content.GetFirstToken(includeZeroWidth: true) == token)
+            || (token.Parent is SwitchLabelSyntax label
+                && label.GetFirstToken(includeZeroWidth: true) == token));
+
+    bool HoldsOnlyComments(int index)
+    {
+        var comment = false;
+        foreach (var trivia in _triviaLayout.Trailing(index - 1))
+        {
+            if (!IsCommentOrSpace(trivia, ref comment))
+                return false;
+        }
+        foreach (var trivia in _triviaLayout.Leading(index))
+        {
+            if (!IsCommentOrSpace(trivia, ref comment))
+                return false;
+        }
+
+        return comment;
+    }
+
+    static bool IsCommentOrSpace(SyntaxTrivia trivia, ref bool comment)
+    {
+        switch (trivia.Kind())
+        {
+            case SyntaxKind.SingleLineCommentTrivia:
+            case SyntaxKind.MultiLineCommentTrivia:
+            case SyntaxKind.SingleLineDocumentationCommentTrivia:
+            case SyntaxKind.MultiLineDocumentationCommentTrivia:
+                comment = true;
+                return true;
+            case SyntaxKind.WhitespaceTrivia:
+            case SyntaxKind.EndOfLineTrivia:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// The indentation the copied gap leaves its following token with, or null when that token
+    /// does not start a line of its own.
+    /// </summary>
+    string? KeptIndent(int start)
+    {
+        var text = _output.ToString(start, _output.Length - start);
+        var lastBreak = text.AsSpan().LastIndexOfAny(LineBreaks);
+        if (lastBreak < 0)
+            return null;
+
+        var kept = text[(lastBreak + 1)..];
+        return kept.Length == InitialIndentLength(kept) ? kept : null;
+    }
+
+    /// <summary>
+    /// The copied gap with every line it starts moved from <c>source</c> to <c>indent</c>, or null
+    /// when the gap does not start a line or already sits where it belongs.
+    /// </summary>
+    string? RebasedGap(int start, string indent)
+    {
+        var text = _output.ToString(start, _output.Length - start);
+        var lastBreak = text.AsSpan().LastIndexOfAny('\n', '\r');
+        if (lastBreak < 0)
+            return null;
+
+        var source = text[(lastBreak + 1)..];
+        if (source.Length != InitialIndentLength(source) || source == indent)
+            return null;
+
+        var output = new StringBuilder(text.Length);
+        var position = 0;
+        while (position < text.Length)
+        {
+            var next = text.AsSpan(position).IndexOfAny('\n', '\r');
+            if (next < 0)
+            {
+                output.Append(text, position, text.Length - position);
+                break;
+            }
+
+            var breakStart = position + next;
+            var breakEnd = breakStart + (text.AsSpan(breakStart).StartsWith("\r\n") ? 2 : 1);
+            output.Append(text, position, breakEnd - position);
+            var lineIndent = text.AsSpan(breakEnd);
+            var length = InitialIndentLength(lineIndent);
+            output.Append(IndentationModel.Rebase(source, indent, lineIndent[..length].ToString())
+                ?? Outdented(source, indent, lineIndent[..length])
+                ?? lineIndent[..length].ToString());
+            position = breakEnd + length;
+        }
+
+        return output.ToString();
+    }
+
+    /// <summary>
+    /// Where a line that starts short of the code it leads goes when that code moves from
+    /// <paramref name="source"/> to <paramref name="indent"/>, or null when the line is not simply
+    /// short of the code.
+    /// </summary>
+    /// <remarks>
+    /// The line keeps its distance from the code, as a line that starts beyond the code keeps its.
+    /// It cannot go further out than the margin, so a line the code overtakes lands there.
+    /// </remarks>
+    static string? Outdented(string source, string indent, ReadOnlySpan<char> lineIndent)
+    {
+        if (!source.AsSpan().StartsWith(lineIndent))
+            return null;
+
+        var distance = source.Length - lineIndent.Length;
+        return indent[..Math.Max(0, indent.Length - distance)];
+    }
+
+    /// <summary>
+    /// The copied gap with every comment in it moved to <paramref name="indent"/>, or null when the
+    /// gap starts no line a comment leads.
+    /// </summary>
+    /// <remarks>
+    /// A comment stands in for the code it leads, so it takes the column that code takes. Only a
+    /// line a comment starts answers to that: the rest of a block comment is the comment's own text,
+    /// which keeps its shape by moving as far as the line that opened it moved. A block whose lines
+    /// do not all start where that line starts has no shape to keep, and stays where it is.
+    /// </remarks>
+    string? AlignedGap(int start, string indent)
+    {
+        var text = _output.ToString(start, _output.Length - start);
+        if (BlockComments(text) is not { } blocks)
+            return null;
+
+        var output = new StringBuilder(text.Length);
+        var position = 0;
+        var changed = false;
+        while (position < text.Length)
+        {
+            var next = text.AsSpan(position).IndexOfAny('\n', '\r');
+            if (next < 0)
+            {
+                output.Append(text, position, text.Length - position);
+                break;
+            }
+
+            var breakStart = position + next;
+            var breakEnd = breakStart + (text.AsSpan(breakStart).StartsWith("\r\n") ? 2 : 1);
+            output.Append(text, position, breakEnd - position);
+            var length = InitialIndentLength(text.AsSpan(breakEnd));
+            var lineIndent = text.Substring(breakEnd, length);
+            // A line with nothing on it holds no comment and would only gain trailing whitespace.
+            var aligned = EmptyLine(text, breakEnd + length)
+                ? lineIndent
+                : Aligned(blocks, breakEnd, LineEnd(text, breakEnd + length), lineIndent, indent);
+            changed |= aligned != lineIndent;
+            output.Append(aligned);
+            position = breakEnd + length;
+        }
+
+        return changed ? output.ToString() : null;
+    }
+
+    /// <summary>
+    /// Where a line reading <paramref name="lineIndent"/> starts once the comment on it is aligned.
+    /// </summary>
+    static string Aligned(List<BlockComment> blocks, int lineStart, int lineEnd, string lineIndent, string indent)
+    {
+        foreach (var block in blocks)
+        {
+            if (block.Close < lineStart)
+                continue;
+            if (block.Open >= lineEnd)
+                break;
+            if (!block.Aligns)
+                return lineIndent;
+
+            return block.Open < lineStart
+                ? IndentationModel.Rebase(block.Indent!, indent, lineIndent) ?? lineIndent
+                : indent;
+        }
+
+        return indent;
+    }
+
+    /// <summary>
+    /// Where each block comment in <paramref name="text"/> runs, or null when a comment is unclosed.
+    /// </summary>
+    static List<BlockComment>? BlockComments(string text)
+    {
+        List<BlockComment> blocks = [];
+        for (var position = 0; position + 1 < text.Length; position++)
+        {
+            if (text[position] != '/')
+                continue;
+            if (text[position + 1] == '/')
+            {
+                var lineEnd = text.AsSpan(position).IndexOfAny('\n', '\r');
+                if (lineEnd < 0)
+                    break;
+                position += lineEnd;
+                continue;
+            }
+            if (text[position + 1] != '*')
+                continue;
+
+            var close = text.IndexOf("*/", position + 2, StringComparison.Ordinal);
+            if (close < 0)
+                return null;
+
+            // The gap opens partway through the line its first token sits on, so a comment starting
+            // there has no indentation of its own to read, and nothing says where its lines belong.
+            var lineStart = text.AsSpan(0, position).LastIndexOfAny('\n', '\r') + 1;
+            var openIndent = lineStart == 0
+                ? null
+                : text.Substring(lineStart, InitialIndentLength(text.AsSpan(lineStart)));
+            blocks.Add(new(position, close + 1, openIndent, openIndent is not null && Shaped(text, position, close, openIndent)));
+            position = close + 1;
+        }
+
+        return blocks;
+    }
+
+    /// <summary>
+    /// Whether every line of a block comment starts where the line that opened it starts.
+    /// </summary>
+    static bool Shaped(string text, int open, int close, string openIndent)
+    {
+        for (var position = open; position < close;)
+        {
+            var next = text.AsSpan(position, close - position).IndexOfAny('\n', '\r');
+            if (next < 0)
+                return true;
+
+            var breakStart = position + next;
+            var breakEnd = breakStart + (text.AsSpan(breakStart).StartsWith("\r\n") ? 2 : 1);
+            var length = InitialIndentLength(text.AsSpan(breakEnd));
+            if (!EmptyLine(text, breakEnd + length)
+                && !text.AsSpan(breakEnd, length).StartsWith(openIndent, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            position = breakEnd + length;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Whether nothing follows the indentation at <paramref name="position"/> on its line. The
+    /// gap runs out at the token it precedes, so its last line is that token's, not an empty one.
+    /// </summary>
+    static bool EmptyLine(string text, int position) =>
+        position < text.Length && text[position] is '\n' or '\r';
+
+    static int LineEnd(string text, int position)
+    {
+        var next = text.AsSpan(position).IndexOfAny('\n', '\r');
+        return next < 0 ? text.Length : position + next;
+    }
+
+    /// <summary>
+    /// A block comment, the indentation of the line it opened on, and whether its lines follow that
+    /// line closely enough to move with it.
+    /// </summary>
+    readonly record struct BlockComment(int Open, int Close, string? Indent, bool Aligns);
 
     void CopyGap(int index)
     {

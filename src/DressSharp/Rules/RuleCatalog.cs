@@ -8,7 +8,7 @@ namespace DressSharp.Rules;
 
 sealed class RuleCatalog
 {
-    const int CurrentVersion = 3;
+    const int CurrentVersion = 4;
 
     RuleCatalog()
     {
@@ -174,6 +174,7 @@ sealed class RuleCatalog
             .Concat(usingRules)
             .Concat(blankLineRules)
             .Concat(commentRules)
+            .Append(new CommentAlignmentRule())
             .Concat(memberRules)
             .Concat(embeddedStatementRules)
             .Concat(initializerIndentationRules)

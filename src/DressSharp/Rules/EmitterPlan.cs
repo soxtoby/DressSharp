@@ -38,7 +38,8 @@ sealed class EmitterPlan
         bool[] initializerLayouts,
         EmbeddedStatementSettings embeddedStatements,
         string? multilineParametersClosingParenthesisPosition,
-        string? multilineParameterListOpenBracePosition)
+        string? multilineParameterListOpenBracePosition,
+        bool alignComments)
     {
         Spacing = spacing;
         NewLines = newLines;
@@ -64,6 +65,7 @@ sealed class EmitterPlan
         EmbeddedStatements = embeddedStatements;
         MultilineParametersClosingParenthesisPosition = multilineParametersClosingParenthesisPosition;
         MultilineParameterListOpenBracePosition = multilineParameterListOpenBracePosition;
+        AlignComments = alignComments;
     }
 
     internal (TokenSpacingRule Rule, string Preference)[] Spacing { get; }
@@ -84,6 +86,7 @@ sealed class EmitterPlan
     internal EmbeddedStatementSettings EmbeddedStatements { get; }
     internal string? MultilineParametersClosingParenthesisPosition { get; }
     internal string? MultilineParameterListOpenBracePosition { get; }
+    internal bool AlignComments { get; }
     internal ulong InitializerMemberBoundaryRules { get; }
 
     /// <summary>
@@ -205,7 +208,8 @@ sealed class EmitterPlan
             initializerLayouts,
             EmbeddedStatementSettings.From(configuration),
             OptionalPreference(configuration, RuleKey.DressMultilineParametersClosingParenthesisPosition),
-            OptionalPreference(configuration, RuleKey.DressMultilineParameterListOpenBracePosition));
+            OptionalPreference(configuration, RuleKey.DressMultilineParameterListOpenBracePosition),
+            OptionalBoolean(configuration, RuleKey.DressCommentAlign) == true);
     }
 
     static bool? OptionalBoolean(FormattingConfiguration configuration, RuleKey key) =>
