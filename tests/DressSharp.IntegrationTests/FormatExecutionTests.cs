@@ -113,7 +113,8 @@ public sealed class FormatExecutionTests : IDisposable
                     ruleKey,
                     acceptedValues,
                     ownedSyntax,
-                    "Only same-line whitespace changes");
+                    "Only same-line whitespace changes"
+                );
 
                 int Identity(int value) => value;
 
@@ -143,6 +144,24 @@ public sealed class FormatExecutionTests : IDisposable
         formattedAgain.ShouldBe(formatted);
         second.Output.ShouldMatch($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$");
         File.GetLastWriteTimeUtc(path).ShouldBe(timestamp);
+    }
+
+    [Fact]
+    public async Task Closing_position_uses_the_effective_per_file_preference()
+    {
+        await File.AppendAllTextAsync(Path.Combine(_directory, ".editorconfig"),
+            "dress_arguments_closing_delimiter_position = own_line\n[A.cs]\ndress_arguments_closing_delimiter_position = after_last_item\n", Token);
+        const string source = "class C { void M() { Call(\n    value\n); } }\n";
+        var attached = Source(source, "A.cs");
+        var ownLine = Source(source, "B.cs");
+
+        (await Run(CommandKind.Format, attached)).ExitCode.ShouldBe(0);
+        (await Run(CommandKind.Format, ownLine)).ExitCode.ShouldBe(0);
+
+        (await File.ReadAllTextAsync(attached, Token)).ShouldBe("class C { void M() { Call(\n    value); } }\n");
+        (await File.ReadAllTextAsync(ownLine, Token)).ShouldBe(source);
+        (await Run(CommandKind.Check, attached)).ExitCode.ShouldBe(0);
+        (await Run(CommandKind.Check, ownLine)).ExitCode.ShouldBe(0);
     }
 
     [Fact]

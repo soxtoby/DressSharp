@@ -43,6 +43,14 @@ sealed class SyntaxWrappingSettings
         var placement = Preference(RuleKey.DotnetStyleOperatorPlacementWhenWrapping);
         Configure(SyntaxWrappingKind.ConditionalExpressions, style);
         Configure(SyntaxWrappingKind.BinaryExpressions, null, binaryIndentation);
+        foreach (var rule in ClosingDelimiterPositionRule.All())
+        {
+            if (Preference(rule.Metadata.RuleKey) is not { } position)
+                continue;
+            var setting = byKind[(int)rule.Kind] ?? new Setting(WrappingMode.Preserve, maximumLineLength);
+            byKind[(int)rule.Kind] = setting with { ClosingPosition = position };
+            enabled = true;
+        }
         return new(byKind, enabled);
 
         string? Preference(RuleKey key) => configuration.Preferences.TryGetValue(key, out var value)
@@ -65,6 +73,7 @@ sealed class SyntaxWrappingSettings
 
     internal readonly record struct Setting(WrappingMode Mode, int MaximumLineLength)
     {
+        internal string? ClosingPosition { get; init; }
         internal string? NestedStyle { get; init; }
         internal string? IndentationStyle { get; init; }
         internal string? OperatorPlacement { get; init; }

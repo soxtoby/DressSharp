@@ -95,6 +95,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         FindSettledBreaks();
         Decide();
         var gapMap = new Dictionary<int, string>(_boundaries.Length);
+        var closingOpenings = new Dictionary<int, int>();
         for (var occurrenceIndex = _occurrences.Length - 1; occurrenceIndex >= 0; occurrenceIndex--)
         {
             var occurrence = _occurrences[occurrenceIndex];
@@ -121,11 +122,23 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
-                if (existingMultilineList
-                    && (boundary.Style == GapStyle.DelimitedClose
-                        || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex)))
+                if (PreservesBoundary(occurrence, boundary, existingMultilineList))
                     continue;
                 var multi = BoundaryBreak(occurrence, offset);
+                if (IsClose(boundary) && occurrence.Setting.ClosingPosition is { } position)
+                {
+                    if (!PlannedMultiline(occurrence, gapMap))
+                        continue;
+                    multi = position == "own_line";
+                    baseIndent = Indent(occurrenceIndex, 0);
+                    if (multi)
+                    {
+                        var opening = occurrence.Node is AnonymousObjectCreationExpressionSyntax anonymous
+                            ? _stream.IndexOf(anonymous.OpenBraceToken, _stream.Pieces[occurrence.FirstToken].SegmentIndex)
+                            : occurrence.FirstToken;
+                        closingOpenings[boundary.RightIndex] = opening;
+                    }
+                }
                 var boundaryIndent = indent;
                 if (multi && occurrence is
                     { Kind: SyntaxWrappingKind.BinaryExpressions, Setting: { IndentationStyle: "precedence" } })
@@ -175,7 +188,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             : new string?[_stream.Pieces.Length];
         foreach (var (tokenIndex, text) in gapMap)
             gaps[tokenIndex] = text;
-        return new(gaps, _skippedOccurrences);
+        return new(gaps, _skippedOccurrences, closingOpenings);
     }
 
     /// <inheritdoc />
@@ -255,7 +268,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 && HasUnownedLineBreak(occurrence);
             if (occurrence.Setting.ShapesOperators && HasCommentedOperator(occurrence))
                 continue;
-            if (occurrence.Setting.Mode == WrappingMode.Preserve && !hasLineBreak)
+            if (occurrence.Setting.Mode == WrappingMode.Preserve && !hasLineBreak
+                && occurrence.Setting.ClosingPosition is null)
                 continue;
             if (occurrence.Setting.Mode == WrappingMode.Auto
                 && (hasLineBreak || hasNestedLineBreak)
@@ -264,6 +278,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 continue;
 
             var multi = occurrence.Setting.Mode == WrappingMode.Multi
+                || occurrence.Setting is { Mode: WrappingMode.Preserve, ClosingPosition: not null }
+                && (hasLineBreak || HasUnownedLineBreak(occurrence))
                 || occurrence.Setting.ShapesOperators && hasLineBreak
                 && occurrence.Setting.Mode is WrappingMode.Auto or WrappingMode.Preserve
                 || occurrence.Setting.Mode == WrappingMode.Auto
@@ -311,7 +327,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 }
             }
 
-            if (!multi
+            if (!multi && occurrence.Setting.ClosingPosition is null
                 && (hasLineComment || !checkedLineComments && HasLineComment(occurrence)))
             {
                 if (initializerLayout && occurrence.Setting.Mode == WrappingMode.Compact)
@@ -326,9 +342,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
-                if (existingMultilineList
-                    && (boundary.Style == GapStyle.DelimitedClose
-                        || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex)))
+                if (PreservesBoundary(occurrence, boundary, existingMultilineList))
                     continue;
                 var boundaryMulti = BoundaryBreak(occurrence, offset);
                 // Where an item is about to stand is a decision, not a measurement: a list asks
@@ -413,11 +427,44 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     bool BoundaryBreak(Occurrence occurrence, int offset)
     {
         var boundary = _boundaries[occurrence.BoundaryStart + offset];
+        if (IsClose(boundary) && occurrence.Setting.ClosingPosition is { } position)
+            return occurrence.Multi && position == "own_line";
         if (!boundary.BreakWhenMulti)
             return false;
         if (occurrence.Setting is { Mode: WrappingMode.Preserve, NestedStyle: null } && boundary.OperatorIndex >= 0)
             return _trivia!.HasLineBreak(boundary.OperatorIndex) || _trivia.HasLineBreak(boundary.OperatorIndex + 1);
         return _chainBoundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, occurrence.Multi);
+    }
+
+    static bool IsClose(Boundary boundary) =>
+        boundary.Style is GapStyle.DelimitedClose or GapStyle.DelimitedSpacedClose;
+
+    bool PreservesBoundary(Occurrence occurrence, Boundary boundary, bool existingMultilineList) =>
+        IsClose(boundary) && occurrence.Setting.ClosingPosition is not null && _trivia!.HasMeaningfulGap(boundary.RightIndex)
+        || occurrence.Setting is { Mode: WrappingMode.Preserve, ClosingPosition: not null } && !IsClose(boundary)
+        || existingMultilineList
+        && !(IsClose(boundary) && occurrence.Setting.ClosingPosition is not null)
+        && (boundary.Style == GapStyle.DelimitedClose
+            || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex));
+
+    bool PlannedMultiline(Occurrence occurrence, IReadOnlyDictionary<int, string> gaps)
+    {
+        if (occurrence.Multi)
+            return true;
+        if (occurrence.Setting.Mode is WrappingMode.Preserve or WrappingMode.Auto
+            && _trivia!.HasLineBreak(occurrence.LastToken))
+            return true;
+        for (var index = occurrence.FirstToken; index <= occurrence.LastToken; index++)
+        {
+            if (_stream.Pieces[index].Token.Text.Contains('\n'))
+                return true;
+            if (index == occurrence.FirstToken)
+                continue;
+            if (gaps.TryGetValue(index, out var gap) ? gap.Contains('\n')
+                : _settledBoundaries.TryGetValue(index, out var breaks) ? breaks : BreaksAt(index))
+                return true;
+        }
+        return false;
     }
 
     bool HasCommentedOperator(Occurrence occurrence)
@@ -532,6 +579,10 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
         {
             var boundary = _boundaries[occurrence.BoundaryStart + offset];
+            // A closing-position preference can add a line without expanding the items.
+            // That line must not become an item-layout trigger on the next run.
+            if (IsClose(boundary) && occurrence.Setting.ClosingPosition is not null)
+                continue;
             if ((boundary.RightIndex != occurrence.FirstToken || boundary.BreakWhenMulti)
                 && BreaksAt(boundary.RightIndex))
                 return true;
@@ -578,8 +629,26 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
-                if (boundary.BreakWhenMulti)
+                if (boundary.BreakWhenMulti
+                    && !(IsClose(boundary) && occurrence.Setting.ClosingPosition == "after_last_item"))
                     _settledBreaks.Add(boundary.RightIndex);
+            }
+        }
+
+        // A multiline token can require an own-line close without wrapping any item.
+        // Publish those closes from the inside out before enclosing lists decide their layout.
+        for (var occurrenceIndex = _occurrences.Length - 1; occurrenceIndex >= 0; occurrenceIndex--)
+        {
+            var occurrence = _occurrences[occurrenceIndex];
+            if (occurrence.Setting.ClosingPosition != "own_line"
+                || occurrence.Setting.Mode is WrappingMode.Single or WrappingMode.Compact)
+                continue;
+            for (var index = occurrence.FirstToken + 1; index < occurrence.LastToken; index++)
+            {
+                if (!BreaksAt(index) && !_stream.Pieces[index].Token.Text.Contains('\n'))
+                    continue;
+                _settledBreaks.Add(occurrence.LastToken);
+                break;
             }
         }
     }

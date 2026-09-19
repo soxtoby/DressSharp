@@ -245,7 +245,8 @@ public class IndentationEmitterTests
             }
             """;
         var result = Format(input, preferences);
-        result.ShouldBe(source);
+        var expected = useDefaults ? source.Replace("})).Value;", "}\n        )\n    ).Value;") : source;
+        result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
     }
 

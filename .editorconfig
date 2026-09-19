@@ -101,3 +101,4 @@ dress_braces_for_multiline_statement_header = true
 dress_multiline_parameter_list_open_brace_position = same_line
 dress_nested_conditional_style = decision_ladder
 dotnet_style_operator_placement_when_wrapping = beginning_of_line
+dress_arguments_closing_delimiter_position = after_last_item

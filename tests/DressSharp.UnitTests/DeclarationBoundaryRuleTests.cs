@@ -14,17 +14,17 @@ public sealed class DeclarationBoundaryRuleTests
         var common = new[] { ("dress_parameters_layout", "always_multi") };
 
         var afterLast = Format(source.ReplaceLineEndings(lineEnding),
-            [.. common, ("dress_multiline_parameters_closing_parenthesis_position", "after_last_parameter")]);
+            [.. common, ("dress_parameters_closing_delimiter_position", "after_last_item")]);
         afterLast.ShouldBe("class C(\n    int single)\n{\n    void M(\n        int first,\n        int second) { }\n}".ReplaceLineEndings(lineEnding));
 
         var ownLine = Format(source.ReplaceLineEndings(lineEnding),
-            [.. common, ("dress_multiline_parameters_closing_parenthesis_position", "own_line")]);
+            [.. common, ("dress_parameters_closing_delimiter_position", "own_line")]);
         ownLine.ShouldBe("class C(\n    int single\n)\n{\n    void M(\n        int first,\n        int second\n    ) { }\n}".ReplaceLineEndings(lineEnding));
 
-        Format(afterLast, [.. common, ("dress_multiline_parameters_closing_parenthesis_position", "after_last_parameter")]).ShouldBe(afterLast);
-        Format(ownLine, [.. common, ("dress_multiline_parameters_closing_parenthesis_position", "own_line")]).ShouldBe(ownLine);
+        Format(afterLast, [.. common, ("dress_parameters_closing_delimiter_position", "after_last_item")]).ShouldBe(afterLast);
+        Format(ownLine, [.. common, ("dress_parameters_closing_delimiter_position", "own_line")]).ShouldBe(ownLine);
 
-        Format("class C(int value) { }", ("dress_multiline_parameters_closing_parenthesis_position", "own_line"))
+        Format("class C(int value) { }", ("dress_parameters_closing_delimiter_position", "own_line"))
             .ShouldBe("class C(int value) { }");
     }
 
@@ -40,7 +40,7 @@ public sealed class DeclarationBoundaryRuleTests
             }
             """;
 
-        var result = Format(source, ("dress_multiline_parameters_closing_parenthesis_position", "own_line"));
+        var result = Format(source, ("dress_parameters_closing_delimiter_position", "own_line"));
         result.ShouldBe("""
             class C
             {
@@ -50,7 +50,7 @@ public sealed class DeclarationBoundaryRuleTests
                 ) { }
             }
             """);
-        Format(result, ("dress_multiline_parameters_closing_parenthesis_position", "after_last_parameter"))
+        Format(result, ("dress_parameters_closing_delimiter_position", "after_last_item"))
             .ShouldBe(source);
     }
 
@@ -71,7 +71,7 @@ public sealed class DeclarationBoundaryRuleTests
 
         var result = Format(
             source,
-            ("dress_multiline_parameters_closing_parenthesis_position", "own_line"),
+            ("dress_parameters_closing_delimiter_position", "own_line"),
             ("csharp_indent_block_contents", "true"));
 
         result.ShouldBe("""
@@ -87,13 +87,13 @@ public sealed class DeclarationBoundaryRuleTests
             """);
         Format(
                 result,
-                ("dress_multiline_parameters_closing_parenthesis_position", "own_line"),
+                ("dress_parameters_closing_delimiter_position", "own_line"),
                 ("csharp_indent_block_contents", "true"))
             .ShouldBe(result);
 
         Format(
                 source,
-                ("dress_multiline_parameters_closing_parenthesis_position", "after_last_parameter"),
+                ("dress_parameters_closing_delimiter_position", "after_last_item"),
                 ("csharp_indent_block_contents", "true"))
             .ShouldBe("""
                 abstract class TokenSpacingRule() : IFormattingRule
@@ -136,7 +136,7 @@ public sealed class DeclarationBoundaryRuleTests
         (string Key, string Value)[] preferences =
             [
                 ("dress_parameters_layout", "auto"),
-                ("dress_multiline_parameters_closing_parenthesis_position", "own_line"),
+                ("dress_parameters_closing_delimiter_position", "own_line"),
                 ("dress_base_type_lists_layout", "auto"),
                 ("csharp_indent_block_contents", "true"),
                 ("max_line_length", "160")
@@ -191,7 +191,7 @@ public sealed class DeclarationBoundaryRuleTests
         (string Key, string Value)[] preferences =
             [
                 ("dress_parameters_layout", "always_multi"),
-                ("dress_multiline_parameters_closing_parenthesis_position", "own_line"),
+                ("dress_parameters_closing_delimiter_position", "own_line"),
                 ("dress_multiline_parameter_list_open_brace_position", "same_line"),
                 ("dress_base_type_lists_layout", "auto"),
                 ("csharp_indent_block_contents", "true"),

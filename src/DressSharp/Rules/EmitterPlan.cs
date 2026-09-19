@@ -37,7 +37,7 @@ sealed class EmitterPlan
         bool?[] initializerIndentations,
         bool[] initializerLayouts,
         EmbeddedStatementSettings embeddedStatements,
-        string? multilineParametersClosingParenthesisPosition,
+        string? parametersClosingDelimiterPosition,
         string? multilineParameterListOpenBracePosition,
         bool alignComments)
     {
@@ -63,7 +63,7 @@ sealed class EmitterPlan
         _initializerIndentations = initializerIndentations;
         _initializerLayouts = initializerLayouts;
         EmbeddedStatements = embeddedStatements;
-        MultilineParametersClosingParenthesisPosition = multilineParametersClosingParenthesisPosition;
+        ParametersClosingDelimiterPosition = parametersClosingDelimiterPosition;
         MultilineParameterListOpenBracePosition = multilineParameterListOpenBracePosition;
         AlignComments = alignComments;
     }
@@ -84,7 +84,7 @@ sealed class EmitterPlan
     internal bool ExpandSingleLineBlocks { get; }
     internal bool SeparateSingleLineStatements { get; }
     internal EmbeddedStatementSettings EmbeddedStatements { get; }
-    internal string? MultilineParametersClosingParenthesisPosition { get; }
+    internal string? ParametersClosingDelimiterPosition { get; }
     internal string? MultilineParameterListOpenBracePosition { get; }
     internal bool AlignComments { get; }
     internal ulong InitializerMemberBoundaryRules { get; }
@@ -207,7 +207,7 @@ sealed class EmitterPlan
             initializerIndentations,
             initializerLayouts,
             EmbeddedStatementSettings.From(configuration),
-            OptionalPreference(configuration, RuleKey.DressMultilineParametersClosingParenthesisPosition),
+            OptionalPreference(configuration, RuleKey.DressParametersClosingDelimiterPosition),
             OptionalPreference(configuration, RuleKey.DressMultilineParameterListOpenBracePosition),
             OptionalBoolean(configuration, RuleKey.DressCommentAlign) == true);
     }

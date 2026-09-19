@@ -2,24 +2,6 @@ using DressSharp.Architecture;
 
 namespace DressSharp.Rules;
 
-sealed class MultilineParametersClosingParenthesisPositionRule : IFormattingRule
-{
-    public RuleMetadata Metadata { get; } = new()
-        {
-            RuleKey = RuleKey.DressMultilineParametersClosingParenthesisPosition,
-            Caption = "Closing parenthesis position",
-            ExpandedCaption = "Multiline parameter list closing parenthesis position",
-            GroupName = "Wrapping",
-            SubgroupName = "Lists",
-            Description = "Places the closing parenthesis after the last parameter or on its own line when a parameter list is multiline. A constructor initializer remains attached to the closing parenthesis. Single-line parameter lists are unchanged.",
-            Values = RuleValues.Choice("after_last_parameter", "own_line"),
-            DefaultValue = "own_line",
-            Example = "class Example(\n    int value\n)\n{\n}",
-            OwnedSyntax = "the closing boundary of multiline parameter lists and directly following constructor initializers",
-            Invariant = "Single-line parameter lists are unchanged"
-        };
-}
-
 sealed class MultilineParameterListOpenBracePositionRule : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()

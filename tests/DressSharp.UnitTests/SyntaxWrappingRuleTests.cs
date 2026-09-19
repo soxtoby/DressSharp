@@ -1291,7 +1291,7 @@ public class SyntaxWrappingRuleTests
     }
 
     [Fact]
-    public void Auto_member_access_keeps_multiline_lambda_calls_attached_with_default_preferences()
+    public void Auto_member_access_keeps_the_member_attached_after_own_line_closes()
     {
         const string source = """
             _ = _validated.GetOrAdd(
@@ -1309,7 +1309,7 @@ public class SyntaxWrappingRuleTests
         var result = Format(source, preferences);
 
         result.Contains("_validated.GetOrAdd(").ShouldBe(true);
-        result.Contains("})).Value;").ShouldBe(true);
+        result.Contains("}\n    )\n).Value;").ShouldBe(true);
         Format(result, preferences).ShouldBe(result);
     }
 

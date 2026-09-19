@@ -184,7 +184,7 @@ sealed class RuleCatalog
             .Append(new BinaryExpressionIndentationRule())
             .Append(new NestedConditionalStyleRule())
             .Append(new OperatorPlacementRule())
-            .Append(new MultilineParametersClosingParenthesisPositionRule())
+            .Concat(ClosingDelimiterPositionRule.All())
             .Append(new MultilineParameterListOpenBracePositionRule())
             .Concat(newLineRules)
             .Concat(indentationRules)

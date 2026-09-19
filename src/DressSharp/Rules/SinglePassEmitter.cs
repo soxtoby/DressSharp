@@ -53,6 +53,7 @@ sealed class SinglePassEmitter
     readonly string[] _sourceIndents;
     Dictionary<SyntaxToken, int>? _piecesByToken;
     readonly Dictionary<ParameterListSyntax, int> _parameterListStartLines = [];
+    readonly Dictionary<int, string> _delimiterLineIndents = [];
     readonly HashSet<ParameterListSyntax> _multilineParameterLists = [];
     int _lineVersion;
     bool _lastTokenStartedLine;
@@ -163,6 +164,8 @@ sealed class SinglePassEmitter
             RememberContentIndents(piece.Token);
             EnterOrLeave(piece.Token);
             _lastTokenStartedLine = _column == _lineIndent.Length;
+            if (_syntaxWrapping.TracksOpening(index))
+                _delimiterLineIndents[index] = _lineIndent;
             Append(_indentation.RebaseTokenText(piece.Token, _sourceIndents[index], _lineIndent));
             RememberParameterListLine(piece.Token);
         }
@@ -401,18 +404,6 @@ sealed class SinglePassEmitter
             return;
         }
 
-        if (MultilineParameterCloseBreak(right) is { } parameterCloseBreak)
-        {
-            if (parameterCloseBreak)
-            {
-                if (_syntaxWrapping.GapBefore(index) is { } wrappingGap)
-                    EmitWrappingGap(wrappingGap, right);
-                else
-                    StartParameterCloseLine((ParameterListSyntax)right.Parent!, right);
-            }
-            return;
-        }
-
         if (AttachesConstructorInitializer(left, right))
         {
             Append(" ");
@@ -487,6 +478,22 @@ sealed class SinglePassEmitter
     void EmitWrappingGap(string gap, SyntaxToken right)
     {
         var lastBreak = gap.LastIndexOfAny(LineBreaks);
+        // The plan names the opening token; the line actually written there supplies its indent.
+        // This includes member-chain and initializer placement that moved the opener this run.
+        if (lastBreak >= 0 && _delimiterLineIndents.Remove(_syntaxWrapping.OpeningForClose(_index), out var openingIndent))
+        {
+            // Consecutive own-line closes share a line when their opening lines align.
+            // A preceding planned close also covers a close already joined to this group.
+            if (_syntaxWrapping.OpeningForClose(_index - 1) >= 0 && _lineIndent == openingIndent)
+                return;
+            var indentStart = gap.Length;
+            while (indentStart > lastBreak + 1 && gap[indentStart - 1] is ' ' or '\t')
+                indentStart--;
+            Append(gap[..indentStart]);
+            _lineIndent = openingIndent;
+            Append(openingIndent);
+            return;
+        }
         if (lastBreak >= 0 && InitializerIndentFor(right) is not null)
         {
             var indentStart = gap.Length;
@@ -888,43 +895,13 @@ sealed class SinglePassEmitter
         Copy(right.Source, right.Token.FullSpan.Start, right.Token.SpanStart);
     }
 
-    bool? MultilineParameterCloseBreak(SyntaxToken token)
-    {
-        if (_plan.MultilineParametersClosingParenthesisPosition is not { } position
-            || !token.IsKind(SyntaxKind.CloseParenToken)
-            || token.Parent is not ParameterListSyntax { Parameters.Count: > 0 } parameters
-            || !_parameterListStartLines.TryGetValue(parameters, out var startLine)
-            || startLine == _lineVersion
-            || _checkMalformedRegions && IsUnsafeOriginal(token))
-        {
-            return null;
-        }
-
-        return position == "own_line";
-    }
-
     bool AttachesConstructorInitializer(SyntaxToken left, SyntaxToken right) =>
-        _plan.MultilineParametersClosingParenthesisPosition is not null
+        _plan.ParametersClosingDelimiterPosition is not null
         && right.IsKind(SyntaxKind.ColonToken)
         && right.Parent is ConstructorInitializerSyntax { Parent: ConstructorDeclarationSyntax constructor }
         && left == constructor.ParameterList.CloseParenToken
         && _multilineParameterLists.Contains(constructor.ParameterList)
         && (!_checkMalformedRegions || !IsUnsafeOriginal(right));
-
-    void StartParameterCloseLine(ParameterListSyntax parameters, SyntaxToken close)
-    {
-        Append(_context.LineEnding);
-        if (_plan.IndentBlockContents is not null)
-        {
-            _lineIndent = _indentation.ForNode(parameters.Parent);
-            Append(_lineIndent);
-        }
-        else
-        {
-            _lineIndent = SourceIndentAt(parameters.OpenParenToken);
-            Append(_lineIndent);
-        }
-    }
 
     void RememberParameterListLine(SyntaxToken token)
     {

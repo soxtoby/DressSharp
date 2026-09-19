@@ -44,7 +44,7 @@ Known invalid effective values and malformed EditorConfig fail preflight before 
 
 ### Argument and parameter layout
 
-`dress_arguments_layout = auto` and `dress_parameters_layout = auto` keep fitting single-line lists compact. Once a list wraps between items, each argument or parameter starts on its own line. Existing multiline lists gain any missing item breaks while retaining their closing-delimiter placement. A multiline argument also expands its enclosing list when there are multiple arguments. A sole multiline argument, such as a lambda, can remain attached to the call.
+`dress_arguments_layout = auto` and `dress_parameters_layout = auto` keep fitting single-line lists compact. Once a list wraps between items, each argument or parameter starts on its own line. Existing multiline lists gain any missing item breaks while retaining their closing-delimiter placement unless a closing-delimiter preference selects otherwise. A multiline argument also expands its enclosing list when there are multiple arguments. A sole multiline argument, such as a lambda, can remain attached to the call.
 
 `always_multi` always expands the list; `always_single` requests a single-line list.
 
@@ -64,6 +64,26 @@ dress_with_initializer_layout = auto
 Each accepts `compact`, `auto` (Default), or `expanded`. `compact` uses one line when the result does not exceed `max_line_length`, otherwise it expands. `auto` keeps a fitting single-line initializer on one line and normalizes any multiline or oversized initializer to expanded form. `expanded` always puts the opening brace, every item, and the closing brace on separate lines. Empty initializers have no items but follow the configured brace layout.
 
 These preferences own the complete layout of their initializer kind. When configured, they override `csharp_new_line_before_open_brace` and `csharp_new_line_before_members_in_object_initializers` at the same boundaries. The corresponding `dress_*_initializer_indentation` preference controls indentation after a multiline layout is selected. Missing or `unset` leaves the standard newline preferences in control.
+
+### Closing delimiter position
+
+Each list shape has an independent closing-delimiter preference:
+
+```editorconfig
+dress_arguments_closing_delimiter_position = own_line
+dress_parameters_closing_delimiter_position = own_line
+dress_object_initializer_closing_delimiter_position = own_line
+dress_collection_initializer_closing_delimiter_position = own_line
+dress_array_initializer_closing_delimiter_position = own_line
+dress_with_initializer_closing_delimiter_position = own_line
+dress_collection_expression_closing_delimiter_position = own_line
+```
+
+All accept `after_last_item` or `own_line` (Default). They affect multiline lists only, including lists made multiline by another rule. `after_last_item` attaches the close to the last item's final line; a trailing comma stays before the close. `own_line` aligns the close with the indentation of the line containing its opening delimiter. Consecutive own-line closes with the same indentation share one line, such as `)));`; different indentation levels and intervening comments keep them separate. Single-line lists stay unchanged. Boundaries containing comments or directives are preserved.
+
+These preferences override the closing boundary selected by a layout preference, including `expanded` initializers, without selecting item layout themselves. Missing or `unset` leaves closing placement to the existing layout rules. An own-line close alone does not trigger item-per-line wrapping. Argument and parameter preferences include bracketed indexer lists; object initializers include anonymous objects. Statement and type body braces are excluded.
+
+For the wrapped exception example, use `dress_arguments_closing_delimiter_position = after_last_item` to keep `);` after the message. The parameter preference replaces `dress_multiline_parameters_closing_parenthesis_position`; rename the key and replace its former `after_last_parameter` value with `after_last_item`.
 
 ### Nested ternaries and operator position
 

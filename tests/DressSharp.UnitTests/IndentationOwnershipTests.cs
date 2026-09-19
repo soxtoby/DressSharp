@@ -187,7 +187,8 @@ public class IndentationOwnershipTests
                         .. Enum.GetValues<SyntaxKind>()
                             .Where(kind =>
                                 SyntaxFacts.GetBinaryExpression(kind) != SyntaxKind.None
-                                || SyntaxFacts.GetAssignmentExpression(kind) != SyntaxKind.None)
+                                || SyntaxFacts.GetAssignmentExpression(kind) != SyntaxKind.None
+                            )
                     ];
             }
             """.ReplaceLineEndings(lineEnding);
@@ -234,7 +235,8 @@ public class IndentationOwnershipTests
                             ? spacesInside
                                 ? GapStyle.DelimitedSpacedFirst
                                 : GapStyle.DelimitedFirst
-                            : GapStyle.DelimitedLater);
+                            : GapStyle.DelimitedLater
+                    );
                 }
             }
             """.ReplaceLineEndings(lineEnding);

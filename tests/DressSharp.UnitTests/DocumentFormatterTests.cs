@@ -85,7 +85,8 @@ public class DocumentFormatterTests
                     [First(
                             a,
                             b
-                        ), c],
+                    ), c
+                    ],
                     d
                 );
             }
