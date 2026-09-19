@@ -117,10 +117,12 @@ public sealed class FormatExecutionTests : IDisposable
                     ruleKey,
                     acceptedValues,
                     ownedSyntax,
-                    "Only same-line whitespace changes"
-                );
+                    "Only same-line whitespace changes");
 
-                int Identity(int value) => value;
+                int Identity(int value)
+                {
+                    return value;
+                }
 
                 object? Discover(ProcessResult result)
                 {

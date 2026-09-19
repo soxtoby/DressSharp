@@ -478,7 +478,7 @@ sealed class SingleLinePreservationRule(RuleKey ruleKey, string caption, string?
             SubgroupName = subgroupName,
             Description = $"Controls {OwnedSyntax(kind)}. {Invariant(kind)}.",
             Values = RuleValues.From(["true", "false"]),
-            DefaultValue = kind == SingleLinePreservationKind.TrivialBlocks ? "false" : "true",
+            DefaultValue = kind == SingleLinePreservationKind.TrivialBlocks ? "true" : "false",
             Example = kind == SingleLinePreservationKind.TrivialBlocks
                 ? "class Example { bool Ready { get; } void Run() { } void Work() { Ready = true; } }"
                 : "class Example { void Run() { Work(); } void Work() { } }",

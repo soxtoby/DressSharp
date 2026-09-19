@@ -23,7 +23,12 @@ sealed class ClosingDelimiterPositionRule(RuleKey key, SyntaxWrappingKind kind, 
             SubgroupName = "Closing delimiters",
             Description = "Places a multiline list's closing delimiter after the last item or on its own line, aligned with the opening line. Single-line lists are unchanged. Comments retain required line breaks.",
             Values = RuleValues.Choice("after_last_item", "own_line"),
-            DefaultValue = "own_line",
+            DefaultValue = kind switch
+                {
+                    SyntaxWrappingKind.Arguments => "after_last_item",
+                    SyntaxWrappingKind.Parameters => "own_line",
+                    _ => "unset"
+                },
             Example = example,
             OwnedSyntax = $"the closing boundary of multiline {kind}",
             Invariant = "Single-line lists and item layout are unchanged"

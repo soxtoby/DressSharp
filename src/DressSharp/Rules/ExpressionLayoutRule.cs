@@ -12,7 +12,7 @@ sealed class BinaryExpressionIndentationRule : IFormattingRule
             SubgroupName = "Expressions",
             Description = "Controls whether wrapped higher-precedence binary groups align with the outer expression or indent one additional level per precedence group. Does not introduce wrapping.",
             Values = RuleValues.Choice("flat", "precedence"),
-            DefaultValue = "flat",
+            DefaultValue = "precedence",
             Example = "var result = first\n    || second\n        && third;",
             OwnedSyntax = "wrapped binary expression indentation",
             Invariant = "Only whitespace changes"
@@ -29,7 +29,7 @@ sealed class NestedConditionalStyleRule : IFormattingRule
             SubgroupName = "Expressions",
             Description = "Shapes wrapped nested ternaries. Decision ladders flatten false-branch chains; multiline conditions or branches fall back to staircase. Does not force single-line expressions to wrap.",
             Values = RuleValues.Choice("flat", "staircase", "decision_ladder"),
-            DefaultValue = "flat",
+            DefaultValue = "decision_ladder",
             Example = "var result = first\n    ? one\n    : second\n        ? two\n        : three;",
             OwnedSyntax = "nested conditional expression whitespace",
             Invariant = "Only whitespace changes"

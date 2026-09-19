@@ -25,9 +25,9 @@ sealed class RuleCatalog
             ];
         ISyntaxFormattingRule[] memberRules =
             [
-                new MemberBodyRule(RuleKey.DressMethodBody, "Method", "Body styles", MemberBodyKind.Method, "expression"),
-                new MemberBodyRule(RuleKey.DressConstructorBody, "Constructor", "Body styles", MemberBodyKind.Constructor, "expression"),
-                new MemberBodyRule(RuleKey.DressOperatorBody, "Operator", "Body styles", MemberBodyKind.Operator, "expression"),
+                new MemberBodyRule(RuleKey.DressMethodBody, "Method", "Body styles", MemberBodyKind.Method, "unset"),
+                new MemberBodyRule(RuleKey.DressConstructorBody, "Constructor", "Body styles", MemberBodyKind.Constructor, "unset"),
+                new MemberBodyRule(RuleKey.DressOperatorBody, "Operator", "Body styles", MemberBodyKind.Operator, "unset"),
                 new MemberBodyRule(RuleKey.DressPropertyBody, "Property", "Body styles", MemberBodyKind.Property, "expression"),
                 new MemberBodyRule(RuleKey.DressIndexerBody, "Indexer", "Body styles", MemberBodyKind.Indexer, "expression"),
                 new MemberBodyRule(RuleKey.DressAccessorBody, "Accessor", "Body styles", MemberBodyKind.Accessor, "expression"),
@@ -140,7 +140,7 @@ sealed class RuleCatalog
                         ],
                         "all",
                         "none"),
-                    "all"),
+                    "accessors,anonymous_methods,anonymous_types,control_blocks,events,indexers,lambdas,local_functions,methods,properties,types"),
                 new NewLineRule(RuleKey.CSharpNewLineBeforeElse, "Before else", "Newlines", NewLineKind.Else, RuleValues.Boolean(), "true"),
                 new NewLineRule(RuleKey.CSharpNewLineBeforeCatch, "Before catch", "Newlines", NewLineKind.Catch, RuleValues.Boolean(), "true"),
                 new NewLineRule(RuleKey.CSharpNewLineBeforeFinally, "Before finally", "Newlines", NewLineKind.Finally, RuleValues.Boolean(), "true"),
@@ -173,7 +173,7 @@ sealed class RuleCatalog
                 new IndentationRule(RuleKey.CSharpIndentLabels, "Labels", null, ["flush_left", "no_change", "one_less_than_current"], "one_less_than_current"),
                 new IndentationRule(RuleKey.CSharpIndentBlockContents, "Block contents", null, ["true", "false"], "true"),
                 new IndentationRule(RuleKey.CSharpIndentBraces, "Braces", null, ["true", "false"], "false"),
-                new IndentationRule(RuleKey.CSharpIndentCaseContentsWhenBlock, "Case contents when block", "Switch statements", ["true", "false"], "true")
+                new IndentationRule(RuleKey.CSharpIndentCaseContentsWhenBlock, "Case contents when block", "Switch statements", ["true", "false"], "false")
             ];
         SingleLinePreservationRule[] preservationRules =
             [
@@ -264,8 +264,8 @@ sealed class RuleCatalog
             [
                 new BlankLineRule(RuleKey.DressBlankLinesAroundNamespaces, "Around namespaces", null, BlankLineKind.AroundNamespaces, "1"),
                 new BlankLineRule(RuleKey.DressBlankLinesAroundTypes, "Around types", null, BlankLineKind.AroundTypes, "1"),
-                new BlankLineRule(RuleKey.DressBlankLinesBetweenMembers, "Between members", null, BlankLineKind.BetweenMembers, "1"),
-                new BlankLineRule(RuleKey.DressBlankLinesBetweenUsingGroups, "Between using groups", null, BlankLineKind.BetweenUsingGroups, "1"),
+                new BlankLineRule(RuleKey.DressBlankLinesBetweenMembers, "Between members", null, BlankLineKind.BetweenMembers, "unset"),
+                new BlankLineRule(RuleKey.DressBlankLinesBetweenUsingGroups, "Between using groups", null, BlankLineKind.BetweenUsingGroups, "0"),
                 new BlankLineRule(RuleKey.DressBlankLinesBetweenMemberCategories, "Between member categories", null, BlankLineKind.BetweenMemberCategories, "1"),
                 new BlankLineRule(RuleKey.DressMaxConsecutiveBlankLines, "Max consecutive blank lines", null, BlankLineKind.Maximum, "1")
             ];
@@ -287,7 +287,7 @@ sealed class RuleCatalog
                     "XML documentation",
                     CommentKind.XmlElementLayout,
                     ["single_line", "multi_line"],
-                    "single_line")
+                    "unset")
             ];
 
         var formattingRules = fileRules.Cast<IFormattingRule>()
@@ -326,7 +326,7 @@ sealed class RuleCatalog
                     "File",
                     "Selects the line-ending sequence used when DressSharp writes the file.",
                     RuleValues.Choice("cr", "lf", "crlf"),
-                    "lf"),
+                    "unset"),
                 Metadata(
                     RuleKey.InsertFinalNewline,
                     "Insert final newline",
@@ -370,7 +370,7 @@ sealed class RuleCatalog
                     "Wrapping",
                     "Sets the target line width used by auto layout preferences.",
                     RuleValues.Integer(1, "off"),
-                    "180")
+                    "160")
             ];
         var rulesByKey = metadataOnlyRules.Concat(formattingRules)
             .ToDictionary(rule => rule.Metadata.RuleKey);

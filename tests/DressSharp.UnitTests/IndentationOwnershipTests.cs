@@ -207,9 +207,12 @@ public class IndentationOwnershipTests
             lineEnding + "    ||",
             StringComparison.Ordinal);
         var preferences = PreferenceCatalog.Defaults
-            .Select(item => (item.Key.ToName(), item.Key == RuleKey.DressBinaryExpressionIndentation
-                ? "precedence"
-                : item.Default))
+            .Select(item => (item.Key.ToName(), item.Key switch
+                {
+                    RuleKey.DressBinaryExpressionIndentation => "precedence",
+                    RuleKey.DressArgumentsClosingDelimiterPosition => "own_line",
+                    _ => item.Default
+                }))
             .ToArray();
 
         var result = Format(source, preferences);
@@ -251,7 +254,12 @@ public class IndentationOwnershipTests
             }
             """.ReplaceLineEndings(lineEnding);
         var preferences = PreferenceCatalog.Defaults
-            .Select(item => (item.Key.ToName(), item.Key == RuleKey.DressNestedConditionalStyle ? "decision_ladder" : item.Default))
+            .Select(item => (item.Key.ToName(), item.Key switch
+                {
+                    RuleKey.DressNestedConditionalStyle => "decision_ladder",
+                    RuleKey.DressArgumentsClosingDelimiterPosition => "own_line",
+                    _ => item.Default
+                }))
             .ToArray();
         var result = Format(source, preferences);
         result.ShouldBe(expected);
@@ -356,7 +364,12 @@ public class IndentationOwnershipTests
             }
             """.ReplaceLineEndings(lineEnding);
         var preferences = PreferenceCatalog.Defaults
-            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .Select(item => (item.Key.ToName(), item.Key switch
+                {
+                    RuleKey.MaxLineLength => "160",
+                    RuleKey.DressArgumentsClosingDelimiterPosition => "own_line",
+                    _ => item.Default
+                }))
             .ToArray();
         var result = Format(source, preferences);
         result.ShouldBe(expected);
@@ -387,7 +400,12 @@ public class IndentationOwnershipTests
             }
             """.ReplaceLineEndings(lineEnding);
         var preferences = PreferenceCatalog.Defaults
-            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .Select(item => (item.Key.ToName(), item.Key switch
+                {
+                    RuleKey.MaxLineLength => "160",
+                    RuleKey.DressArgumentsClosingDelimiterPosition => "own_line",
+                    _ => item.Default
+                }))
             .ToArray();
         var result = Format(source, preferences);
         result.ShouldBe(expected);
@@ -594,7 +612,12 @@ public class IndentationOwnershipTests
             }
             """.ReplaceLineEndings(lineEnding);
         var preferences = PreferenceCatalog.Defaults
-            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .Select(item => (item.Key.ToName(), item.Key switch
+                {
+                    RuleKey.MaxLineLength => "160",
+                    RuleKey.DressArgumentsClosingDelimiterPosition => "own_line",
+                    _ => item.Default
+                }))
             .ToArray();
         var result = Format(source, preferences);
         result.ShouldBe(expected);

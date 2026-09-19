@@ -114,7 +114,7 @@ sealed record RuleMetadata
         ? [Values.Minimum == 0 ? "non-negative integer" : "positive integer", .. Values.SpecialValues.IsDefault ? [] : Values.SpecialValues]
         : [.. Values.Options.Select(option => option.Value), .. Values.SpecialValues.IsDefault ? [] : Values.SpecialValues];
 
-    internal bool Accepts(string value) => Values.Accepts(value);
+    internal bool Accepts(string value) => value.Equals("unset", StringComparison.OrdinalIgnoreCase) || Values.Accepts(value);
 
     internal static string Humanize(string value)
     {

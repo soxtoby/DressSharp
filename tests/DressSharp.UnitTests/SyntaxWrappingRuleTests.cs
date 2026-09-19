@@ -1089,7 +1089,12 @@ public class SyntaxWrappingRuleTests
             }
             """;
         var preferences = PreferenceCatalog.Defaults
-            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .Select(item => (item.Key.ToName(), item.Key switch
+                {
+                    RuleKey.MaxLineLength => "160",
+                    RuleKey.DressArgumentsClosingDelimiterPosition => "own_line",
+                    _ => item.Default
+                }))
             .ToArray();
 
         var input = source.ReplaceLineEndings(lineEnding);
@@ -1367,7 +1372,12 @@ public class SyntaxWrappingRuleTests
                       })).Value;
             """;
         var preferences = PreferenceCatalog.Defaults
-            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "160" : item.Default))
+            .Select(item => (item.Key.ToName(), item.Key switch
+                {
+                    RuleKey.MaxLineLength => "160",
+                    RuleKey.DressArgumentsClosingDelimiterPosition => "own_line",
+                    _ => item.Default
+                }))
             .ToArray();
 
         var result = Format(source, preferences);
@@ -1717,7 +1727,7 @@ public class SyntaxWrappingRuleTests
         var defaults = PreferenceCatalog.Defaults.ToDictionary(item => item.Key, item => item.Default);
 
         keys.AllItemsSatisfy(key => defaults[RuleKeys.Parse(key)].ShouldBe("auto"));
-        defaults[RuleKey.MaxLineLength].ShouldBe("180");
+        defaults[RuleKey.MaxLineLength].ShouldBe("160");
     }
 
     static string Format(string source, params (string Key, string Value)[] preferences) =>

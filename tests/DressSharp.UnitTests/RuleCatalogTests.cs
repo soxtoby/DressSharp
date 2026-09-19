@@ -121,6 +121,6 @@ public class RuleCatalogTests
             .Single(rule => rule.Metadata.RuleKey == RuleKey.DressBinaryExpressionIndentation)
             .Metadata;
         metadata.AcceptedValueForms.ShouldMatch(["flat", "precedence"]);
-        metadata.DefaultValue.ShouldBe("flat");
+        metadata.DefaultValue.ShouldBe("precedence");
     }
 }

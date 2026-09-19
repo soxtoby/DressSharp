@@ -66,10 +66,18 @@ public class DocumentFormatterTests
         // has to be known to the list nested inside it, or that list is indented from the wrong
         // place and moves again on the next run.
         var preferences = PreferenceCatalog.Defaults
-            .Where(preference => preference.Key is not (RuleKey.MaxLineLength or RuleKey.DressArgumentsLayout))
+            .Where(preference => preference.Key is not (
+                RuleKey.MaxLineLength
+                or RuleKey.DressArgumentsLayout
+                or RuleKey.DressArgumentsClosingDelimiterPosition
+                or RuleKey.DressCollectionExpressionClosingDelimiterPosition
+                or RuleKey.DressMethodBody))
             .Select(preference => (preference.Key.ToName(), preference.Default))
             .Append(("max_line_length", "unset"))
             .Append(("dress_arguments_layout", "always_multi"))
+            .Append(("dress_arguments_closing_delimiter_position", "own_line"))
+            .Append(("dress_collection_expression_closing_delimiter_position", "own_line"))
+            .Append(("dress_method_body", "expression"))
             .ToArray();
         var first = EmitterTestHarness.Format("""
             class C
