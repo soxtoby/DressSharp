@@ -31,8 +31,8 @@ sealed class TriviaLayoutPlan
         RuleCatalog catalog,
         FormattingConfiguration configuration) =>
         new(
-            BlankLineSettings.From(catalog.BlankLineRules, configuration),
-            CommentSettings.From(catalog.CommentRules, configuration));
+        BlankLineSettings.From(catalog.BlankLineRules, configuration),
+        CommentSettings.From(catalog.CommentRules, configuration));
 
     internal static TriviaLayoutPlan For(
         SyntaxNode root,
@@ -243,11 +243,16 @@ sealed class TriviaLayoutPlan
                 var isType = node is BaseTypeDeclarationSyntax;
                 if (previous.RawKind != 0
                     && !(isType && previous.IsKind(SyntaxKind.OpenBraceToken) && previous.Parent == node.Parent))
+                {
                     SetTarget(first, count, priority);
+                }
                 var next = node.GetLastToken().GetNextToken();
-                if (next.RawKind != 0 && !next.IsKind(SyntaxKind.EndOfFileToken)
+                if (next.RawKind != 0
+                    && !next.IsKind(SyntaxKind.EndOfFileToken)
                     && !(isType && next.IsKind(SyntaxKind.CloseBraceToken) && next.Parent == node.Parent))
+                {
                     SetTarget(next, count, priority);
+                }
             }
 
             void SetTarget(SyntaxToken token, int count, int priority)
@@ -299,11 +304,11 @@ sealed class TriviaLayoutPlan
                 .Select(item => new OwnedTrivia(item, leading, _pieces[tokenIndex].IsOriginal))
                 .ToList();
             if (!RewriteAttached(
-                    combined,
-                    preference,
-                    hasLeftToken: !leading,
-                    hasRightToken: leading,
-                    trailingCommentsAttachRight: leading))
+                combined,
+                preference,
+                hasLeftToken: !leading,
+                hasRightToken: leading,
+                trailingCommentsAttachRight: leading))
             {
                 return;
             }
@@ -326,11 +331,11 @@ sealed class TriviaLayoutPlan
                 .Concat(leading.Select(item => new OwnedTrivia(item, Leading: true, _pieces[rightIndex].IsOriginal)))
                 .ToList();
             if (!RewriteAttached(
-                    combined,
-                    preference,
-                    hasLeftToken: true,
-                    hasRightToken: true,
-                    trailingCommentsAttachRight: StartsAttachedSyntax(_pieces[rightIndex - 1].Token)))
+                combined,
+                preference,
+                hasLeftToken: true,
+                hasRightToken: true,
+                trailingCommentsAttachRight: StartsAttachedSyntax(_pieces[rightIndex - 1].Token)))
             {
                 return;
             }
@@ -695,20 +700,20 @@ sealed class TriviaLayoutPlan
     }
 
     static int UsingCategory(UsingDirectiveSyntax directive) =>
-        directive.Alias is not null
-            ? 2
-            : directive.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) ? 1 : 0;
+        directive.Alias is not null ? 2
+            : directive.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) ? 1
+            : 0;
 
     static int MemberCategory(MemberDeclarationSyntax member) =>
         member switch
-        {
-            FieldDeclarationSyntax or EventFieldDeclarationSyntax => 0,
-            ConstructorDeclarationSyntax => 1,
-            PropertyDeclarationSyntax or IndexerDeclarationSyntax or EventDeclarationSyntax => 2,
-            MethodDeclarationSyntax or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax => 3,
-            BaseTypeDeclarationSyntax or DelegateDeclarationSyntax => 4,
-            _ => 5
-        };
+            {
+                FieldDeclarationSyntax or EventFieldDeclarationSyntax => 0,
+                ConstructorDeclarationSyntax => 1,
+                PropertyDeclarationSyntax or IndexerDeclarationSyntax or EventDeclarationSyntax => 2,
+                MethodDeclarationSyntax or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax => 3,
+                BaseTypeDeclarationSyntax or DelegateDeclarationSyntax => 4,
+                _ => 5
+            };
 
     static int RequiredLineBreaks(int blankLines) =>
         blankLines == int.MaxValue ? int.MaxValue : blankLines + 1;
@@ -811,15 +816,15 @@ sealed class TriviaLayoutPlan
         foreach (var item in trivia)
         {
             if (settings[CommentKind.LineSpacing] is not null
-                && item.IsKind(SyntaxKind.SingleLineCommentTrivia)
+                    && item.IsKind(SyntaxKind.SingleLineCommentTrivia)
                 || settings[CommentKind.BlockSpacing] is not null
-                && item.IsKind(SyntaxKind.MultiLineCommentTrivia)
+                    && item.IsKind(SyntaxKind.MultiLineCommentTrivia)
                 || settings[CommentKind.AttachedPlacement] is { } attached
-                && attached != "auto"
-                && IsOrdinaryComment(item)
+                    && attached != "auto"
+                    && IsOrdinaryComment(item)
                 || (settings[CommentKind.XmlPlacement] is not null
                     || settings[CommentKind.XmlElementLayout] is not null)
-                && IsDocumentationComment(item))
+                    && IsDocumentationComment(item))
             {
                 return true;
             }
@@ -895,9 +900,9 @@ sealed class TriviaLayoutPlan
         var whitespace = SyntaxFactory.TriviaList(
             combined.Skip(start).Take(end - start).Select(item => item.Trivia));
         var result = new List<OwnedTrivia>
-        {
-            new(SyntaxFactory.EndOfLine(lineEnding), owner.Leading, owner.IsOriginal)
-        };
+            {
+                new(SyntaxFactory.EndOfLine(lineEnding), owner.Leading, owner.IsOriginal)
+            };
         var indent = LastIndent(whitespace);
         if (indent.Length != 0)
             result.Add(new(SyntaxFactory.Whitespace(indent), owner.Leading, owner.IsOriginal));
@@ -921,7 +926,7 @@ sealed class TriviaLayoutPlan
     {
         StringBuilder? rewritten = null;
         var copiedThrough = 0;
-        for (var position = 0; position < text.Length;)
+        for (var position = 0; position < text.Length; )
         {
             var first = ReadLine(text, position);
             if (multiLine
@@ -1133,8 +1138,10 @@ sealed class TriviaLayoutPlan
         while (end < text.Length && text[end] is not '\r' and not '\n')
             end++;
         var next = end;
-        if (next < text.Length && text[next++] == '\r'
-            && next < text.Length && text[next] == '\n')
+        if (next < text.Length
+            && text[next++] == '\r'
+            && next < text.Length
+            && text[next] == '\n')
         {
             next++;
         }

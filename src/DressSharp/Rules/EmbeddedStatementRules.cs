@@ -33,7 +33,9 @@ sealed record EmbeddedStatementSettings(
 }
 
 sealed class EmbeddedStatementPreferenceRule(
-    RuleKey key, string caption, string? subgroupName,
+    RuleKey key,
+    string caption,
+    string? subgroupName,
     ImmutableArray<string> values,
     string defaultValue,
     string ownedSyntax,
@@ -43,27 +45,27 @@ sealed class EmbeddedStatementPreferenceRule(
 ) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
-    {
-        RuleKey = key,
-        Caption = caption,
-        ExpandedCaption = expandedCaption ?? RuleMetadata.Humanize(key.ToName()),
-        GroupName = "Braces and bodies",
-        SubgroupName = subgroupName,
-        Description = description ?? $"Controls {ownedSyntax}. {invariant}.",
-        Values = RuleValues.From(values),
-        DefaultValue = defaultValue,
-        Example = key == RuleKey.DressBracesForMultilineStatementHeader
-            ? "if (firstCondition\n    && secondCondition)\n    Work();"
-            : """
-            class Example
-            {
-                void Run() { if (true) Work(); }
-                void Work() { }
-            }
-            """,
-        OwnedSyntax = ownedSyntax,
-        Invariant = invariant
-    };
+        {
+            RuleKey = key,
+            Caption = caption,
+            ExpandedCaption = expandedCaption ?? RuleMetadata.Humanize(key.ToName()),
+            GroupName = "Braces and bodies",
+            SubgroupName = subgroupName,
+            Description = description ?? $"Controls {ownedSyntax}. {invariant}.",
+            Values = RuleValues.From(values),
+            DefaultValue = defaultValue,
+            Example = key == RuleKey.DressBracesForMultilineStatementHeader
+                ? "if (firstCondition\n    && secondCondition)\n    Work();"
+                : """
+                class Example
+                {
+                    void Run() { if (true) Work(); }
+                    void Work() { }
+                }
+                """,
+            OwnedSyntax = ownedSyntax,
+            Invariant = invariant
+        };
 }
 
 enum EmbeddedStatementBraceMode
@@ -337,9 +339,11 @@ static class EmbeddedStatementBraces
             var leading = statement.GetLeadingTrivia();
             var trailing = statement.GetTrailingTrivia();
             if (statement is EmptyStatementSyntax)
+            {
                 return GeneratedSyntax.Mark(SyntaxFactory.Block())
                     .WithLeadingTrivia(leading)
                     .WithTrailingTrivia(trailing);
+            }
             var inner = statement.WithoutLeadingTrivia().WithoutTrailingTrivia();
             var block = GeneratedSyntax.Mark(SyntaxFactory.Block(inner));
             if (spansLines)
@@ -410,7 +414,7 @@ static class EmbeddedStatementBraces
         if (block.Statements.Count == 0)
         {
             return SyntaxFactory.EmptyStatement(
-                    SyntaxFactory.Token(SyntaxKind.SemicolonToken))
+                SyntaxFactory.Token(SyntaxKind.SemicolonToken))
                 .WithLeadingTrivia(block.GetLeadingTrivia())
                 .WithTrailingTrivia(block.GetTrailingTrivia());
         }

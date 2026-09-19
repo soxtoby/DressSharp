@@ -97,7 +97,9 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
         {
             if ((candidates & (1UL << index)) != 0
                 && rules[index].Rule.ClaimsBreakBefore(token, rules[index].Categories, initializerAtMemberBoundary) is { } claim)
+            {
                 return claim;
+            }
         }
 
         return null;
@@ -121,25 +123,25 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
 
     static bool IsDirectDeclarationBody(ParameterListSyntax parameters, SyntaxToken openBrace) =>
         openBrace.Parent switch
-        {
-            TypeDeclarationSyntax { ParameterList: { } typeParameters, BaseList: null } =>
-                parameters == typeParameters,
-            BlockSyntax { Parent: MethodDeclarationSyntax { ParameterList: { } methodParameters } } =>
-                parameters == methodParameters,
-            BlockSyntax { Parent: ConstructorDeclarationSyntax { ParameterList: { } constructorParameters, Initializer: null } } =>
-                parameters == constructorParameters,
-            _ => false
-        };
+            {
+                TypeDeclarationSyntax { ParameterList: { } typeParameters, BaseList: null } =>
+                    parameters == typeParameters,
+                BlockSyntax { Parent: MethodDeclarationSyntax { ParameterList: { } methodParameters } } =>
+                    parameters == methodParameters,
+                BlockSyntax { Parent: ConstructorDeclarationSyntax { ParameterList: { } constructorParameters, Initializer: null } } =>
+                    parameters == constructorParameters,
+                _ => false
+            };
 
     internal static SyntaxNode? SingleLineBraceOwner(SyntaxToken token, bool opening) => token.Parent switch
-    {
-        BlockSyntax block when token == (opening ? block.OpenBraceToken : block.CloseBraceToken) => block,
-        AccessorListSyntax accessors when token == (opening ? accessors.OpenBraceToken : accessors.CloseBraceToken) => accessors,
-        BaseTypeDeclarationSyntax type when token == (opening ? type.OpenBraceToken : type.CloseBraceToken) => type,
-        NamespaceDeclarationSyntax @namespace when token == (opening ? @namespace.OpenBraceToken : @namespace.CloseBraceToken) => @namespace,
-        SwitchStatementSyntax @switch when token == (opening ? @switch.OpenBraceToken : @switch.CloseBraceToken) => @switch,
-        _ => null
-    };
+        {
+            BlockSyntax block when token == (opening ? block.OpenBraceToken : block.CloseBraceToken) => block,
+            AccessorListSyntax accessors when token == (opening ? accessors.OpenBraceToken : accessors.CloseBraceToken) => accessors,
+            BaseTypeDeclarationSyntax type when token == (opening ? type.OpenBraceToken : type.CloseBraceToken) => type,
+            NamespaceDeclarationSyntax @namespace when token == (opening ? @namespace.OpenBraceToken : @namespace.CloseBraceToken) => @namespace,
+            SwitchStatementSyntax @switch when token == (opening ? @switch.OpenBraceToken : @switch.CloseBraceToken) => @switch,
+            _ => null
+        };
 
     bool? EmbeddedStatementBreak(SyntaxToken token)
     {

@@ -15,7 +15,8 @@ public class EmbeddedStatementRuleTests
     [InlineData("next_line", "\n            ")]
     public void Placement_collapses_existing_body_whitespace(string placement, string expectedGap)
     {
-        var result = Format("""
+        var result = Format(
+            """
                 class C
                 {
                     void M()
@@ -27,12 +28,13 @@ public class EmbeddedStatementRuleTests
                     }
                 }
                 """.ReplaceLineEndings("\n"),
-                ("dress_embedded_statement_placement", placement),
-                ("csharp_indent_block_contents", "true"));
+            ("dress_embedded_statement_placement", placement),
+            ("csharp_indent_block_contents", "true"));
         var conditional = Root(result)
             .DescendantNodes().OfType<IfStatementSyntax>().Single();
 
-        Gap(result,
+        Gap(
+            result,
             conditional.CloseParenToken,
             conditional.Statement.GetFirstToken()).ShouldBe(expectedGap);
     }
@@ -42,7 +44,8 @@ public class EmbeddedStatementRuleTests
     [InlineData("next_line", "\n        ")]
     public void Placement_owns_braced_bodies(string placement, string expectedGap)
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
                 void M()
@@ -129,10 +132,10 @@ public class EmbeddedStatementRuleTests
     public void Balanced_propagates_a_multiline_header_across_the_chain()
     {
         var conditional = Root(Format(
-                "class C { void M() { if (first && second) A(); else B(); } }",
-                ("dress_embedded_statement_braces", "balanced"),
-                ("dress_braces_for_multiline_statement_header", "true"),
-                ("dress_binary_expressions_layout", "always_multi")))
+            "class C { void M() { if (first && second) A(); else B(); } }",
+            ("dress_embedded_statement_braces", "balanced"),
+            ("dress_braces_for_multiline_statement_header", "true"),
+            ("dress_binary_expressions_layout", "always_multi")))
             .DescendantNodes().OfType<IfStatementSyntax>().Single();
 
         conditional.Statement.ShouldBeA<BlockSyntax>();
@@ -158,8 +161,8 @@ public class EmbeddedStatementRuleTests
     public void Header_preference_does_not_remove_unconstrained_existing_braces()
     {
         var body = Root(Format(
-                "class C { void M() { if (ready) { Run(); } } }",
-                ("dress_braces_for_multiline_statement_header", "true")))
+            "class C { void M() { if (ready) { Run(); } } }",
+            ("dress_braces_for_multiline_statement_header", "true")))
             .DescendantNodes().OfType<IfStatementSyntax>().Single().Statement;
 
         body.ShouldBeA<BlockSyntax>();
@@ -169,10 +172,10 @@ public class EmbeddedStatementRuleTests
     public void Do_trailing_while_is_part_of_the_statement_header()
     {
         var body = Root(Format(
-                "class C { void M() { do Run(); while (first && second); } }",
-                ("dress_embedded_statement_braces", "compact"),
-                ("dress_braces_for_multiline_statement_header", "true"),
-                ("dress_binary_expressions_layout", "always_multi")))
+            "class C { void M() { do Run(); while (first && second); } }",
+            ("dress_embedded_statement_braces", "compact"),
+            ("dress_braces_for_multiline_statement_header", "true"),
+            ("dress_binary_expressions_layout", "always_multi")))
             .DescendantNodes().OfType<DoStatementSyntax>().Single().Statement;
 
         body.ShouldBeA<BlockSyntax>();
@@ -182,9 +185,9 @@ public class EmbeddedStatementRuleTests
     public void Nested_body_lines_constrain_the_owning_body()
     {
         var loop = Root(Format(
-                "class C { void M() { while (ready) if (other) Run(); } }",
-                ("dress_embedded_statement_placement", "next_line"),
-                ("dress_embedded_statement_braces", "compact")))
+            "class C { void M() { while (ready) if (other) Run(); } }",
+            ("dress_embedded_statement_placement", "next_line"),
+            ("dress_embedded_statement_braces", "compact")))
             .DescendantNodes().OfType<WhileStatementSyntax>().Single();
 
         loop.Statement.ShouldBeA<BlockSyntax>();
@@ -219,8 +222,8 @@ public class EmbeddedStatementRuleTests
     public void Empty_bodies_use_the_mode_canonical_form(string mode, bool expectedBlock)
     {
         var body = Root(Format(
-                "class C { void M() { if (ready) { } } }",
-                ("dress_embedded_statement_braces", mode)))
+            "class C { void M() { if (ready) { } } }",
+            ("dress_embedded_statement_braces", mode)))
             .DescendantNodes().OfType<IfStatementSyntax>().Single().Statement;
 
         (body is BlockSyntax).ShouldBe(expectedBlock);
@@ -231,8 +234,8 @@ public class EmbeddedStatementRuleTests
     public void Meaningful_trivia_preserves_the_owned_boundary()
     {
         Format(
-                "class C { void M() { if (ready) /* keep */ Run(); } }",
-                ("dress_embedded_statement_placement", "next_line"))
+            "class C { void M() { if (ready) /* keep */ Run(); } }",
+            ("dress_embedded_statement_placement", "next_line"))
             .ShouldBe("class C { void M() { if (ready) /* keep */ Run(); } }");
     }
 
@@ -240,8 +243,8 @@ public class EmbeddedStatementRuleTests
     public void Significant_trivia_prevents_brace_removal()
     {
         Format(
-                "class C { void M() { if (/* keep */ ready) { Run(); } } }",
-                ("dress_embedded_statement_braces", "compact"))
+            "class C { void M() { if (/* keep */ ready) { Run(); } } }",
+            ("dress_embedded_statement_braces", "compact"))
             .ShouldBe("class C { void M() { if (/* keep */ ready) { Run(); } } }");
     }
 
@@ -249,8 +252,8 @@ public class EmbeddedStatementRuleTests
     public void Malformed_occurrences_are_unchanged()
     {
         Format(
-                "class C { void M() { if (ready       Run(); } }",
-                ("dress_embedded_statement_placement", "next_line"))
+            "class C { void M() { if (ready       Run(); } }",
+            ("dress_embedded_statement_placement", "next_line"))
             .ShouldBe("class C { void M() { if (ready       Run(); } }");
     }
 
@@ -259,9 +262,9 @@ public class EmbeddedStatementRuleTests
     {
         // Rewriting the safe conditional must not vouch for the malformed one beside it.
         Format(
-                "class C { void M() { if (\n) Work(); if (ok) { Other(); } } }",
-                ("dress_embedded_statement_braces", "balanced"),
-                ("dress_braces_for_multiline_statement_header", "true"))
+            "class C { void M() { if (\n) Work(); if (ok) { Other(); } } }",
+            ("dress_embedded_statement_braces", "balanced"),
+            ("dress_braces_for_multiline_statement_header", "true"))
             .ShouldBe("class C { void M() { if (\n) Work(); if (ok) Other(); } }");
     }
 
@@ -269,10 +272,10 @@ public class EmbeddedStatementRuleTests
     public void Unset_preferences_make_no_change()
     {
         Format(
-                "class C { void M() { if (ready)       { Run(); } } }",
-                ("dress_embedded_statement_placement", "unset"),
-                ("dress_embedded_statement_braces", "unset"),
-                ("dress_braces_for_multiline_statement_header", "unset"))
+            "class C { void M() { if (ready)       { Run(); } } }",
+            ("dress_embedded_statement_placement", "unset"),
+            ("dress_embedded_statement_braces", "unset"),
+            ("dress_braces_for_multiline_statement_header", "unset"))
             .ShouldBe("class C { void M() { if (ready)       { Run(); } } }");
     }
 
@@ -282,7 +285,8 @@ public class EmbeddedStatementRuleTests
         var preferences = PreferenceCatalog.Defaults
             .Select(preference => (preference.Key.ToName(), preference.Default))
             .ToArray();
-        var first = Format("""
+        var first = Format(
+            """
             class C
             {
                 bool Equal(C right)

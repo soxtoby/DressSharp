@@ -6,18 +6,8 @@ namespace DressSharp.UnitTests;
 public sealed class ClosingDelimiterPositionRuleTests
 {
     public static TheoryData<string, string, string> Lists => new()
-    {
-        { "arguments", "Call(\n    first,\n    second", ");" },
-        { "arguments", "var value = items[\n    first,\n    second", "];" },
-        { "parameters", "class C(\n    int first,\n    int second", ") { }" },
-        { "parameters", "class C\n{\n    int this[\n        int first,\n        int second", "] => 0;\n}" },
-        { "object_initializer", "var value = new C\n{\n    First = 1,\n    Second = 2", "};" },
-        { "object_initializer", "var value = new\n{\n    First = 1,\n    Second = 2", "};" },
-        { "collection_initializer", "var value = new List<int>\n{\n    1,\n    2", "};" },
-        { "array_initializer", "var value = new[]\n{\n    1,\n    2", "};" },
-        { "with_initializer", "var value = original with\n{\n    First = 1,\n    Second = 2", "};" },
-        { "collection_expression", "int[] value = [\n    1,\n    2", "];" }
-    };
+        { { "arguments", "Call(\n    first,\n    second", ");" }, { "arguments", "var value = items[\n    first,\n    second", "];" }, { "parameters", "class C(\n    int first,\n    int second", ") { }" }, { "parameters", "class C\n{\n    int this[\n        int first,\n        int second", "] => 0;\n}" }, { "object_initializer", "var value = new C\n{\n    First = 1,\n    Second = 2", "};" }, { "object_initializer", "var value = new\n{\n    First = 1,\n    Second = 2", "};" }, { "collection_initializer", "var value = new List<int>\n{\n    1,\n    2", "};" }, { "array_initializer", "var value = new[]\n{\n    1,\n    2", "};" }, { "with_initializer", "var value = original with\n{\n    First = 1,\n    Second = 2", "};" }, { "collection_expression", "int[] value = [\n    1,\n    2", "];" }
+        };
 
     [Theory]
     [MemberData(nameof(Lists))]
@@ -45,8 +35,12 @@ public sealed class ClosingDelimiterPositionRuleTests
     {
         const string message = "Materialized corpus does not match corpus/manifest.json. Run with -UpdateLock after an intentional source-manifest change.";
         var source = $"throw new InvalidOperationException(\"{message}\");";
-        var preferences = new[] { ("dress_arguments_layout", "auto"), ("max_line_length", "80"),
-            ("dress_arguments_closing_delimiter_position", position) };
+        var preferences = new[]
+            {
+                ("dress_arguments_layout", "auto"),
+                ("max_line_length", "80"),
+                ("dress_arguments_closing_delimiter_position", position)
+            };
         var result = Format(source, preferences);
         result.ShouldBe($"throw new InvalidOperationException(\n    \"{message}" + suffix);
         Format(result, preferences).ShouldBe(result);
@@ -79,8 +73,11 @@ public sealed class ClosingDelimiterPositionRuleTests
     public void Nested_lists_apply_their_own_preferences()
     {
         const string source = "Call(\n    new[]\n    {\n        1,\n        2\n    }\n);";
-        var preferences = new[] { ("dress_arguments_closing_delimiter_position", "after_last_item"),
-            ("dress_array_initializer_closing_delimiter_position", "own_line") };
+        var preferences = new[]
+            {
+                ("dress_arguments_closing_delimiter_position", "after_last_item"),
+                ("dress_array_initializer_closing_delimiter_position", "own_line")
+            };
         var result = Format(source, preferences);
         result.ShouldBe("Call(\n    new[]\n    {\n        1,\n        2\n    });");
         Format(result, preferences).ShouldBe(result);
@@ -89,8 +86,11 @@ public sealed class ClosingDelimiterPositionRuleTests
     [Fact]
     public void Expanded_initializer_allows_an_attached_close()
     {
-        var preferences = new[] { ("dress_array_initializer_layout", "expanded"),
-            ("dress_array_initializer_closing_delimiter_position", "after_last_item") };
+        var preferences = new[]
+            {
+                ("dress_array_initializer_layout", "expanded"),
+                ("dress_array_initializer_closing_delimiter_position", "after_last_item")
+            };
         var result = Format("var value = new[] { 1, 2 };", preferences);
         result.ShouldBe("var value = new[]\n{\n    1,\n    2 };");
         Format(result, preferences).ShouldBe(result);
@@ -101,7 +101,9 @@ public sealed class ClosingDelimiterPositionRuleTests
     [InlineData("auto")]
     public void A_close_only_line_can_be_attached(string layout)
     {
-        Format("Call(value\n);", ("dress_arguments_layout", layout),
+        Format(
+            "Call(value\n);",
+            ("dress_arguments_layout", layout),
             ("dress_arguments_closing_delimiter_position", "after_last_item")).ShouldBe("Call(value);");
     }
 
@@ -110,8 +112,12 @@ public sealed class ClosingDelimiterPositionRuleTests
     [InlineData("\r\n")]
     public void A_multiline_string_publishes_its_close_before_the_enclosing_list_wraps(string ending)
     {
-        var preferences = new[] { ("dress_arguments_layout", "auto"),
-            ("dress_arguments_closing_delimiter_position", "own_line"), ("max_line_length", "160") };
+        var preferences = new[]
+            {
+                ("dress_arguments_layout", "auto"),
+                ("dress_arguments_closing_delimiter_position", "own_line"),
+                ("max_line_length", "160")
+            };
         var source = "Assert.Equal(2, Execute(@\"first\nsecond\"));\n".ReplaceLineEndings(ending);
         var result = Format(source, preferences);
         result.ShouldBe("Assert.Equal(\n    2,\n    Execute(@\"first\nsecond\"\n    )\n);\n".ReplaceLineEndings(ending));
@@ -122,8 +128,12 @@ public sealed class ClosingDelimiterPositionRuleTests
     public void Closing_a_multiline_lambda_does_not_expand_its_items_on_the_next_run()
     {
         const string source = "Call(() =>\n{\n    Run();\n});";
-        var preferences = new[] { ("dress_arguments_layout", "auto"),
-            ("dress_arguments_closing_delimiter_position", "own_line"), ("max_line_length", "160") };
+        var preferences = new[]
+            {
+                ("dress_arguments_layout", "auto"),
+                ("dress_arguments_closing_delimiter_position", "own_line"),
+                ("max_line_length", "160")
+            };
         var result = Format(source, preferences);
         result.ShouldBe("Call(() =>\n{\n    Run();\n}\n);");
         Format(result, preferences).ShouldBe(result);
@@ -179,8 +189,11 @@ public sealed class ClosingDelimiterPositionRuleTests
     {
         const string source = "Call(new[] {\n    1,\n    2 });";
         const string expected = "Call(new[] {\n    1,\n    2\n});";
-        var preferences = new[] { ("dress_arguments_closing_delimiter_position", "own_line"),
-            ("dress_array_initializer_closing_delimiter_position", "own_line") };
+        var preferences = new[]
+            {
+                ("dress_arguments_closing_delimiter_position", "own_line"),
+                ("dress_array_initializer_closing_delimiter_position", "own_line")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);

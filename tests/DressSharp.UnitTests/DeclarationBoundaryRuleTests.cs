@@ -13,11 +13,13 @@ public sealed class DeclarationBoundaryRuleTests
         const string source = "class C(int single)\n{\n    void M(int first, int second) { }\n}";
         var common = new[] { ("dress_parameters_layout", "always_multi") };
 
-        var afterLast = Format(source.ReplaceLineEndings(lineEnding),
+        var afterLast = Format(
+            source.ReplaceLineEndings(lineEnding),
             [.. common, ("dress_parameters_closing_delimiter_position", "after_last_item")]);
         afterLast.ShouldBe("class C(\n    int single)\n{\n    void M(\n        int first,\n        int second) { }\n}".ReplaceLineEndings(lineEnding));
 
-        var ownLine = Format(source.ReplaceLineEndings(lineEnding),
+        var ownLine = Format(
+            source.ReplaceLineEndings(lineEnding),
             [.. common, ("dress_parameters_closing_delimiter_position", "own_line")]);
         ownLine.ShouldBe("class C(\n    int single\n)\n{\n    void M(\n        int first,\n        int second\n    ) { }\n}".ReplaceLineEndings(lineEnding));
 
@@ -86,15 +88,15 @@ public sealed class DeclarationBoundaryRuleTests
             }
             """);
         Format(
-                result,
-                ("dress_parameters_closing_delimiter_position", "own_line"),
-                ("csharp_indent_block_contents", "true"))
+            result,
+            ("dress_parameters_closing_delimiter_position", "own_line"),
+            ("csharp_indent_block_contents", "true"))
             .ShouldBe(result);
 
         Format(
-                source,
-                ("dress_parameters_closing_delimiter_position", "after_last_item"),
-                ("csharp_indent_block_contents", "true"))
+            source,
+            ("dress_parameters_closing_delimiter_position", "after_last_item"),
+            ("csharp_indent_block_contents", "true"))
             .ShouldBe("""
                 abstract class TokenSpacingRule() : IFormattingRule
                 {
@@ -120,9 +122,9 @@ public sealed class DeclarationBoundaryRuleTests
 
         result.ShouldBe("class LongClassName(int value)\n    : TokenSpacingRule(value) { }");
         Format(
-                result,
-                ("dress_base_type_lists_layout", layout),
-                ("max_line_length", maximum.ToString()))
+            result,
+            ("dress_base_type_lists_layout", layout),
+            ("max_line_length", maximum.ToString()))
             .ShouldBe(result);
     }
 
@@ -257,9 +259,9 @@ public sealed class DeclarationBoundaryRuleTests
 
         (result.Split(expectedBoundary, StringSplitOptions.None).Length - 1).ShouldBe(3);
         Format(
-                result,
-                ("dress_multiline_parameter_list_open_brace_position", position),
-                ("csharp_new_line_before_open_brace", standard))
+            result,
+            ("dress_multiline_parameter_list_open_brace_position", position),
+            ("csharp_new_line_before_open_brace", standard))
             .ShouldBe(result);
     }
 

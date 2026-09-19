@@ -16,11 +16,11 @@ public sealed class ParseContextResolverTests : IDisposable
         var file = File("Program.cs");
         var project = File("App.csproj");
         var evaluator = new FakeEvaluator
-        {
-            [project, null] = Success(("TargetFrameworks", "net9.0;net8.0")),
-            [project, "net9.0"] = Success(file, ("TargetFramework", "net9.0"), ("LangVersion", "13"), ("DefineConstants", "NET9;DEBUG")),
-            [project, "net8.0"] = Success(file, ("TargetFramework", "net8.0"), ("LangVersion", "12"), ("DefineConstants", "NET8;DEBUG")),
-        };
+            {
+                [project, null] = Success(("TargetFrameworks", "net9.0;net8.0")),
+                [project, "net9.0"] = Success(file, ("TargetFramework", "net9.0"), ("LangVersion", "13"), ("DefineConstants", "NET9;DEBUG")),
+                [project, "net8.0"] = Success(file, ("TargetFramework", "net8.0"), ("LangVersion", "12"), ("DefineConstants", "NET8;DEBUG")),
+            };
 
         var result = await Resolve(evaluator, file, "Release");
 
@@ -36,10 +36,10 @@ public sealed class ParseContextResolverTests : IDisposable
         var first = File("First.csproj");
         var second = File("Second.csproj");
         var evaluator = new FakeEvaluator
-        {
-            [first, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "FIRST")),
-            [second, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "SECOND")),
-        };
+            {
+                [first, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "FIRST")),
+                [second, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "SECOND")),
+            };
 
         var result = await Resolve(evaluator, file);
 
@@ -94,9 +94,9 @@ public sealed class ParseContextResolverTests : IDisposable
         var file = File("Program.cs");
         var project = File("App.csproj");
         var evaluator = new FakeEvaluator
-        {
-            [project, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "999")),
-        };
+            {
+                [project, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "999")),
+            };
 
         var result = await Resolve(evaluator, file);
 
@@ -153,6 +153,7 @@ public sealed class ParseContextResolverTests : IDisposable
     sealed class FakeEvaluator : IMSBuildEvaluator
     {
         readonly Dictionary<(string Target, string? Framework), MSBuildEvaluation> evaluations = new();
+
         internal List<string> Configurations { get; } = [];
 
         internal MSBuildEvaluation this[string target, string? framework]
@@ -175,8 +176,12 @@ public sealed class ParseContextResolverTests : IDisposable
 
         internal int MaximumConcurrency => Volatile.Read(ref _maximumConcurrency);
 
-        public async ValueTask<MSBuildEvaluation> EvaluateAsync(string target, string configuration, string? targetFramework, CancellationToken cancellationToken)
-        {
+        public async ValueTask<MSBuildEvaluation> EvaluateAsync(
+            string target,
+            string configuration,
+            string? targetFramework,
+            CancellationToken cancellationToken
+        ) {
             var concurrency = Interlocked.Increment(ref _active);
             var observed = Volatile.Read(ref _maximumConcurrency);
             while (observed < concurrency)

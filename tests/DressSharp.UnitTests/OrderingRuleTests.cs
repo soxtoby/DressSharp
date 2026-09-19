@@ -9,7 +9,8 @@ public class OrderingRuleTests
     [Fact]
     public void Orders_global_using_directives_first()
     {
-        var first = Format("""
+        var first = Format(
+            """
             using A;
             global using B;
 
@@ -26,7 +27,8 @@ public class OrderingRuleTests
     [Fact]
     public void Orders_using_kinds()
     {
-        var first = Format("""
+        var first = Format(
+            """
             using X = A;
             using static B;
             using C;
@@ -56,7 +58,8 @@ public class OrderingRuleTests
     [Fact]
     public void Ordering_stops_at_comments_and_directives()
     {
-        Format("""
+        Format(
+            """
                 using Z;
                 // boundary
                 global using A;
@@ -65,7 +68,7 @@ public class OrderingRuleTests
                 #endif
 
                 """,
-                ("dress_global_using_order", "first"))
+            ("dress_global_using_order", "first"))
             .ShouldBe("""
                 using Z;
                 // boundary

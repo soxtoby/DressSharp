@@ -84,9 +84,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
     {
         var evaluation = await _evaluator.EvaluateAsync(path, configuration, null, cancellationToken);
         if (!evaluation.Succeeded)
-        {
             return new(Fallback, [$"{path}: implicit file-app evaluation failed; using latest-stable fallback. {evaluation.Diagnostic}"]);
-        }
         try
         {
             return new(CreateOptions(evaluation.Properties), []);
@@ -118,9 +116,10 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
         if (!LanguageVersionFacts.TryParse(requested, out var languageVersion))
             throw new UnsupportedLanguageVersionException($"Language version '{requested}' is newer than bundled Roslyn or unsupported.");
         languageVersion = languageVersion.MapSpecifiedToEffectiveVersion();
-        var documentationMode = bool.TryParse(properties.GetValueOrDefault("GenerateDocumentationFile"), out var generatesDocumentation) && generatesDocumentation
-            ? DocumentationMode.Diagnose
-            : DocumentationMode.Parse;
+        var documentationMode = bool.TryParse(properties.GetValueOrDefault("GenerateDocumentationFile"), out var generatesDocumentation)
+            && generatesDocumentation
+                ? DocumentationMode.Diagnose
+                : DocumentationMode.Parse;
         return new(languageVersion, documentationMode: documentationMode, preprocessorSymbols: Split(properties.GetValueOrDefault("DefineConstants")));
     }
 
@@ -149,9 +148,12 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
         (value ?? "").Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
     static bool IsUnder(string path, string directory) =>
-        Path.GetRelativePath(directory, path) is var relative && relative != ".." && !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+        Path.GetRelativePath(directory, path) is var relative
+        && relative != ".."
+        && !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
 
     static readonly StringComparer PathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
     static CSharpParseOptions Fallback { get; } = new(LanguageVersion.Latest.MapSpecifiedToEffectiveVersion(), documentationMode: DocumentationMode.Parse);
 
     sealed record ProjectContext(string Project, string Framework, CSharpParseOptions? Options, string? Diagnostic)

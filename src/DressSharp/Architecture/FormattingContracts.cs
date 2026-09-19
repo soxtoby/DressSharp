@@ -46,7 +46,10 @@ sealed class FormattingConfigurationValueComparer : IEqualityComparer<Formatting
         foreach (var (key, value) in left.Preferences)
         {
             if (!right.Preferences.TryGetValue(key, out var other)
-                || !value.Equals(other, StringComparison.OrdinalIgnoreCase))                return false;
+                || !value.Equals(other, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
         }
 
         return true;

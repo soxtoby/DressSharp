@@ -95,14 +95,14 @@ sealed class SourceDocument
     }
 
     static Encoding CreateEncoder(SourceEncoding encoding) => encoding switch
-    {
-        SourceEncoding.Utf8 => new UTF8Encoding(false, true),
-        SourceEncoding.Utf8Bom => new UTF8Encoding(true, true),
-        SourceEncoding.Utf16LittleEndian => new UnicodeEncoding(false, true, true),
-        SourceEncoding.Utf16BigEndian => new UnicodeEncoding(true, true, true),
-        SourceEncoding.Latin1 => Latin1(),
-        _ => throw new ArgumentOutOfRangeException(nameof(encoding))
-    };
+        {
+            SourceEncoding.Utf8 => new UTF8Encoding(false, true),
+            SourceEncoding.Utf8Bom => new UTF8Encoding(true, true),
+            SourceEncoding.Utf16LittleEndian => new UnicodeEncoding(false, true, true),
+            SourceEncoding.Utf16BigEndian => new UnicodeEncoding(true, true, true),
+            SourceEncoding.Latin1 => Latin1(),
+            _ => throw new ArgumentOutOfRangeException(nameof(encoding))
+        };
 
     static Encoding Latin1() => Encoding.GetEncoding(
         28591,
@@ -138,11 +138,11 @@ sealed class SourceDocument
                         index++;
                     builder.Append(lineEnding);
                     break;
-                
+
                 case '\n':
                     builder.Append(lineEnding);
                     break;
-                
+
                 default:
                     builder.Append(text[index]);
                     break;
@@ -185,12 +185,12 @@ sealed class SourceDocument
     }
 
     static string DisplayName(SourceEncoding encoding) => encoding switch
-    {
-        SourceEncoding.Utf8Bom => "UTF-8",
-        SourceEncoding.Utf16LittleEndian => "UTF-16 LE",
-        SourceEncoding.Utf16BigEndian => "UTF-16 BE",
-        _ => encoding.ToString()
-    };
+        {
+            SourceEncoding.Utf8Bom => "UTF-8",
+            SourceEncoding.Utf16LittleEndian => "UTF-16 LE",
+            SourceEncoding.Utf16BigEndian => "UTF-16 BE",
+            _ => encoding.ToString()
+        };
 }
 
 enum SourceEncoding

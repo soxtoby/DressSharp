@@ -19,12 +19,12 @@ public class IndentationEmitterTests
         var statementIndent = labelIndent + (indentContents ? "    " : "");
         var source = $"switch (foo) {{\n{labelIndent}case 0:\n{statementIndent}if (ready)\n{statementIndent}{{\n{statementIndent}    Work();\n{statementIndent}}}\n}}";
         var preferences = new[]
-        {
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_braces", "false"),
-            ("csharp_indent_switch_labels", indentLabels ? "true" : "false"),
-            ("csharp_indent_case_contents", indentContents ? "true" : "false")
-        };
+            {
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "false"),
+                ("csharp_indent_switch_labels", indentLabels ? "true" : "false"),
+                ("csharp_indent_case_contents", indentContents ? "true" : "false")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -55,14 +55,14 @@ public class IndentationEmitterTests
             }
             """.ReplaceLineEndings(lineEnding);
         var preferences = new[]
-        {
-            ("dress_binary_expressions_layout", binaryLayout),
-            ("max_line_length", "100"),
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_braces", "false"),
-            ("csharp_indent_switch_labels", "true"),
-            ("csharp_indent_case_contents", "true")
-        };
+            {
+                ("dress_binary_expressions_layout", binaryLayout),
+                ("max_line_length", "100"),
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "false"),
+                ("csharp_indent_switch_labels", "true"),
+                ("csharp_indent_case_contents", "true")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -253,7 +253,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Block_indentation_preserves_continuation_indentation()
     {
-        Format("""
+        Format(
+            """
                 class C
                 {
                     int M(bool value) =>
@@ -262,7 +263,7 @@ public class IndentationEmitterTests
                             : 2;
                 }
                 """,
-                ("csharp_indent_block_contents", "true"))
+            ("csharp_indent_block_contents", "true"))
             .ShouldBe("""
                 class C
                 {
@@ -277,7 +278,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Switch_expression_arms_follow_the_reindented_brace()
     {
-        Format("""
+        Format(
+            """
                 class C
                 {
                 int M(int value)
@@ -292,8 +294,8 @@ public class IndentationEmitterTests
                 }
                 }
                 """,
-                ("csharp_indent_block_contents", "true"),
-                ("csharp_indent_braces", "false"))
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_braces", "false"))
             .ShouldBe("""
                 class C
                 {
@@ -315,17 +317,17 @@ public class IndentationEmitterTests
     public void Switch_expression_inside_a_wrapped_argument_uses_that_argument_indent()
     {
         Format(
-                """
+            """
                 class C : B(kind switch
                 {
                 0 => 1,
                 _ => 2
                 }) { }
                 """,
-                ("dress_arguments_layout", "always_multi"),
-                ("csharp_new_line_before_open_brace", "all"),
-                ("csharp_indent_block_contents", "true"),
-                ("csharp_indent_braces", "false"))
+            ("dress_arguments_layout", "always_multi"),
+            ("csharp_new_line_before_open_brace", "all"),
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_braces", "false"))
             .ShouldBe("""
                 class C : B(
                     kind switch
@@ -341,7 +343,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Switch_label_setting_preserves_unrelated_source_indentation()
     {
-        Format("""
+        Format(
+            """
                 class C
                   {
                       void M(int x)
@@ -354,7 +357,7 @@ public class IndentationEmitterTests
                         }
                   }
                 """,
-                ("csharp_indent_switch_labels", "false"))
+            ("csharp_indent_switch_labels", "false"))
             .ShouldBe("""
                 class C
                   {
@@ -373,7 +376,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Indents_switch_labels()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             void M(int x)
@@ -402,7 +406,8 @@ public class IndentationEmitterTests
                 }
             }
             """);
-        Format(result,
+        Format(
+            result,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_switch_labels", "true")).ShouldBe(result);
     }
@@ -410,7 +415,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Does_not_indent_switch_labels()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             void M(int x)
@@ -440,7 +446,8 @@ public class IndentationEmitterTests
                 }
             }
             """);
-        Format(result,
+        Format(
+            result,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_switch_labels", "false"),
             ("csharp_indent_case_contents", "true")).ShouldBe(result);
@@ -449,7 +456,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Flushes_labels_left()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             void M()
@@ -472,7 +480,8 @@ public class IndentationEmitterTests
                 }
             }
             """);
-        Format(result,
+        Format(
+            result,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_labels", "flush_left")).ShouldBe(result);
     }
@@ -480,7 +489,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Indents_labels_one_less_than_current()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             void M()
@@ -503,7 +513,8 @@ public class IndentationEmitterTests
                 }
             }
             """);
-        Format(result,
+        Format(
+            result,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_labels", "one_less_than_current")).ShouldBe(result);
     }
@@ -511,7 +522,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Leaves_labels_unchanged()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             void M()
@@ -534,7 +546,8 @@ public class IndentationEmitterTests
                 }
             }
             """);
-        Format(result,
+        Format(
+            result,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_labels", "no_change")).ShouldBe(result);
     }
@@ -542,7 +555,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Indents_case_blocks()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             void M(int x)
@@ -583,7 +597,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Does_not_indent_case_blocks()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             void M(int x)
@@ -621,7 +636,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Preserves_comments_and_directives_attached_to_indentation_targets()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             void M(int x)
@@ -674,7 +690,8 @@ public class IndentationEmitterTests
                 }
             }
             """);
-        Format(result,
+        Format(
+            result,
             ("csharp_indent_block_contents", "true"),
             ("csharp_indent_switch_labels", "false"),
             ("csharp_indent_case_contents", "false"),
@@ -685,7 +702,8 @@ public class IndentationEmitterTests
     [Fact]
     public void Leading_block_comment_does_not_become_same_line_brace_indentation()
     {
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
                 /* keep */ void M() {
@@ -710,23 +728,24 @@ public class IndentationEmitterTests
     public void Skips_malformed_switch_sections_and_labeled_statements()
     {
         (string, string)[] firstPreferences =
-        [
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_switch_labels", "true"),
-            ("csharp_indent_case_contents", "true"),
-            ("csharp_indent_labels", "flush_left"),
-            ("csharp_indent_case_contents_when_block", "true")
-        ];
+            [
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_switch_labels", "true"),
+                ("csharp_indent_case_contents", "true"),
+                ("csharp_indent_labels", "flush_left"),
+                ("csharp_indent_case_contents_when_block", "true")
+            ];
         (string, string)[] oppositePreferences =
-        [
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_switch_labels", "false"),
-            ("csharp_indent_case_contents", "false"),
-            ("csharp_indent_labels", "one_less_than_current"),
-            ("csharp_indent_case_contents_when_block", "false")
-        ];
+            [
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_switch_labels", "false"),
+                ("csharp_indent_case_contents", "false"),
+                ("csharp_indent_labels", "one_less_than_current"),
+                ("csharp_indent_case_contents_when_block", "false")
+            ];
 
-        Format("""
+        Format(
+            """
             class C
             {
             void M(int x)
@@ -743,7 +762,8 @@ public class IndentationEmitterTests
             }
             }
             """,
-            oppositePreferences).ShouldBe(Format("""
+            oppositePreferences).ShouldBe(Format(
+            """
             class C
             {
             void M(int x)
@@ -772,7 +792,8 @@ public class IndentationEmitterTests
     {
         (string, string)[] baseline = [("csharp_indent_block_contents", "true")];
 
-        Format("""
+        Format(
+            """
             class C
             {
             void M(int x)
@@ -790,7 +811,8 @@ public class IndentationEmitterTests
             }
             """,
             ("csharp_indent_block_contents", "true"),
-            (key, "unset")).ShouldBe(Format("""
+            (key, "unset")).ShouldBe(Format(
+            """
             class C
             {
             void M(int x)
@@ -819,7 +841,8 @@ public class IndentationEmitterTests
     [InlineData("csharp_indent_case_contents_when_block")]
     public void Unset_indentation_preference_is_inactive(string key)
     {
-        Format("""
+        Format(
+            """
             class C
               {
                   void M(int x)
@@ -850,7 +873,8 @@ public class IndentationEmitterTests
     [Fact]
     public void A_comment_moves_with_the_code_it_leads()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()
@@ -877,7 +901,8 @@ public class IndentationEmitterTests
     [Fact]
     public void A_comment_keeps_its_offset_from_the_code_it_leads()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()
@@ -906,7 +931,8 @@ public class IndentationEmitterTests
     {
         // The comment sits eight columns short of the call; the call moves out four, and the
         // comment moves out with it.
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()
@@ -932,7 +958,8 @@ public class IndentationEmitterTests
     [Fact]
     public void An_unaligned_comment_the_code_overtakes_lands_on_the_margin()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()
@@ -958,7 +985,8 @@ public class IndentationEmitterTests
     [Fact]
     public void An_aligned_comment_lands_where_the_code_it_leads_lands()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()
@@ -988,7 +1016,8 @@ public class IndentationEmitterTests
     {
         // No indentation preference is set, so the call keeps the six columns its author gave it,
         // and the comment is aligned to that rather than to any indentation the code would be given.
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()
@@ -1013,7 +1042,8 @@ public class IndentationEmitterTests
     [Fact]
     public void An_aligned_comment_moves_out_to_the_code_it_leads()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()
@@ -1039,7 +1069,8 @@ public class IndentationEmitterTests
     [Fact]
     public void An_aligned_documentation_comment_lands_on_the_member_it_leads()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                     /// <summary>Works.</summary>
@@ -1063,7 +1094,8 @@ public class IndentationEmitterTests
     [Fact]
     public void An_aligned_block_comment_keeps_its_shape()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()
@@ -1093,7 +1125,8 @@ public class IndentationEmitterTests
     [Fact]
     public void A_block_comment_whose_lines_share_no_start_stays_where_it_is()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                 void M()

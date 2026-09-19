@@ -6,7 +6,8 @@ namespace DressSharp.UnitTests;
 public sealed class TriviaLayoutRuleTests
 {
     [Theory]
-    [InlineData("dress_blank_lines_around_namespaces", "1",
+    [
+        InlineData("dress_blank_lines_around_namespaces", "1",
         """
         using A;
         namespace N { }
@@ -15,8 +16,10 @@ public sealed class TriviaLayoutRuleTests
         using A;
 
         namespace N { }
-        """)]
-    [InlineData("dress_blank_lines_around_types", "1",
+        """)
+    ]
+    [
+        InlineData("dress_blank_lines_around_types", "1",
         """
         namespace N
         {
@@ -31,8 +34,10 @@ public sealed class TriviaLayoutRuleTests
 
             class B { }
         }
-        """)]
-    [InlineData("dress_blank_lines_between_members", "0",
+        """)
+    ]
+    [
+        InlineData("dress_blank_lines_between_members", "0",
         """
         class C
         {
@@ -47,8 +52,10 @@ public sealed class TriviaLayoutRuleTests
             int A;
             int B;
         }
-        """)]
-    [InlineData("dress_blank_lines_between_using_groups", "2",
+        """)
+    ]
+    [
+        InlineData("dress_blank_lines_between_using_groups", "2",
         """
         using A;
         using static B;
@@ -58,8 +65,10 @@ public sealed class TriviaLayoutRuleTests
 
 
         using static B;
-        """)]
-    [InlineData("dress_blank_lines_between_member_categories", "1",
+        """)
+    ]
+    [
+        InlineData("dress_blank_lines_between_member_categories", "1",
         """
         class C
         {
@@ -76,8 +85,10 @@ public sealed class TriviaLayoutRuleTests
 
             void M() { }
         }
-        """)]
-    [InlineData("dress_max_consecutive_blank_lines", "0",
+        """)
+    ]
+    [
+        InlineData("dress_max_consecutive_blank_lines", "0",
         """
         class C
         {
@@ -90,7 +101,8 @@ public sealed class TriviaLayoutRuleTests
         {
             int A;
         }
-        """)]
+        """)
+    ]
     public void Applies_each_blank_line_rule(
         string key,
         string value,
@@ -104,7 +116,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Around_namespaces_separates_both_sides_without_padding_file_boundaries()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             namespace First { }
             namespace Second { }
             """,
@@ -118,7 +131,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Around_namespaces_separates_nested_declarations_from_adjacent_syntax()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             namespace Outer
             {
                 namespace Inner { }
@@ -139,7 +153,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Around_types_separates_both_sides_without_padding_file_boundaries()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class A { }
             class B { }
             """,
@@ -168,7 +183,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Around_types_separates_nested_declarations_from_adjacent_members()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class Outer
             {
                 int A;
@@ -191,7 +207,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Around_types_keeps_leading_comments_attached_to_the_declaration()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class A { }
             /// <summary>B</summary>
             class B { }
@@ -210,7 +227,8 @@ public sealed class TriviaLayoutRuleTests
     [InlineData("10", "class C\n{\n    int A;\n\n\n\n\n\n\n\n\n\n\n    int B;\n}")]
     public void Blank_line_counts_accept_zero_and_multi_digit_values(string count, string expected)
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class C
             {
                 int A;
@@ -281,7 +299,8 @@ public sealed class TriviaLayoutRuleTests
     }
 
     [Theory]
-    [InlineData("dress_line_comment_spacing",
+    [
+        InlineData("dress_line_comment_spacing",
         "none",
         """
         class C { int A; // note
@@ -290,8 +309,10 @@ public sealed class TriviaLayoutRuleTests
         """
         class C { int A; //note
         }
-        """)]
-    [InlineData("dress_line_comment_spacing",
+        """)
+    ]
+    [
+        InlineData("dress_line_comment_spacing",
         "single",
         """
         class C { int A; //note
@@ -300,26 +321,32 @@ public sealed class TriviaLayoutRuleTests
         """
         class C { int A; // note
         }
-        """)]
+        """)
+    ]
     [InlineData("dress_block_comment_spacing", "none", "class C { /* note */ int A; }", "class C { /*note*/ int A; }")]
     [InlineData("dress_block_comment_spacing", "single", "class C { /*note*/ int A; }", "class C { /* note */ int A; }")]
-    [InlineData("dress_attached_comment_placement",
+    [
+        InlineData("dress_attached_comment_placement",
         "same_line",
         """
         class C { /* note */
             int A; }
         """,
-        "class C { /* note */ int A; }")]
-    [InlineData("dress_attached_comment_placement",
+        "class C { /* note */ int A; }")
+    ]
+    [
+        InlineData("dress_attached_comment_placement",
         "own_line",
         "class C { /* note */ int A; }",
         """
         class C {
             /* note */
             int A; }
-        """)]
+        """)
+    ]
     [InlineData("dress_attached_comment_placement", "auto", "class C { /* note */  int A; }", "class C { /* note */  int A; }")]
-    [InlineData("dress_xml_comment_placement",
+    [
+        InlineData("dress_xml_comment_placement",
         "separated",
         """
         /// <summary>Text</summary>
@@ -329,8 +356,10 @@ public sealed class TriviaLayoutRuleTests
         /// <summary>Text</summary>
 
         class C { }
-        """)]
-    [InlineData("dress_xml_comment_placement",
+        """)
+    ]
+    [
+        InlineData("dress_xml_comment_placement",
         "attached",
         """
         /// <summary>Text</summary>
@@ -340,8 +369,10 @@ public sealed class TriviaLayoutRuleTests
         """
         /// <summary>Text</summary>
         class C { }
-        """)]
-    [InlineData("dress_xml_element_layout",
+        """)
+    ]
+    [
+        InlineData("dress_xml_element_layout",
         "multi_line",
         """
         /// <summary>Text</summary>
@@ -352,8 +383,10 @@ public sealed class TriviaLayoutRuleTests
         /// Text
         /// </summary>
         class C { }
-        """)]
-    [InlineData("dress_xml_element_layout",
+        """)
+    ]
+    [
+        InlineData("dress_xml_element_layout",
         "single_line",
         """
         /// <summary>
@@ -364,7 +397,8 @@ public sealed class TriviaLayoutRuleTests
         """
         /// <summary>Text</summary>
         class C { }
-        """)]
+        """)
+    ]
     public void Applies_every_comment_value(
         string key,
         string value,
@@ -409,7 +443,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Own_line_isolates_a_trailing_comment_from_its_attached_syntax()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class C { int A; /* note */
             int B; }
             """,
@@ -423,7 +458,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Same_line_preserves_a_trailing_comment_boundary()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class C { int A; /* note */
             int B; }
             """,
@@ -436,7 +472,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Same_line_attaches_a_leading_block_comment_to_the_following_syntax()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class C { int A;
             /* note */
             int B; }
@@ -450,7 +487,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Same_line_does_not_move_syntax_behind_a_line_comment()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class C { int A;
             // note
             int B; }
@@ -465,7 +503,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Same_line_does_not_move_a_following_directive_off_line_start()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class C
             {
             /* note */
@@ -488,7 +527,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Same_line_does_not_merge_adjacent_comments()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             class C
             {
             /* first */
@@ -548,7 +588,8 @@ public sealed class TriviaLayoutRuleTests
     [Fact]
     public void Xml_attached_placement_does_not_move_a_following_directive()
     {
-        FormatTwice("""
+        FormatTwice(
+            """
             /// <summary>Text</summary>
 
             #if X
@@ -712,7 +753,6 @@ public sealed class TriviaLayoutRuleTests
             }
             """);
     }
-
 
     static string TransformTrivia(
         string source,

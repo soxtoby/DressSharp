@@ -26,8 +26,13 @@ static class BenchmarkDiagnostics
             ? parallelWall.TotalMilliseconds / parallelTotal.TotalMilliseconds
             : 1;
         double Attributed(TimeSpan value) => value.TotalMilliseconds * scale;
-        var attributed = timing.MsBuild.TotalMilliseconds + timing.EditorConfig.TotalMilliseconds +
-            Attributed(timing.Read) + Attributed(timing.Parse) + Attributed(timing.Transform) + Attributed(timing.Encode) + Attributed(timing.Write);
+        var attributed = timing.MsBuild.TotalMilliseconds
+            + timing.EditorConfig.TotalMilliseconds
+            + Attributed(timing.Read)
+            + Attributed(timing.Parse)
+            + Attributed(timing.Transform)
+            + Attributed(timing.Encode)
+            + Attributed(timing.Write);
         var payload = new
             {
                 schemaVersion = 1,
@@ -42,8 +47,8 @@ static class BenchmarkDiagnostics
                         transformMilliseconds = Attributed(timing.Transform),
                         encodeMilliseconds = Attributed(timing.Encode),
                         writeMilliseconds = Attributed(timing.Write),
-                      otherMilliseconds = Math.Max(0, timing.Wall.TotalMilliseconds - attributed)
-                }
+                        otherMilliseconds = Math.Max(0, timing.Wall.TotalMilliseconds - attributed)
+                    }
             };
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(payload), cancellationToken);
     }

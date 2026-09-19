@@ -104,7 +104,9 @@ sealed class EditorConfigResolver
             {
                 if (!right.TryGetValue(key, out var other)
                     || !value.Equals(other, StringComparison.OrdinalIgnoreCase))
+                {
                     return false;
+                }
             }
 
             return true;

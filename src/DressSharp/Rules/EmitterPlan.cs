@@ -137,7 +137,9 @@ sealed class EmitterPlan
         {
             if (!configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                 || preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
             spacing.Add((rule, preference));
         }
 
@@ -176,9 +178,7 @@ sealed class EmitterPlan
 
         var initializerIndentations = new bool?[Enum.GetValues<InitializerKind>().Length];
         foreach (var rule in catalog.InitializerIndentationRules)
-        {
             initializerIndentations[(int)rule.Kind] = OptionalIndentation(configuration.Preferences.GetValueOrDefault(rule.Metadata.RuleKey));
-        }
 
         var initializerLayouts = new bool[Enum.GetValues<InitializerKind>().Length];
         foreach (var rule in catalog.SyntaxWrappingRules)
@@ -234,11 +234,9 @@ sealed class EmitterPlan
             : null;
 
     static bool? OptionalIndentation(string? value) =>
-        value?.Equals("indented", StringComparison.OrdinalIgnoreCase) == true
-            ? true
-            : value?.Equals("not_indented", StringComparison.OrdinalIgnoreCase) == true
-                ? false
-                : null;
+        value?.Equals("indented", StringComparison.OrdinalIgnoreCase) == true ? true
+            : value?.Equals("not_indented", StringComparison.OrdinalIgnoreCase) == true ? false
+            : null;
 
     static LabelIndentationStyle? OptionalLabelIndentation(FormattingConfiguration configuration) =>
         configuration.Preferences.GetValueOrDefault(RuleKey.CSharpIndentLabels) switch {

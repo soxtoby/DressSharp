@@ -239,7 +239,7 @@ sealed class SyntaxWrappingDiscovery
             || token.Parent is not BinaryExpressionSyntax binary
             || token != binary.OperatorToken
             || binary.Parent is BinaryExpressionSyntax parent
-            && (Enabled(SyntaxWrappingKind.BinaryExpressions)?.Mode != SyntaxWrappingSettings.WrappingMode.Auto
+                && (Enabled(SyntaxWrappingKind.BinaryExpressions)?.Mode != SyntaxWrappingSettings.WrappingMode.Auto
                 || parent.RawKind == binary.RawKind))
         {
             return;
@@ -361,7 +361,7 @@ sealed class SyntaxWrappingDiscovery
             var token = pieces[index].Token;
             if (BelongsToOccurrence(token, occurrence)
                 && (token.IsKind(SyntaxKind.QuestionToken)
-                && token.Parent is ConditionalAccessExpressionSyntax
+                    && token.Parent is ConditionalAccessExpressionSyntax
                 || (token.IsKind(SyntaxKind.DotToken)
                     && !token.GetPreviousToken().IsKind(SyntaxKind.QuestionToken))
                 || token.IsKind(SyntaxKind.MinusGreaterThanToken)))
@@ -394,7 +394,7 @@ sealed class SyntaxWrappingDiscovery
             if (token.Parent is BinaryExpressionSyntax expression
                 && token == expression.OperatorToken
                 && (Enabled(SyntaxWrappingKind.BinaryExpressions)?.Mode != SyntaxWrappingSettings.WrappingMode.Auto
-                    || BelongsToBinary(expression, root)))
+                || BelongsToBinary(expression, root)))
             {
                 OperatorBoundary(index, SyntaxWrappingKind.BinaryExpressions);
             }
@@ -432,11 +432,15 @@ sealed class SyntaxWrappingDiscovery
     void Delimited<T>(SeparatedSyntaxList<T> items, SyntaxToken close, bool spacesInside = false) where T : SyntaxNode
     {
         for (var index = 0; index < items.Count; index++)
+        {
             AddBoundary(
                 items[index].GetFirstToken(),
                 index == 0
-                    ? spacesInside ? GapStyle.DelimitedSpacedFirst : GapStyle.DelimitedFirst
+                    ? spacesInside
+                        ? GapStyle.DelimitedSpacedFirst
+                        : GapStyle.DelimitedFirst
                     : GapStyle.DelimitedLater);
+        }
         AddBoundary(close, spacesInside ? GapStyle.DelimitedSpacedClose : GapStyle.DelimitedClose);
     }
 
@@ -476,8 +480,10 @@ sealed class SyntaxWrappingDiscovery
                     && candidate.FirstToken <= occurrence.FirstToken
                     && occurrence.LastToken <= candidate.LastToken
                     && (candidate.FirstToken != occurrence.FirstToken
-                        || candidate.LastToken != occurrence.LastToken))
+                    || candidate.LastToken != occurrence.LastToken))
+                {
                     break;
+                }
                 ancestors.RemoveAt(ancestors.Count - 1);
             }
 
@@ -525,7 +531,7 @@ sealed class SyntaxWrappingDiscovery
 
     bool Unsafe(SyntaxNode node) => node.ContainsDirectives
         || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)
-        && _safetyContext?.IsUnsafe(node) == true;
+            && _safetyContext?.IsUnsafe(node) == true;
 
     internal sealed record Result(
         Occurrence[] Occurrences,

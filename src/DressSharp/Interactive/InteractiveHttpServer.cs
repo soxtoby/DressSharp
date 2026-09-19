@@ -191,18 +191,20 @@ sealed class InteractiveHttpServer : IInteractiveServer
             if (context.Request.HttpMethod == "POST" && path == "/api/preview")
             {
                 var request = await JsonSerializer.DeserializeAsync<PreviewRequest>(
-                    context.Request.InputStream, JsonOptions, _stopping.Token)
+                    context.Request.InputStream,
+                    JsonOptions,
+                    _stopping.Token)
                     ?? throw new JsonException("A request body is required.");
                 if (request.Source is null || request.Preferences is null)
                     throw new JsonException("Source and preferences are required.");
                 var preferences = request.Preferences.Select(preference =>
-                {
-                    if (preference.Local is null || preference.Inherited is null)
-                        throw new JsonException("Local and inherited assignments are required.");
-                    var local = ToEdit(new SaveEdit(preference.Key, preference.Local.Kind, preference.Local.Value));
-                    var inherited = ToEdit(new SaveEdit(preference.Key, preference.Inherited.Kind, preference.Inherited.Value));
-                    return new InteractivePreference(local.RuleKey, local.DesiredLocal, inherited.DesiredLocal, null, null, null);
-                }).ToArray();
+                    {
+                        if (preference.Local is null || preference.Inherited is null)
+                            throw new JsonException("Local and inherited assignments are required.");
+                        var local = ToEdit(new SaveEdit(preference.Key, preference.Local.Kind, preference.Local.Value));
+                        var inherited = ToEdit(new SaveEdit(preference.Key, preference.Inherited.Kind, preference.Inherited.Value));
+                        return new InteractivePreference(local.RuleKey, local.DesiredLocal, inherited.DesiredLocal, null, null, null);
+                    }).ToArray();
                 await WriteJson(context.Response, 200, await InteractivePreview.Format(request.Source, preferences, _stopping.Token));
                 return;
             }
@@ -223,7 +225,9 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
             if (path is "/" or "/app.js" or "/app.css" or "/api/bootstrap" or "/api/configuration" or "/api/shutdown" or "/api/preview")
             {
-                context.Response.Headers[HttpResponseHeader.Allow] = path is "/api/shutdown" or "/api/preview" ? "POST" : path is "/api/configuration" ? "GET, POST" : "GET";
+                context.Response.Headers[HttpResponseHeader.Allow] = path is "/api/shutdown" or "/api/preview" ? "POST"
+                    : path is "/api/configuration" ? "GET, POST"
+                    : "GET";
                 await Write(context.Response, 405, "text/plain; charset=utf-8", "Method not allowed");
                 return;
             }
@@ -271,12 +275,14 @@ sealed class InteractiveHttpServer : IInteractiveServer
                 minimum = rule.Metadata.Values.Minimum,
                 specialValues = rule.Metadata.Values.SpecialValues.IsDefault ? [] : rule.Metadata.Values.SpecialValues,
             });
-        return JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                csrfToken = _csrfToken,
-                requestedConfig = _targetPath,
-                catalog = new { version = RuleCatalog.BuiltIn.Version, rules },
-            }, JsonOptions);
+        return JsonSerializer.SerializeToUtf8Bytes(
+            new
+                {
+                    csrfToken = _csrfToken,
+                    requestedConfig = _targetPath,
+                    catalog = new { version = RuleCatalog.BuiltIn.Version, rules },
+                },
+            JsonOptions);
     }
 
     async Task<InteractiveEditorConfigData> LoadConfiguration() =>
@@ -287,17 +293,20 @@ sealed class InteractiveHttpServer : IInteractiveServer
         if (!RuleKeys.TryParse(edit.Key, out var key))
             throw new ArgumentException($"Unknown preference '{edit.Key}'.");
         var desired = edit.Kind switch
-        {
-            "absent" when edit.Value is null => PreferenceAssignment.Absent,
-            "unset" when edit.Value is null => PreferenceAssignment.Unset,
-            "explicit" when edit.Value is not null => PreferenceAssignment.Explicit(edit.Value),
-            _ => throw new ArgumentException($"Invalid assignment for '{edit.Key}'.")
-        };
+            {
+                "absent" when edit.Value is null => PreferenceAssignment.Absent,
+                "unset" when edit.Value is null => PreferenceAssignment.Unset,
+                "explicit" when edit.Value is not null => PreferenceAssignment.Explicit(edit.Value),
+                _ => throw new ArgumentException($"Invalid assignment for '{edit.Key}'.")
+            };
         return new InteractivePreferenceEdit(key, desired);
     }
 
     static async Task WriteConfiguration(HttpListenerResponse response, InteractiveEditorConfigData data) =>
-        await WriteJson(response, 200, new
+        await WriteJson(
+        response,
+        200,
+        new
             {
                 targetPath = data.TargetPath,
                 interactiveRoot = data.InteractiveRoot,
@@ -370,9 +379,12 @@ sealed class InteractiveHttpServer : IInteractiveServer
     }
 
     sealed record SaveRequest(IReadOnlyList<SaveEdit> Edits);
+
     sealed record SaveEdit(string Key, string Kind, string? Value);
 
     sealed record PreviewRequest(string Source, IReadOnlyList<PreviewPreference> Preferences);
+
     sealed record PreviewPreference(string Key, PreviewAssignment Local, PreviewAssignment Inherited);
+
     sealed record PreviewAssignment(string Kind, string? Value);
 }

@@ -14,7 +14,9 @@ public class NestedConditionalStyleTests
     public void Styles_and_operator_positions(string style, string placement, string expression)
     {
         var expected = "var result = " + expression + ";";
-        Check("var result = first ? one : second ? two : three;", expected,
+        Check(
+            "var result = first ? one : second ? two : three;",
+            expected,
             ("dress_conditional_expressions_layout", "always_multi"),
             ("dress_nested_conditional_style", style),
             ("dotnet_style_operator_placement_when_wrapping", placement));
@@ -26,20 +28,23 @@ public class NestedConditionalStyleTests
     public void True_branch_nesting_remains_a_tree(string style) => Check(
         "var result = outer ? inner ? one : two : three;",
         "var result = outer\n    ? inner\n        ? one\n        : two\n    : three;",
-        ("dress_conditional_expressions_layout", "always_multi"), ("dress_nested_conditional_style", style));
+        ("dress_conditional_expressions_layout", "always_multi"),
+        ("dress_nested_conditional_style", style));
 
     [Theory]
     [InlineData("beginning_of_line", "var result = first\n    + second + third;")]
     [InlineData("end_of_line", "var result = first +\n    second + third;")]
     public void Operator_position_alone_preserves_which_operators_wrap(string placement, string expected) => Check(
-        "var result = first\n    + second + third;", expected,
+        "var result = first\n    + second + third;",
+        expected,
         ("dotnet_style_operator_placement_when_wrapping", placement));
 
     [Theory]
     [InlineData("beginning_of_line", "var result = first\n    + second\n    + third;")]
     [InlineData("end_of_line", "var result = first +\n    second +\n    third;")]
     public void Binary_wrapping_obeys_position(string placement, string expected) => Check(
-        "var result = first + second + third;", expected,
+        "var result = first + second + third;",
+        expected,
         ("dress_binary_expressions_layout", "always_multi"),
         ("dotnet_style_operator_placement_when_wrapping", placement));
 
@@ -52,11 +57,11 @@ public class NestedConditionalStyleTests
     [Fact]
     public void Decision_ladder_keeps_the_first_condition_on_its_existing_line() => Check(
         "var parent = left.IsKind(SyntaxKind.OpenParenToken) ? left.Parent\n"
-            + "    : right.IsKind(SyntaxKind.CloseParenToken) ? right.Parent\n"
-            + "    : null;",
+        + "    : right.IsKind(SyntaxKind.CloseParenToken) ? right.Parent\n"
+        + "    : null;",
         "var parent = left.IsKind(SyntaxKind.OpenParenToken) ? left.Parent\n"
-            + "    : right.IsKind(SyntaxKind.CloseParenToken) ? right.Parent\n"
-            + "    : null;",
+        + "    : right.IsKind(SyntaxKind.CloseParenToken) ? right.Parent\n"
+        + "    : null;",
         ("dress_nested_conditional_style", "decision_ladder"));
 
     [Fact]
@@ -109,7 +114,8 @@ public class NestedConditionalStyleTests
         "var result = first ? one : second ? two : three;",
         "var result = first\n\t? one\n\t: second\n\t\t? two\n\t\t: three;",
         ("dress_conditional_expressions_layout", "always_multi"),
-        ("dress_nested_conditional_style", "staircase"), ("indent_style", "tab"));
+        ("dress_nested_conditional_style", "staircase"),
+        ("indent_style", "tab"));
 
     [Fact]
     public void Ladder_uses_structural_indentation() => Check(

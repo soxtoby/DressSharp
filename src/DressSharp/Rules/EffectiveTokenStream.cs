@@ -35,7 +35,7 @@ sealed class EffectiveTokenStream
             var start = token.FullSpan.Start;
             while (next < replacements.Count && start >= replacements[next].Original.End)
                 next++;
-            
+
             if (next < replacements.Count && replacements[next].Original.Contains(start))
             {
                 if (start == replacements[next].Original.Start)
@@ -44,11 +44,12 @@ sealed class EffectiveTokenStream
                     var replacementStart = pieces.Count;
                     var segmentIndex = segments?.Count ?? 0;
                     pieces.AddRange(replacement.Rewritten.DescendantTokens()
-                        .Select(rewritten => new Piece(rewritten,
-                            replacement.Text,
-                            false,
-                            replacement.Original.Start,
-                            segmentIndex)));
+                        .Select(rewritten => new Piece(
+                        rewritten,
+                        replacement.Text,
+                        false,
+                        replacement.Original.Start,
+                        segmentIndex)));
                     (segments ??= []).Add(new(
                         replacement.Original,
                         replacementStart,
@@ -83,7 +84,7 @@ sealed class EffectiveTokenStream
             var start = token.FullSpan.Start;
             while (next < replacements.Count && start >= replacements[next].Original.End)
                 next++;
-            
+
             if (next < replacements.Count && replacements[next].Original.Contains(start))
             {
                 if (start == replacements[next].Original.Start)
@@ -198,7 +199,7 @@ sealed class EffectiveTokenStream
 
             for (var candidate = low;
                 candidate < segment.Start + segment.Length
-                    && Pieces[candidate].Token.SpanStart == token.SpanStart;
+                && Pieces[candidate].Token.SpanStart == token.SpanStart;
                 candidate++)
             {
                 if (Pieces[candidate].Token == token)
@@ -284,13 +285,13 @@ sealed class EffectiveTokenStream
         segment = default;
         return false;
     }
-    
+
     internal readonly record struct Piece(
         SyntaxToken Token,
         string Source,
         bool IsOriginal,
         int OriginalPosition,
         int SegmentIndex);
-    
+
     internal readonly record struct Segment(TextSpan Original, int Start, int Length);
 }

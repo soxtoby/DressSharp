@@ -17,7 +17,7 @@ sealed class AtomicFilePersistence
         {
             throw new SourceIOException($"Could not verify '{document.Path}' before writing.", exception);
         }
-        
+
         if (!current.AsSpan().SequenceEqual(document.OriginalBytes.Span))
             throw new ConcurrentFileChangeException($"'{document.Path}' changed after it was read.");
 

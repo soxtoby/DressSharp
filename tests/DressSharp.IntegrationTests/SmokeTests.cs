@@ -12,10 +12,10 @@ public sealed class SmokeTests
         using var output = new StringWriter();
         using var error = new StringWriter();
         var configuration = new System.CommandLine.InvocationConfiguration
-        {
-            Output = output,
-            Error = error,
-        };
+            {
+                Output = output,
+                Error = error,
+            };
 
         var exitCode = await Program.CreateCommand().Parse("--help").InvokeAsync(
             configuration,

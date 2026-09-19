@@ -16,17 +16,17 @@ public class SourcePreservationTests
         // put the item on its own line supply no whitespace after that comment, so the item used to
         // be written into it.
         Format(
-                """
+            """
                 record R(
                     string First,   // first
                     string Second,  // second
                     string Third);
                 """,
-                ("max_line_length", "180"),
-                ("csharp_indent_block_contents", "true"),
-                ("dress_parameters_layout", "auto"))
+            ("max_line_length", "180"),
+            ("csharp_indent_block_contents", "true"),
+            ("dress_parameters_layout", "auto"))
             .ShouldBe(
-                """
+            """
                 record R(
                     string First,
                     // first
@@ -42,7 +42,7 @@ public class SourcePreservationTests
         // A member a syntax rule rewrites becomes its own detached root, so the walk up from its
         // tokens used to find no containing type and fall back to the indentation the source had.
         Format(
-                """
+            """
                 class C
                 {
                         public void M()
@@ -51,10 +51,10 @@ public class SourcePreservationTests
                         }
                 }
                 """,
-                ("csharp_indent_block_contents", "true"),
-                ("dress_method_body", "expression"))
+            ("csharp_indent_block_contents", "true"),
+            ("dress_method_body", "expression"))
             .ShouldBe(
-                """
+            """
                 class C
                 {
                     public void M() => Work();

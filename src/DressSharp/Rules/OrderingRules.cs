@@ -12,24 +12,24 @@ sealed class UsingOrderRule(RuleKey ruleKey, RuleValueDefinition values, string 
     static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 
     public RuleMetadata Metadata { get; } = new()
-    {
-        RuleKey = ruleKey,
-        Caption = RuleMetadata.Humanize(ruleKey.ToName()),
-        GroupName = "Using directives",
-        Description = "Controls contiguous using directive runs. Directives and comments remain boundaries.",
-        Values = values,
-        DefaultValue = defaultValue,
-        Example = """
-            global using Alpha;
-            using Zeta;
-            using static System.Math;
-            using Alias = System.String;
+        {
+            RuleKey = ruleKey,
+            Caption = RuleMetadata.Humanize(ruleKey.ToName()),
+            GroupName = "Using directives",
+            Description = "Controls contiguous using directive runs. Directives and comments remain boundaries.",
+            Values = values,
+            DefaultValue = defaultValue,
+            Example = """
+                global using Alpha;
+                using Zeta;
+                using static System.Math;
+                using Alias = System.String;
 
-            class Example { }
-            """,
-        OwnedSyntax = "contiguous using directive runs",
-        Invariant = "Directives and comments remain boundaries"
-    };
+                class Example { }
+                """,
+            OwnedSyntax = "contiguous using directive runs",
+            Invariant = "Directives and comments remain boundaries"
+        };
 
     public ImmutableArray<SyntaxKind> TargetKinds { get; } = [SyntaxKind.UsingDirective];
 
@@ -45,7 +45,9 @@ sealed class UsingOrderRule(RuleKey ruleKey, RuleValueDefinition values, string 
             : SyntaxFactory.List(source.OrderBy(RankOf));
 
         int RankOf(UsingDirectiveSyntax directive) => ruleKey == RuleKey.DressGlobalUsingOrder
-            ? preference == "first" == !directive.GlobalKeyword.IsKind(SyntaxKind.None) ? 0 : 1
+            ? preference == "first" == !directive.GlobalKeyword.IsKind(SyntaxKind.None)
+                ? 0
+                : 1
             : Rank(directive, ranks!);
     }
 
@@ -53,11 +55,9 @@ sealed class UsingOrderRule(RuleKey ruleKey, RuleValueDefinition values, string 
 
     static int Rank(UsingDirectiveSyntax directive, Dictionary<string, int> ranks)
     {
-        var kind = directive.Alias is not null
-            ? "alias"
-            : directive.StaticKeyword.IsKind(SyntaxKind.StaticKeyword)
-                ? "static"
-                : "ordinary";
+        var kind = directive.Alias is not null ? "alias"
+            : directive.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) ? "static"
+            : "ordinary";
         return ranks[kind];
     }
 
@@ -86,17 +86,33 @@ sealed class UsingOrderRule(RuleKey ruleKey, RuleValueDefinition values, string 
 sealed class ModifierOrderRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
-    {
-        RuleKey = RuleKey.CSharpPreferredModifierOrder,
-        Caption = RuleMetadata.Humanize(RuleKey.CSharpPreferredModifierOrder.ToName()),
-        GroupName = "Braces and bodies",
-        Description = "Controls member modifier lists. Only modifier token order changes.",
-        Values = RuleValues.Permutation("public", "protected", "internal", "private", "file", "new", "static", "abstract", "virtual", "sealed", "override", "readonly", "unsafe", "required", "volatile", "async"),
-        DefaultValue = "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async",
-        Example = "class Example { readonly public static int Value; }",
-        OwnedSyntax = "member modifier lists",
-        Invariant = "Only modifier token order changes"
-    };
+        {
+            RuleKey = RuleKey.CSharpPreferredModifierOrder,
+            Caption = RuleMetadata.Humanize(RuleKey.CSharpPreferredModifierOrder.ToName()),
+            GroupName = "Braces and bodies",
+            Description = "Controls member modifier lists. Only modifier token order changes.",
+            Values = RuleValues.Permutation(
+                "public",
+                "protected",
+                "internal",
+                "private",
+                "file",
+                "new",
+                "static",
+                "abstract",
+                "virtual",
+                "sealed",
+                "override",
+                "readonly",
+                "unsafe",
+                "required",
+                "volatile",
+                "async"),
+            DefaultValue = "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async",
+            Example = "class Example { readonly public static int Value; }",
+            OwnedSyntax = "member modifier lists",
+            Invariant = "Only modifier token order changes"
+        };
 
     static readonly ConcurrentDictionary<string, Dictionary<string, int>> RankCache = new();
 
@@ -104,7 +120,9 @@ sealed class ModifierOrderRule : ISyntaxFormattingRule
     {
         if (root is not MemberDeclarationSyntax member)
             return root;
-        var ranks = RankCache.GetOrAdd(preference, static value => value
+        var ranks = RankCache.GetOrAdd(
+            preference,
+            static value => value
             .Split(',', StringSplitOptions.TrimEntries)
             .Select((name, rank) => (name, rank))
             .ToDictionary(entry => entry.name, entry => entry.rank));

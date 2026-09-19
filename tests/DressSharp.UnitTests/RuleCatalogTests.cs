@@ -58,16 +58,16 @@ public class RuleCatalogTests
     public void Non_syntax_preferences_are_rules_without_formatting_implementations()
     {
         RuleKey[] expected =
-        [
-            RuleKey.Charset,
-            RuleKey.EndOfLine,
-            RuleKey.InsertFinalNewline,
-            RuleKey.TrimTrailingWhitespace,
-            RuleKey.IndentStyle,
-            RuleKey.IndentSize,
-            RuleKey.TabWidth,
-            RuleKey.MaxLineLength
-        ];
+            [
+                RuleKey.Charset,
+                RuleKey.EndOfLine,
+                RuleKey.InsertFinalNewline,
+                RuleKey.TrimTrailingWhitespace,
+                RuleKey.IndentStyle,
+                RuleKey.IndentSize,
+                RuleKey.TabWidth,
+                RuleKey.MaxLineLength
+            ];
 
         RuleCatalog.BuiltIn.Rules.Where(rule => rule is not IFormattingRule).Select(rule => rule.Metadata.RuleKey).ToArray()
             .ShouldMatch(expected);
@@ -99,19 +99,19 @@ public class RuleCatalogTests
     public void Initializer_layout_rules_expose_their_distinct_modes()
     {
         RuleKey[] keys =
-        [
-            RuleKey.DressObjectInitializerLayout,
-            RuleKey.DressCollectionInitializerLayout,
-            RuleKey.DressArrayInitializerLayout,
-            RuleKey.DressWithInitializerLayout
-        ];
+            [
+                RuleKey.DressObjectInitializerLayout,
+                RuleKey.DressCollectionInitializerLayout,
+                RuleKey.DressArrayInitializerLayout,
+                RuleKey.DressWithInitializerLayout
+            ];
 
         var rules = RuleCatalog.BuiltIn.Rules.ToDictionary(rule => rule.Metadata.RuleKey);
         keys.AllItemsSatisfy(key =>
-        {
-            rules[key].Metadata.AcceptedValueForms.ShouldMatch(["compact", "auto", "expanded"]);
-            rules[key].Metadata.DefaultValue.ShouldBe("auto");
-        });
+            {
+                rules[key].Metadata.AcceptedValueForms.ShouldMatch(["compact", "auto", "expanded"]);
+                rules[key].Metadata.DefaultValue.ShouldBe("auto");
+            });
     }
 
     [Fact]

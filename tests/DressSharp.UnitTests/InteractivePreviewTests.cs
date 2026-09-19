@@ -12,11 +12,18 @@ public sealed class InteractivePreviewTests
     public async Task Disabling_inherited_placement_explains_a_return_moving_to_a_new_line()
     {
         const string source = "if (true) return false;";
-        var placement = new InteractivePreference(RuleKey.DressEmbeddedStatementPlacement,
-            PreferenceAssignment.Absent, PreferenceAssignment.Explicit("next_line"), null, null, null);
+        var placement = new InteractivePreference(
+            RuleKey.DressEmbeddedStatementPlacement,
+            PreferenceAssignment.Absent,
+            PreferenceAssignment.Explicit("next_line"),
+            null,
+            null,
+            null);
         var enabled = await InteractivePreview.Format(source, [placement], TestContext.Current.CancellationToken);
-        var disabled = await InteractivePreview.Format(source,
-            [placement with { Local = PreferenceAssignment.Unset }], TestContext.Current.CancellationToken);
+        var disabled = await InteractivePreview.Format(
+            source,
+            [placement with { Local = PreferenceAssignment.Unset }],
+            TestContext.Current.CancellationToken);
 
         enabled.Text.ShouldBe("if (true)\n    return false;");
         disabled.Text.ShouldBe(source);
@@ -33,8 +40,7 @@ public sealed class InteractivePreviewTests
                 Preference(RuleKey.InsertFinalNewline, "true"),
                 Preference(RuleKey.Charset, "utf-16le"),
             ],
-            TestContext.Current.CancellationToken
-        );
+            TestContext.Current.CancellationToken);
 
         result.Text.ShouldContain("int a, int b");
         result.Text.EndsWith("\r\n", StringComparison.Ordinal).ShouldBe(true);
@@ -74,14 +80,14 @@ public sealed class InteractivePreviewTests
             }
             """.ReplaceLineEndings(lineEnding);
         var preferences = new[]
-        {
-            Preference(RuleKey.IndentSize, "4"),
-            Preference(RuleKey.CSharpIndentBlockContents, "true"),
-            Preference(RuleKey.DressBinaryExpressionsLayout, "auto"),
-            Preference(RuleKey.DressBinaryExpressionIndentation, "precedence"),
-            Preference(RuleKey.DotnetStyleOperatorPlacementWhenWrapping, "beginning_of_line"),
-            Preference(RuleKey.MaxLineLength, "160")
-        };
+            {
+                Preference(RuleKey.IndentSize, "4"),
+                Preference(RuleKey.CSharpIndentBlockContents, "true"),
+                Preference(RuleKey.DressBinaryExpressionsLayout, "auto"),
+                Preference(RuleKey.DressBinaryExpressionIndentation, "precedence"),
+                Preference(RuleKey.DotnetStyleOperatorPlacementWhenWrapping, "beginning_of_line"),
+                Preference(RuleKey.MaxLineLength, "160")
+            };
 
         var result = await InteractivePreview.Format(source, preferences, TestContext.Current.CancellationToken);
 
@@ -93,12 +99,11 @@ public sealed class InteractivePreviewTests
     public void Pending_assignments_resolve_inheritance_unset_and_derived_values()
     {
         var configuration = InteractiveEditorConfig.ResolvePending(
-        [
-            new(RuleKey.IndentSize, PreferenceAssignment.Absent, PreferenceAssignment.Explicit("tab"), null, null, null),
-            Preference(RuleKey.TabWidth, "8"),
-            new(RuleKey.CSharpSpaceAfterComma, PreferenceAssignment.Unset, PreferenceAssignment.Explicit("true"), null, null, null),
-        ]
-        );
+            [
+                new(RuleKey.IndentSize, PreferenceAssignment.Absent, PreferenceAssignment.Explicit("tab"), null, null, null),
+                Preference(RuleKey.TabWidth, "8"),
+                new(RuleKey.CSharpSpaceAfterComma, PreferenceAssignment.Unset, PreferenceAssignment.Explicit("true"), null, null, null),
+            ]);
         configuration.Preferences[RuleKey.IndentSize].ShouldBe("8");
         configuration.Preferences.ContainsKey(RuleKey.CSharpSpaceAfterComma).ShouldBe(false);
     }
@@ -123,7 +128,8 @@ public sealed class InteractivePreviewTests
     [Fact]
     public async Task Invalid_preference_does_not_poison_next_preview()
     {
-        await Assert.ThrowsAsync<ArgumentException>(() => InteractivePreview.Format("class C {}", [Preference(RuleKey.IndentSize, "bad")], TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => InteractivePreview.Format("class C {}", [Preference(RuleKey.IndentSize, "bad")], TestContext.Current.CancellationToken));
         (await InteractivePreview.Format("class C {}", [], TestContext.Current.CancellationToken)).Text.ShouldBe("class C {}");
     }
 

@@ -25,15 +25,15 @@ public class IndentationOwnershipTests
             expected = expected.Replace("    ", "\t", StringComparison.Ordinal);
         var source = "var result = first || second && third ? yes : no;";
         var preferences = new[]
-        {
-            ("dress_binary_expressions_layout", "always_multi"),
-            ("dress_binary_expression_indentation", "precedence"),
-            ("dress_conditional_expressions_layout", "always_multi"),
-            ("csharp_indent_block_contents", "true"),
-            ("indent_style", indentStyle),
-            ("indent_size", "4"),
-            ("tab_width", "4")
-        };
+            {
+                ("dress_binary_expressions_layout", "always_multi"),
+                ("dress_binary_expression_indentation", "precedence"),
+                ("dress_conditional_expressions_layout", "always_multi"),
+                ("csharp_indent_block_contents", "true"),
+                ("indent_style", indentStyle),
+                ("indent_size", "4"),
+                ("tab_width", "4")
+            };
         // Supply the line ending without pre-wrapping the condition.
         source += lineEnding;
         expected += lineEnding;
@@ -101,21 +101,27 @@ public class IndentationOwnershipTests
             """.ReplaceLineEndings(lineEnding);
         var expected = source.Replace(
             "new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineStatements, \"Statements\", \"Preserve single line\", SingleLinePreservationKind.Statements)",
-            "new SingleLinePreservationRule(" + lineEnding
-                + "                RuleKey.CSharpPreserveSingleLineStatements," + lineEnding
-                + "                \"Statements\"," + lineEnding
-                + "                \"Preserve single line\"," + lineEnding
-                + "                SingleLinePreservationKind.Statements" + lineEnding
-                + "            )", StringComparison.Ordinal);
+            "new SingleLinePreservationRule("
+            + lineEnding
+            + "                RuleKey.CSharpPreserveSingleLineStatements,"
+            + lineEnding
+            + "                \"Statements\","
+            + lineEnding
+            + "                \"Preserve single line\","
+            + lineEnding
+            + "                SingleLinePreservationKind.Statements"
+            + lineEnding
+            + "            )",
+            StringComparison.Ordinal);
         (string Key, string Value)[] preferences =
-        [
-            ("indent_style", "space"),
-            ("indent_size", "4"),
-            ("csharp_indent_block_contents", "true"),
-            ("dress_arguments_layout", "auto"),
-            ("dress_collection_expressions_layout", "auto"),
-            ("max_line_length", "160")
-        ];
+            [
+                ("indent_style", "space"),
+                ("indent_size", "4"),
+                ("csharp_indent_block_contents", "true"),
+                ("dress_arguments_layout", "auto"),
+                ("dress_collection_expressions_layout", "auto"),
+                ("max_line_length", "160")
+            ];
 
         var result = Format(source, preferences);
         result.ShouldBe(expected, result);
@@ -123,18 +129,22 @@ public class IndentationOwnershipTests
     }
 
     [Theory]
-    [InlineData("flat", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;")]
-    [InlineData("precedence", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n        && _safetyContext?.IsUnsafe(node) == true;")]
+    [
+        InlineData("flat", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;")
+    ]
+    [
+        InlineData("precedence", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n        && _safetyContext?.IsUnsafe(node) == true;")
+    ]
     public void Binary_indentation_can_follow_operator_precedence(string indentation, string expected)
     {
         const string source = "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;";
         var preferences = new[]
-        {
-            ("dress_binary_expressions_layout", "auto"),
-            ("dress_binary_expression_indentation", indentation),
-            ("dotnet_style_operator_placement_when_wrapping", "beginning_of_line"),
-            ("max_line_length", "160")
-        };
+            {
+                ("dress_binary_expressions_layout", "auto"),
+                ("dress_binary_expression_indentation", indentation),
+                ("dotnet_style_operator_placement_when_wrapping", "beginning_of_line"),
+                ("max_line_length", "160")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
@@ -145,10 +155,10 @@ public class IndentationOwnershipTests
     {
         const string source = "var result = first\n    + second\n    - third;";
         var preferences = new[]
-        {
-            ("dress_binary_expressions_layout", "auto"),
-            ("dress_binary_expression_indentation", "precedence")
-        };
+            {
+                ("dress_binary_expressions_layout", "auto"),
+                ("dress_binary_expression_indentation", "precedence")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -160,10 +170,10 @@ public class IndentationOwnershipTests
         const string source = "var result = first || second && third == fourth + fifth;";
         const string expected = "var result = first\n    || second\n        && third\n            == fourth\n                + fifth;";
         var preferences = new[]
-        {
-            ("dress_binary_expressions_layout", "always_multi"),
-            ("dress_binary_expression_indentation", "precedence")
-        };
+            {
+                ("dress_binary_expressions_layout", "always_multi"),
+                ("dress_binary_expression_indentation", "precedence")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
@@ -275,13 +285,13 @@ public class IndentationOwnershipTests
             source = header + source + footer;
         }
         var preferences = new[]
-        {
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_braces", "false"),
-            ("dress_binary_expressions_layout", "auto"),
-            ("dotnet_style_operator_placement_when_wrapping", "beginning_of_line"),
-            ("max_line_length", "160")
-        };
+            {
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "false"),
+                ("dress_binary_expressions_layout", "auto"),
+                ("dotnet_style_operator_placement_when_wrapping", "beginning_of_line"),
+                ("max_line_length", "160")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
@@ -304,13 +314,13 @@ public class IndentationOwnershipTests
                     : GapStyle.SeparatedLater);
             """.ReplaceLineEndings(lineEnding);
         var preferences = new[]
-        {
-            ("csharp_indent_block_contents", "true"),
-            ("dress_arguments_layout", argumentsLayout),
-            ("dress_conditional_expressions_layout", "auto"),
-            ("dress_nested_conditional_style", "decision_ladder"),
-            ("max_line_length", maximumLineLength)
-        };
+            {
+                ("csharp_indent_block_contents", "true"),
+                ("dress_arguments_layout", argumentsLayout),
+                ("dress_conditional_expressions_layout", "auto"),
+                ("dress_nested_conditional_style", "decision_ladder"),
+                ("max_line_length", maximumLineLength)
+            };
         var result = Format(source, preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -394,10 +404,10 @@ public class IndentationOwnershipTests
                     && third);
             """;
         var preferences = new[]
-        {
-            ("csharp_indent_block_contents", "true"),
-            ("dress_binary_expressions_layout", "always_multi")
-        };
+            {
+                ("csharp_indent_block_contents", "true"),
+                ("dress_binary_expressions_layout", "always_multi")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -442,11 +452,11 @@ public class IndentationOwnershipTests
                 }
             """;
         var preferences = new[]
-        {
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_braces", "true"),
-            ("dress_binary_expressions_layout", "always_multi")
-        };
+            {
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "true"),
+                ("dress_binary_expressions_layout", "always_multi")
+            };
         var result = Format(source.Replace("    ", ""), preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -469,11 +479,11 @@ public class IndentationOwnershipTests
             }
             """;
         var preferences = new[]
-        {
-            ("csharp_indent_block_contents", "false"),
-            ("csharp_indent_braces", "false"),
-            ("dress_binary_expressions_layout", "always_multi")
-        };
+            {
+                ("csharp_indent_block_contents", "false"),
+                ("csharp_indent_braces", "false"),
+                ("dress_binary_expressions_layout", "always_multi")
+            };
         var result = Format(source.Replace("    ", ""), preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -490,14 +500,14 @@ public class IndentationOwnershipTests
         var statement = label + (indentContents ? "\t" : "");
         var source = $"switch (value) {{\n{label}case 0:\n{statement}if (firstCondition\n{statement}\t&& secondCondition)\n{statement}{{\n{statement}\tWork();\n{statement}}}\n}}";
         var preferences = new[]
-        {
-            ("indent_style", "tab"),
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_braces", "false"),
-            ("csharp_indent_switch_labels", indentLabels ? "true" : "false"),
-            ("csharp_indent_case_contents", indentContents ? "true" : "false"),
-            ("dress_binary_expressions_layout", "always_multi")
-        };
+            {
+                ("indent_style", "tab"),
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "false"),
+                ("csharp_indent_switch_labels", indentLabels ? "true" : "false"),
+                ("csharp_indent_case_contents", indentContents ? "true" : "false"),
+                ("dress_binary_expressions_layout", "always_multi")
+            };
         var result = Format(source.Replace("\t", ""), preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -522,12 +532,12 @@ public class IndentationOwnershipTests
                 }
             """.ReplaceLineEndings(lineEnding);
         var preferences = new[]
-        {
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_indent_braces", "false"),
-            ("dress_binary_expressions_layout", "auto"),
-            ("max_line_length", "35")
-        };
+            {
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_indent_braces", "false"),
+                ("dress_binary_expressions_layout", "auto"),
+                ("max_line_length", "35")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);
@@ -546,10 +556,10 @@ public class IndentationOwnershipTests
                     && secondCondition;
             """;
         var preferences = new[]
-        {
-            ("csharp_indent_block_contents", "true"),
-            ("dress_binary_expressions_layout", "always_multi")
-        };
+            {
+                ("csharp_indent_block_contents", "true"),
+                ("dress_binary_expressions_layout", "always_multi")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(source);
         Format(result, preferences).ShouldBe(result);

@@ -150,9 +150,9 @@ static class RuleKeys
             var startsWord = index > 0
                 && char.IsUpper(current)
                 && (char.IsLower(name[index - 1])
-                    || !TryGet(name, index + 1, out var next)
-                    || char.IsUpper(next)
-                    || index > 1 && char.IsUpper(name[index - 2]));
+                || !TryGet(name, index + 1, out var next)
+                || char.IsUpper(next)
+                || index > 1 && char.IsUpper(name[index - 2]));
             if (startsWord)
                 buffer[length++] = '_';
             buffer[length++] = char.ToLowerInvariant(current);

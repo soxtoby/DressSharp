@@ -8,46 +8,46 @@ namespace DressSharp.Rules;
 sealed class InitializerIndentationRule(RuleKey key, string caption, string? subgroupName, InitializerKind kind, string defaultValue) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
-    {
-        RuleKey = key,
-        Caption = caption,
-        ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
-        GroupName = "Indentation",
-        SubgroupName = subgroupName,
-        Description = kind switch
         {
-            InitializerKind.CollectionExpression => "Controls multiline non-empty collection expression delimiters outside arguments, including assignments and returns.",
-            InitializerKind.CollectionExpressionArgument => "Controls multiline non-empty collection expression delimiters when the expression is an argument, including named arguments.",
-            _ => "Controls multiline non-empty initializer delimiters. Only delimiter indentation changes."
-        },
-        Values = RuleValues.From(["indented", "not_indented"]),
-        DefaultValue = defaultValue,
-        Example = kind switch
-        {
-            InitializerKind.Collection => "var values = new List<int>\n{\n    1,\n    2\n};",
-            InitializerKind.Array => "var values = new[]\n{\n    1,\n    2\n};",
-            InitializerKind.With => "var value = original with\n{\n    First = 1,\n    Second = 2\n};",
-            InitializerKind.CollectionExpression => """
-                class Example
+            RuleKey = key,
+            Caption = caption,
+            ExpandedCaption = RuleMetadata.Humanize(key.ToName()),
+            GroupName = "Indentation",
+            SubgroupName = subgroupName,
+            Description = kind switch
                 {
-                    string[] Values =
-                    [
-                        "first",
-                        "second"
-                    ];
-                }
-                """,
-            InitializerKind.CollectionExpressionArgument => """
-                class Example
+                    InitializerKind.CollectionExpression => "Controls multiline non-empty collection expression delimiters outside arguments, including assignments and returns.",
+                    InitializerKind.CollectionExpressionArgument => "Controls multiline non-empty collection expression delimiters when the expression is an argument, including named arguments.",
+                    _ => "Controls multiline non-empty initializer delimiters. Only delimiter indentation changes."
+                },
+            Values = RuleValues.From(["indented", "not_indented"]),
+            DefaultValue = defaultValue,
+            Example = kind switch
                 {
-                    void M() => Process(
-                    [
-                        "first",
-                        "second"
-                    ]);
-                }
-                """,
-            _ => """
+                    InitializerKind.Collection => "var values = new List<int>\n{\n    1,\n    2\n};",
+                    InitializerKind.Array => "var values = new[]\n{\n    1,\n    2\n};",
+                    InitializerKind.With => "var value = original with\n{\n    First = 1,\n    Second = 2\n};",
+                    InitializerKind.CollectionExpression => """
+                        class Example
+                        {
+                            string[] Values =
+                            [
+                                "first",
+                                "second"
+                            ];
+                        }
+                        """,
+                    InitializerKind.CollectionExpressionArgument => """
+                        class Example
+                        {
+                            void M() => Process(
+                            [
+                                "first",
+                                "second"
+                            ]);
+                        }
+                        """,
+                    _ => """
         class Example
         {
             object Value = new Example
@@ -57,10 +57,10 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
             int Number { get; set; }
         }
         """
-        },
-        OwnedSyntax = "multiline non-empty initializer delimiters",
-        Invariant = "Only delimiter indentation changes"
-    };
+                },
+            OwnedSyntax = "multiline non-empty initializer delimiters",
+            Invariant = "Only delimiter indentation changes"
+        };
 
     internal InitializerKind Kind => kind;
 
@@ -91,21 +91,21 @@ sealed class InitializerIndentationRule(RuleKey key, string caption, string? sub
     }
 
     internal static InitializerKind? KindOf(InitializerExpressionSyntax initializer) => initializer.Kind() switch
-    {
-        SyntaxKind.ObjectInitializerExpression => InitializerKind.Object,
-        SyntaxKind.CollectionInitializerExpression => InitializerKind.Collection,
-        SyntaxKind.ArrayInitializerExpression => InitializerKind.Array,
-        SyntaxKind.WithInitializerExpression => InitializerKind.With,
-        _ => null
-    };
+        {
+            SyntaxKind.ObjectInitializerExpression => InitializerKind.Object,
+            SyntaxKind.CollectionInitializerExpression => InitializerKind.Collection,
+            SyntaxKind.ArrayInitializerExpression => InitializerKind.Array,
+            SyntaxKind.WithInitializerExpression => InitializerKind.With,
+            _ => null
+        };
 
     internal static InitializerKind? KindOf(SyntaxNode initializer) => initializer switch
-    {
-        AnonymousObjectCreationExpressionSyntax => InitializerKind.Object,
-        InitializerExpressionSyntax expression => KindOf(expression),
-        CollectionExpressionSyntax collection => CollectionKind(collection),
-        _ => null
-    };
+        {
+            AnonymousObjectCreationExpressionSyntax => InitializerKind.Object,
+            InitializerExpressionSyntax expression => KindOf(expression),
+            CollectionExpressionSyntax collection => CollectionKind(collection),
+            _ => null
+        };
 
     static InitializerKind CollectionKind(CollectionExpressionSyntax collection)
     {

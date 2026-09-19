@@ -33,12 +33,12 @@ public class LambdaBlockIndentationEmitterTests
             expected = expected.Replace("    ", "\t", StringComparison.Ordinal);
         }
         var preferences = new[]
-        {
-            ("dress_lambda_block_indentation", "indented"),
-            ("csharp_indent_block_contents", "true"),
-            ("indent_style", style),
-            ("indent_size", "4")
-        };
+            {
+                ("dress_lambda_block_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("indent_style", style),
+                ("indent_size", "4")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
@@ -53,7 +53,8 @@ public class LambdaBlockIndentationEmitterTests
                 Work();
             };
             """;
-        Format(source,
+        Format(
+            source,
             ("dress_lambda_block_indentation", "not_indented"),
             ("csharp_indent_braces", "true"),
             ("csharp_indent_block_contents", "true")).ShouldBe(source);
@@ -72,13 +73,15 @@ public class LambdaBlockIndentationEmitterTests
     public void Unset_leaves_indentation_to_existing_rules()
     {
         const string source = "var callback = () =>\n    {\n        Work();\n    };";
-        Format(source,
-                ("dress_lambda_block_indentation", "unset"),
-                ("csharp_indent_braces", "false"),
-                ("csharp_indent_block_contents", "true"))
-            .ShouldBe(Format(source,
-                ("csharp_indent_braces", "false"),
-                ("csharp_indent_block_contents", "true")));
+        Format(
+            source,
+            ("dress_lambda_block_indentation", "unset"),
+            ("csharp_indent_braces", "false"),
+            ("csharp_indent_block_contents", "true"))
+            .ShouldBe(Format(
+            source,
+            ("csharp_indent_braces", "false"),
+            ("csharp_indent_block_contents", "true")));
     }
 
     [Theory]
@@ -111,11 +114,11 @@ public class LambdaBlockIndentationEmitterTests
             }
             """;
         var preferences = new[]
-        {
-            ("dress_lambda_block_indentation", preference),
-            ("csharp_indent_braces", "false"),
-            ("csharp_indent_block_contents", "true")
-        };
+            {
+                ("dress_lambda_block_indentation", preference),
+                ("csharp_indent_braces", "false"),
+                ("csharp_indent_block_contents", "true")
+            };
         var result = Format(source, preferences);
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);

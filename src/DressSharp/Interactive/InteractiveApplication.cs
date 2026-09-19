@@ -50,8 +50,8 @@ sealed class SystemInteractiveBrowser : IInteractiveBrowser
     public void Open(Uri address)
     {
         Process.Start(new ProcessStartInfo(address.AbsoluteUri)
-        {
-            UseShellExecute = true
-        });
+            {
+                UseShellExecute = true
+            });
     }
 }

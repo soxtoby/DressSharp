@@ -9,27 +9,27 @@ namespace DressSharp.Rules;
 sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupName, MemberBodyKind kind, string defaultValue) : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
-    {
-        RuleKey = ruleKey,
-        Caption = caption,
-        ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
-        GroupName = "Braces and bodies",
-        SubgroupName = subgroupName,
-        Description = $"Controls {kind.ToString().ToLowerInvariant()} bodies. The selected body form preserves the represented statement or returned expression.",
-        Values = RuleValues.From(["block", "expression"]),
-        DefaultValue = defaultValue,
-        Example = kind switch
         {
-            MemberBodyKind.Constructor => "class Example { int value; public Example(int value) { this.value = value; } }",
-            MemberBodyKind.Operator => "class Example { public static Example operator +(Example a, Example b) { return a; } }",
-            MemberBodyKind.Property => "class Example { int Value { get { return 1; } } }",
-            MemberBodyKind.Indexer => "class Example { int this[int index] { get { return index; } } }",
-            MemberBodyKind.Accessor => "class Example { int Value { get { return 1; } set { Store(value); } } }",
-            _ => "class Example { int Value() { return 1; } }"
-        },
-        OwnedSyntax = $"{kind.ToString().ToLowerInvariant()} bodies",
-        Invariant = "The selected body form preserves the represented statement or returned expression."
-    };
+            RuleKey = ruleKey,
+            Caption = caption,
+            ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
+            GroupName = "Braces and bodies",
+            SubgroupName = subgroupName,
+            Description = $"Controls {kind.ToString().ToLowerInvariant()} bodies. The selected body form preserves the represented statement or returned expression.",
+            Values = RuleValues.From(["block", "expression"]),
+            DefaultValue = defaultValue,
+            Example = kind switch
+                {
+                    MemberBodyKind.Constructor => "class Example { int value; public Example(int value) { this.value = value; } }",
+                    MemberBodyKind.Operator => "class Example { public static Example operator +(Example a, Example b) { return a; } }",
+                    MemberBodyKind.Property => "class Example { int Value { get { return 1; } } }",
+                    MemberBodyKind.Indexer => "class Example { int this[int index] { get { return index; } } }",
+                    MemberBodyKind.Accessor => "class Example { int Value { get { return 1; } set { Store(value); } } }",
+                    _ => "class Example { int Value() { return 1; } }"
+                },
+            OwnedSyntax = $"{kind.ToString().ToLowerInvariant()} bodies",
+            Invariant = "The selected body form preserves the represented statement or returned expression."
+        };
 
     /// <summary>
     /// The declaration kinds this rule's rewriter visits, which follow directly from its member kind.
@@ -62,7 +62,12 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
     {
         public override SyntaxNode? VisitMethodDeclaration(MethodDeclarationSyntax node) =>
             kind == MemberBodyKind.Method
-                ? RewriteCallable(node, node.Body, node.ExpressionBody, node.SemicolonToken, node.ReturnType is PredefinedTypeSyntax { Keyword.RawKind: (int)SyntaxKind.VoidKeyword })
+                ? RewriteCallable(
+                    node,
+                    node.Body,
+                    node.ExpressionBody,
+                    node.SemicolonToken,
+                    node.ReturnType is PredefinedTypeSyntax { Keyword.RawKind: (int)SyntaxKind.VoidKeyword })
                 : base.VisitMethodDeclaration(node);
 
         public override SyntaxNode? VisitConstructorDeclaration(ConstructorDeclarationSyntax node) =>
@@ -107,13 +112,18 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
                 case true when body is not null && TryExpression(body, statementBody, out var value):
                 {
                     var clause = SyntaxFactory.ArrowExpressionClause(value).WithArrowToken(Arrow());
-                    var rewritten = (T)((dynamic)node).WithBody(null).WithExpressionBody(clause).WithSemicolonToken(SyntaxRuleSafety.SemicolonFrom(body.CloseBraceToken));
+                    var rewritten = (T)((dynamic)node).WithBody(null).WithExpressionBody(clause).WithSemicolonToken(
+                        SyntaxRuleSafety.SemicolonFrom(body.CloseBraceToken));
                     return RemoveTriviaBeforeArrow(rewritten, ((dynamic)rewritten).ExpressionBody.ArrowToken);
                 }
                 case false when arrow is not null:
                 {
                     var statement = statementBody ? (StatementSyntax)SyntaxFactory.ExpressionStatement(arrow.Expression) : Return(arrow.Expression);
-                    var block = GeneratedSyntax.Mark(SyntaxFactory.Block(statement)).WithOpenBraceToken(SyntaxFactory.Token(SyntaxKind.OpenBraceToken).WithLeadingTrivia(arrow.ArrowToken.LeadingTrivia)).WithCloseBraceToken(SyntaxFactory.Token(SyntaxKind.CloseBraceToken).WithTrailingTrivia(semicolon.TrailingTrivia));
+                    var block = GeneratedSyntax
+                        .Mark(SyntaxFactory.Block(statement))
+                        .WithOpenBraceToken(
+                            SyntaxFactory.Token(SyntaxKind.OpenBraceToken).WithLeadingTrivia(arrow.ArrowToken.LeadingTrivia))
+                        .WithCloseBraceToken(SyntaxFactory.Token(SyntaxKind.CloseBraceToken).WithTrailingTrivia(semicolon.TrailingTrivia));
                     return (T)((dynamic)node).WithBody(block).WithExpressionBody(null).WithSemicolonToken(default(SyntaxToken));
                 }
                 default:
@@ -132,7 +142,8 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
 
             switch (expression)
             {
-                case true when (node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body: not null } accessor] && TryExpression(accessor.Body, false, out var value)):
+                case true when (node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body: not null } accessor]
+                        && TryExpression(accessor.Body, false, out var value)):
                     var rewritten = node
                         .WithAccessorList(null)
                         .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(value)
@@ -158,7 +169,8 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
 
             switch (expression)
             {
-                case true when (node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body: not null } accessor] && TryExpression(accessor.Body, false, out var value)):
+                case true when (node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body: not null } accessor]
+                        && TryExpression(accessor.Body, false, out var value)):
                     var rewritten = node
                         .WithAccessorList(null)
                         .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(value)
@@ -177,7 +189,10 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
 
         AccessorDeclarationSyntax RewriteAccessor(AccessorDeclarationSyntax node)
         {
-            var statementBody = node.IsKind(SyntaxKind.SetAccessorDeclaration) || node.IsKind(SyntaxKind.InitAccessorDeclaration) || node.IsKind(SyntaxKind.AddAccessorDeclaration) || node.IsKind(SyntaxKind.RemoveAccessorDeclaration);
+            var statementBody = node.IsKind(SyntaxKind.SetAccessorDeclaration)
+                || node.IsKind(SyntaxKind.InitAccessorDeclaration)
+                || node.IsKind(SyntaxKind.AddAccessorDeclaration)
+                || node.IsKind(SyntaxKind.RemoveAccessorDeclaration);
             if (!CanConvert(node.Body, node.ExpressionBody, statementBody))
                 return node;
             if (!SyntaxRuleSafety.CanRewrite(node, context))
@@ -196,8 +211,8 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
                 }
                 case false when node.ExpressionBody is { } arrow:
                 {
-                    StatementSyntax statement = statementBody 
-                        ? SyntaxFactory.ExpressionStatement(arrow.Expression) 
+                    StatementSyntax statement = statementBody
+                        ? SyntaxFactory.ExpressionStatement(arrow.Expression)
                         : Return(arrow.Expression);
                     return node
                         .WithExpressionBody(null)
@@ -216,7 +231,9 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
         }
 
         static AccessorListSyntax Getter(ArrowExpressionClauseSyntax arrow, SyntaxToken semicolon) =>
-            SyntaxFactory.AccessorList(SyntaxFactory.SingletonList(SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration, GeneratedSyntax.Mark(SyntaxFactory.Block(Return(arrow.Expression))))))
+            SyntaxFactory.AccessorList(
+                SyntaxFactory.SingletonList(
+                    SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration, GeneratedSyntax.Mark(SyntaxFactory.Block(Return(arrow.Expression))))))
                 .WithOpenBraceToken(SyntaxFactory.Token(SyntaxKind.OpenBraceToken)
                     .WithLeadingTrivia(arrow.ArrowToken.LeadingTrivia))
                 .WithCloseBraceToken(SyntaxFactory.Token(SyntaxKind.CloseBraceToken)
@@ -256,18 +273,18 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
             expression = null;
             if (body.Statements.Count != 1)
                 return false;
-            
+
             switch (statementBody)
             {
                 case false when body.Statements[0] is ReturnStatementSyntax { Expression: { } returned }:
                     expression = returned.WithoutLeadingTrivia();
                     break;
-                
+
                 case true when body.Statements[0] is ExpressionStatementSyntax statement:
                     expression = statement.Expression.WithoutLeadingTrivia();
                     break;
             }
-            
+
             return expression is not null;
         }
     }

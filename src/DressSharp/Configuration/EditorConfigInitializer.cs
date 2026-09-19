@@ -8,7 +8,9 @@ sealed record InitializationResult(string Path, bool Changed);
 static class EditorConfigInitializer
 {
     internal static async Task<InitializationResult> InitializeAsync(
-        string? target, string invocationDirectory, CancellationToken cancellationToken)
+        string? target,
+        string invocationDirectory,
+        CancellationToken cancellationToken)
     {
         var path = ResolveTarget(target, invocationDirectory);
         var original = File.Exists(path)

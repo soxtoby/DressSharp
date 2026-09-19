@@ -18,6 +18,7 @@ sealed record PreferenceAssignment(PreferenceAssignmentKind Kind, string? Value 
 {
     internal static PreferenceAssignment Absent { get; } = new(PreferenceAssignmentKind.Absent);
     internal static PreferenceAssignment Unset { get; } = new(PreferenceAssignmentKind.Unset);
+
     internal static PreferenceAssignment Explicit(string value) => new(PreferenceAssignmentKind.Explicit, value);
 }
 
@@ -132,16 +133,16 @@ static class InteractiveEditorConfig
 
         var preferences = RuleCatalog.BuiltIn.Rules
             .Select(rule =>
-            {
-                var key = rule.Metadata.RuleKey;
-                return new InteractivePreference(
+                {
+                    var key = rule.Metadata.RuleKey;
+                    return new InteractivePreference(
                     key,
                     local.GetValueOrDefault(key, PreferenceAssignment.Absent),
                     inherited.GetValueOrDefault(key, PreferenceAssignment.Absent),
                     inheritedSources.GetValueOrDefault(key),
                     effective.GetValueOrDefault(key),
                     effectiveSources.GetValueOrDefault(key));
-            })
+                })
             .ToImmutableArray();
         return new InteractiveEditorConfigData(
             target.Path,
@@ -254,10 +255,14 @@ static class InteractiveEditorConfig
             {
                 if (string.IsNullOrWhiteSpace(assignment.Value)
                     || !PreferenceCatalog.IsValid(edit.RuleKey, assignment.Value))
+                {
                     throw new ArgumentException($"Invalid value for '{edit.RuleKey.ToName()}'.", nameof(edits));
+                }
             }
             else if (assignment.Value is not null)
+            {
                 throw new ArgumentException("Only explicit assignments may carry a value.", nameof(edits));
+            }
         }
     }
 
@@ -341,7 +346,9 @@ sealed class EditorConfigDocument
                     removals.Add(match);
             }
             else if (matches.Count > 0)
+            {
                 lines[matches[^1]].Content = ReplaceValue(lines[matches[^1]].Content, edit.DesiredLocal);
+            }
         }
         foreach (var index in removals.OrderDescending())
             lines.RemoveAt(index);
@@ -349,7 +356,7 @@ sealed class EditorConfigDocument
         var remaining = FindOccurrences(lines);
         var additions = edits
             .Where(edit => edit.DesiredLocal.Kind != PreferenceAssignmentKind.Absent
-                && !remaining.ContainsKey(edit.RuleKey))
+            && !remaining.ContainsKey(edit.RuleKey))
             .OrderBy(edit => CatalogIndex(edit.RuleKey))
             .ToArray();
         var hadFinalNewline = Source.Text.EndsWith('\r') || Source.Text.EndsWith('\n');
@@ -411,7 +418,9 @@ sealed class EditorConfigDocument
             var separator = trimmed.IndexOf('=');
             if (separator > 0
                 && trimmed[..separator].Trim().Equals("root", StringComparison.OrdinalIgnoreCase))
+            {
                 return trimmed[(separator + 1)..].Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+            }
         }
         return false;
     }
@@ -525,7 +534,7 @@ sealed class EditorConfigDocument
     static List<EditorConfigLine> ParseLines(string text)
     {
         var lines = new List<EditorConfigLine>();
-        for (var start = 0; start < text.Length;)
+        for (var start = 0; start < text.Length; )
         {
             var end = text.IndexOfAny(['\r', '\n'], start);
             if (end < 0)

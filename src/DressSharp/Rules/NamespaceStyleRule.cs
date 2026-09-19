@@ -8,23 +8,23 @@ namespace DressSharp.Rules;
 sealed class NamespaceStyleRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
-    {
-        RuleKey = RuleKey.DressNamespaceStyle,
-        Caption = RuleMetadata.Humanize(RuleKey.DressNamespaceStyle.ToName()),
-        GroupName = "Braces and bodies",
-        Description =
-            "Controls compilation-unit namespace declaration. The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.",
-        Values = RuleValues.From(["file_scoped", "block_scoped"]),
-        DefaultValue = "file_scoped",
-        Example = """
-            namespace Example
-            {
-                class Value { }
-            }
-            """,
-        OwnedSyntax = "compilation-unit namespace declaration",
-        Invariant = "The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes."
-    };
+        {
+            RuleKey = RuleKey.DressNamespaceStyle,
+            Caption = RuleMetadata.Humanize(RuleKey.DressNamespaceStyle.ToName()),
+            GroupName = "Braces and bodies",
+            Description =
+                "Controls compilation-unit namespace declaration. The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.",
+            Values = RuleValues.From(["file_scoped", "block_scoped"]),
+            DefaultValue = "file_scoped",
+            Example = """
+                namespace Example
+                {
+                    class Value { }
+                }
+                """,
+            OwnedSyntax = "compilation-unit namespace declaration",
+            Invariant = "The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes."
+        };
 
     public SyntaxNode Transform(SyntaxNode root, string preference, RuleContext context)
     {
@@ -40,14 +40,14 @@ sealed class NamespaceStyleRule : ISyntaxFormattingRule
         if (unit.Members is not [NamespaceDeclarationSyntax declaration] || !SyntaxRuleSafety.CanRewrite(declaration, context))
             return unit;
         var converted = SyntaxFactory.FileScopedNamespaceDeclaration(
-                declaration.AttributeLists,
-                declaration.Modifiers,
-                declaration.NamespaceKeyword,
-                declaration.Name.WithoutTrailingTrivia(),
-                SyntaxRuleSafety.SemicolonFrom(declaration.OpenBraceToken),
-                declaration.Externs,
-                declaration.Usings,
-                declaration.Members)
+            declaration.AttributeLists,
+            declaration.Modifiers,
+            declaration.NamespaceKeyword,
+            declaration.Name.WithoutTrailingTrivia(),
+            SyntaxRuleSafety.SemicolonFrom(declaration.OpenBraceToken),
+            declaration.Externs,
+            declaration.Usings,
+            declaration.Members)
             .WithLeadingTrivia(declaration.GetLeadingTrivia())
             .WithTrailingTrivia(declaration.CloseBraceToken.TrailingTrivia.AddRange(declaration.GetTrailingTrivia()));
         return unit.WithMembers(SyntaxFactory.SingletonList<MemberDeclarationSyntax>(converted));
@@ -58,16 +58,16 @@ sealed class NamespaceStyleRule : ISyntaxFormattingRule
         if (unit.Members is not [FileScopedNamespaceDeclarationSyntax declaration] || !SyntaxRuleSafety.CanRewrite(declaration, context))
             return unit;
         var converted = SyntaxFactory.NamespaceDeclaration(
-                declaration.AttributeLists,
-                declaration.Modifiers,
-                declaration.NamespaceKeyword,
-                declaration.Name,
-                SyntaxFactory.Token(declaration.SemicolonToken.LeadingTrivia, SyntaxKind.OpenBraceToken, default),
-                declaration.Externs,
-                declaration.Usings,
-                declaration.Members,
-                SyntaxFactory.Token(SyntaxKind.CloseBraceToken).WithTrailingTrivia(declaration.SemicolonToken.TrailingTrivia),
-                default)
+            declaration.AttributeLists,
+            declaration.Modifiers,
+            declaration.NamespaceKeyword,
+            declaration.Name,
+            SyntaxFactory.Token(declaration.SemicolonToken.LeadingTrivia, SyntaxKind.OpenBraceToken, default),
+            declaration.Externs,
+            declaration.Usings,
+            declaration.Members,
+            SyntaxFactory.Token(SyntaxKind.CloseBraceToken).WithTrailingTrivia(declaration.SemicolonToken.TrailingTrivia),
+            default)
             .WithLeadingTrivia(declaration.GetLeadingTrivia())
             .WithTrailingTrivia(declaration.GetTrailingTrivia());
         return unit.WithMembers(SyntaxFactory.SingletonList<MemberDeclarationSyntax>(converted));

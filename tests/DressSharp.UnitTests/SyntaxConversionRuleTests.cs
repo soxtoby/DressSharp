@@ -26,7 +26,9 @@ public class SyntaxConversionRuleTests
     [Theory]
     [InlineData("dress_method_body", "class C { int M() { return 1; } }", "class C { int M() => 1; }")]
     [InlineData("dress_constructor_body", "class C { C() { Start(); } void Start() {} }", "class C { C() => Start(); void Start() {} }")]
-    [InlineData("dress_operator_body", "class C { public static C operator +(C x, C y) { return x; } }", "class C { public static C operator +(C x, C y) => x; }")]
+    [
+        InlineData("dress_operator_body", "class C { public static C operator +(C x, C y) { return x; } }", "class C { public static C operator +(C x, C y) => x; }")
+    ]
     [InlineData("dress_property_body", "class C { int P { get { return 1; } } }", "class C { int P => 1; }")]
     [InlineData("dress_indexer_body", "class C { int this[int i] { get { return i; } } }", "class C { int this[int i] => i; }")]
     [InlineData("dress_accessor_body", "class C { int P { get { return 1; } } }", "class C { int P { get => 1; } }")]
@@ -37,7 +39,9 @@ public class SyntaxConversionRuleTests
     [Theory]
     [InlineData("dress_method_body", "class C { int M() => 1; }", "class C { int M() {\nreturn 1;\n} }")]
     [InlineData("dress_constructor_body", "class C { C() => Start(); void Start() {} }", "class C { C() {\nStart();\n} void Start() {} }")]
-    [InlineData("dress_operator_body", "class C { public static C operator +(C x, C y) => x; }", "class C { public static C operator +(C x, C y) {\nreturn x;\n} }")]
+    [
+        InlineData("dress_operator_body", "class C { public static C operator +(C x, C y) => x; }", "class C { public static C operator +(C x, C y) {\nreturn x;\n} }")
+    ]
     [InlineData("dress_property_body", "class C { int P => 1; }", "class C { int P {get{\nreturn 1;\n}} }")]
     [InlineData("dress_indexer_body", "class C { int this[int i] => i; }", "class C { int this[int i] {get{\nreturn i;\n}} }")]
     [InlineData("dress_accessor_body", "class C { int P { get => 1; } }", "class C { int P { get {\nreturn 1;\n} } }")]
@@ -84,7 +88,9 @@ public class SyntaxConversionRuleTests
     [Fact]
     public void Unsafe_occurrences_are_skipped_while_safe_occurrences_continue()
     {
-        var result = Transform("class C { int Safe() { return 1; } int Commented() { /* keep */ return 2; } int Broken() { return ; } int Later() { return 3; } }", ("dress_method_body", "expression"));
+        var result = Transform(
+            "class C { int Safe() { return 1; } int Commented() { /* keep */ return 2; } int Broken() { return ; } int Later() { return 3; } }",
+            ("dress_method_body", "expression"));
         result.ShouldBe("class C { int Safe() => 1; int Commented() { /* keep */ return 2; } int Broken() { return ; } int Later() => 3; }");
     }
 
@@ -163,11 +169,22 @@ public class SyntaxConversionRuleTests
     [Fact]
     public void Built_in_rules_are_independently_selectable_deterministic_and_idempotent()
     {
-        var preferences = new[] { ("dress_method_body", "expression"), ("dress_property_body", "expression"), ("dress_namespace_style", "file_scoped"), ("dress_embedded_statement_braces", "balanced") };
-        var first = Transform("namespace N { class C { int P { get { return 1; } } int M() { return P; } void V() { if (P > 0) { M(); } else { V(); } } } }", preferences);
+        var preferences = new[]
+            {
+                ("dress_method_body", "expression"),
+                ("dress_property_body", "expression"),
+                ("dress_namespace_style", "file_scoped"),
+                ("dress_embedded_statement_braces", "balanced")
+            };
+        var first = Transform(
+            "namespace N { class C { int P { get { return 1; } } int M() { return P; } void V() { if (P > 0) { M(); } else { V(); } } } }",
+            preferences);
         var second = Transform(first, preferences);
         second.ShouldBe(first);
-        CSharpSyntaxTree.ParseText(first, cancellationToken: TestContext.Current.CancellationToken).GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
+        CSharpSyntaxTree
+            .ParseText(first, cancellationToken: TestContext.Current.CancellationToken)
+            .GetDiagnostics(TestContext.Current.CancellationToken)
+            .ShouldBeEmpty();
     }
 
     static string Transform(string source, params (string Key, string Value)[] preferences)
@@ -178,6 +195,9 @@ public class SyntaxConversionRuleTests
         if (wrap)
             expected = $"class C {{ void M() {{ {expected} }} }}";
         actual.ShouldBe(expected);
-        CSharpSyntaxTree.ParseText(actual, cancellationToken: TestContext.Current.CancellationToken).GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
+        CSharpSyntaxTree
+            .ParseText(actual, cancellationToken: TestContext.Current.CancellationToken)
+            .GetDiagnostics(TestContext.Current.CancellationToken)
+            .ShouldBeEmpty();
     }
 }

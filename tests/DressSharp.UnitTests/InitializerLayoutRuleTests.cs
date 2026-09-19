@@ -18,12 +18,12 @@ public sealed class InitializerLayoutRuleTests
             };
             """;
         (string, string)[] preferences =
-        [
-            ("dress_array_initializer_layout", "expanded"),
-            ("dress_array_initializer_indentation", "not_indented"),
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_space_around_binary_operators", "before_and_after")
-        ];
+            [
+                ("dress_array_initializer_layout", "expanded"),
+                ("dress_array_initializer_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_space_around_binary_operators", "before_and_after")
+            ];
         var result = Format(source, preferences);
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
@@ -56,20 +56,21 @@ public sealed class InitializerLayoutRuleTests
             }
             """;
         (string, string)[] preferences =
-        [
-            ("dress_collection_initializer_layout", "auto"),
-            ("dress_collection_initializer_indentation", "indented"),
-            ("csharp_indent_block_contents", "true"),
-            ("max_line_length", "160"),
-            ("end_of_line", lineEnding == "\n" ? "lf" : "crlf")
-        ];
+            [
+                ("dress_collection_initializer_layout", "auto"),
+                ("dress_collection_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "160"),
+                ("end_of_line", lineEnding == "\n" ? "lf" : "crlf")
+            ];
         var result = Format(source.ReplaceLineEndings(lineEnding), preferences);
         result.ShouldBe(expected.ReplaceLineEndings(lineEnding));
         Format(result, preferences).ShouldBe(result);
     }
 
     [Theory]
-    [InlineData(
+    [
+        InlineData(
         "dress_object_initializer_layout",
         "dress_object_initializer_indentation",
         "C M() => new C { X = 1, Y = 2 };",
@@ -79,8 +80,10 @@ public sealed class InitializerLayoutRuleTests
             X = 1,
             Y = 2
         };
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_collection_initializer_layout",
         "dress_collection_initializer_indentation",
         "List<int> M() => new() { 1, 2 };",
@@ -90,8 +93,10 @@ public sealed class InitializerLayoutRuleTests
             1,
             2
         };
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_array_initializer_layout",
         "dress_array_initializer_indentation",
         "int[] M() => new[] { 1, 2 };",
@@ -101,8 +106,10 @@ public sealed class InitializerLayoutRuleTests
             1,
             2
         };
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_with_initializer_layout",
         "dress_with_initializer_indentation",
         "C M(C value) => value with { X = 1, Y = 2 };",
@@ -112,7 +119,8 @@ public sealed class InitializerLayoutRuleTests
             X = 1,
             Y = 2
         };
-        """)]
+        """)
+    ]
     public void Each_initializer_kind_has_an_independent_layout_rule(
         string layoutKey,
         string indentationKey,
@@ -120,15 +128,16 @@ public sealed class InitializerLayoutRuleTests
         string expanded)
     {
         var preferences = new[]
-        {
-            (layoutKey, "expanded"),
-            (indentationKey, "not_indented"),
-            ("csharp_indent_block_contents", "true")
-        };
+            {
+                (layoutKey, "expanded"),
+                (indentationKey, "not_indented"),
+                ("csharp_indent_block_contents", "true")
+            };
 
         Format(compact, preferences).ShouldBe(expanded);
         Format(expanded, preferences).ShouldBe(expanded);
-        Format(expanded,
+        Format(
+            expanded,
             (layoutKey, "compact"),
             ("max_line_length", "200")).ShouldBe(compact);
     }
@@ -149,12 +158,12 @@ public sealed class InitializerLayoutRuleTests
             };
             """;
         (string, string)[] preferences =
-        [
-            ("dress_object_initializer_layout", "auto"),
-            ("dress_object_initializer_indentation", "not_indented"),
-            ("csharp_indent_block_contents", "true"),
-            ("max_line_length", "200")
-        ];
+            [
+                ("dress_object_initializer_layout", "auto"),
+                ("dress_object_initializer_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "200")
+            ];
 
         Format(compact, preferences).ShouldBe(compact);
         Format(partial, preferences).ShouldBe(expanded);
@@ -176,14 +185,14 @@ public sealed class InitializerLayoutRuleTests
             """;
 
         (string, string)[] preferences =
-        [
-            ("dress_object_initializer_layout", mode),
-            ("dress_object_initializer_indentation", "not_indented"),
-            ("csharp_indent_block_contents", "true"),
-            ("csharp_new_line_before_open_brace", "anonymous_types"),
-            ("csharp_new_line_before_members_in_anonymous_types", "true"),
-            ("max_line_length", "200")
-        ];
+            [
+                ("dress_object_initializer_layout", mode),
+                ("dress_object_initializer_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("csharp_new_line_before_open_brace", "anonymous_types"),
+                ("csharp_new_line_before_members_in_anonymous_types", "true"),
+                ("max_line_length", "200")
+            ];
         var result = Format(compact, preferences);
 
         result.ShouldBe(expanded ? multi : compact);
@@ -194,11 +203,11 @@ public sealed class InitializerLayoutRuleTests
     public void Anonymous_object_auto_expands_when_too_wide()
     {
         Format(
-                "object M() => new { FirstProperty = 1, SecondProperty = 2 };",
-                ("dress_object_initializer_layout", "auto"),
-                ("dress_object_initializer_indentation", "not_indented"),
-                ("csharp_indent_block_contents", "true"),
-                ("max_line_length", "40"))
+            "object M() => new { FirstProperty = 1, SecondProperty = 2 };",
+            ("dress_object_initializer_layout", "auto"),
+            ("dress_object_initializer_indentation", "not_indented"),
+            ("csharp_indent_block_contents", "true"),
+            ("max_line_length", "40"))
             .ShouldBe("""
                 object M() => new
                 {
@@ -213,15 +222,16 @@ public sealed class InitializerLayoutRuleTests
     [InlineData("compact")]
     public void Width_aware_modes_expand_when_an_item_contains_multiple_lines(string mode)
     {
-        Format("""
+        Format(
+            """
                 C M() => new C { X = N(
                     first,
                     second), Y = 2 };
                 """,
-                ("dress_object_initializer_layout", mode),
-                ("dress_object_initializer_indentation", "not_indented"),
-                ("csharp_indent_block_contents", "true"),
-                ("max_line_length", "200"))
+            ("dress_object_initializer_layout", mode),
+            ("dress_object_initializer_indentation", "not_indented"),
+            ("csharp_indent_block_contents", "true"),
+            ("max_line_length", "200"))
             .ShouldBe("""
                 C M() => new C
                 {
@@ -247,11 +257,12 @@ public sealed class InitializerLayoutRuleTests
 
         foreach (var mode in new[] { "compact", "auto" })
         {
-            Format(source,
-                    ("dress_object_initializer_layout", mode),
-                    ("dress_object_initializer_indentation", "not_indented"),
-                    ("csharp_indent_block_contents", "true"),
-                    ("max_line_length", "40"))
+            Format(
+                source,
+                ("dress_object_initializer_layout", mode),
+                ("dress_object_initializer_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "40"))
                 .ShouldBe(expected);
         }
     }
@@ -260,7 +271,8 @@ public sealed class InitializerLayoutRuleTests
     public void Initializer_layout_owns_braces_and_items_over_standard_newline_rules()
     {
         const string source = "C M() => new C { X = 1, Y = 2 };";
-        var result = Format(source,
+        var result = Format(
+            source,
             ("dress_object_initializer_layout", "compact"),
             ("max_line_length", "200"),
             ("csharp_new_line_before_open_brace", "object_collection_array_initializers"),
@@ -273,8 +285,8 @@ public sealed class InitializerLayoutRuleTests
     public void Expanded_puts_empty_initializer_braces_on_separate_lines()
     {
         Format(
-                "C M() => new C { };",
-                ("dress_object_initializer_layout", "expanded"))
+            "C M() => new C { };",
+            ("dress_object_initializer_layout", "expanded"))
             .ShouldBe("""
                 C M() => new C
                 {
@@ -293,10 +305,11 @@ public sealed class InitializerLayoutRuleTests
             }
             """;
 
-        Format(source,
-                ("dress_object_initializer_layout", "expanded"),
-                ("dress_object_initializer_indentation", "not_indented"),
-                ("csharp_indent_block_contents", "true"))
+        Format(
+            source,
+            ("dress_object_initializer_layout", "expanded"),
+            ("dress_object_initializer_indentation", "not_indented"),
+            ("csharp_indent_block_contents", "true"))
             .ShouldBe("""
                 class C
                 {
@@ -314,14 +327,14 @@ public sealed class InitializerLayoutRuleTests
     public void Nested_initializer_layouts_compose_and_stabilize()
     {
         (string, string)[] preferences =
-        [
-            ("dress_object_initializer_layout", "compact"),
-            ("dress_collection_initializer_layout", "expanded"),
-            ("dress_object_initializer_indentation", "not_indented"),
-            ("dress_collection_initializer_indentation", "not_indented"),
-            ("csharp_indent_block_contents", "true"),
-            ("max_line_length", "200")
-        ];
+            [
+                ("dress_object_initializer_layout", "compact"),
+                ("dress_collection_initializer_layout", "expanded"),
+                ("dress_object_initializer_indentation", "not_indented"),
+                ("dress_collection_initializer_indentation", "not_indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "200")
+            ];
 
         var result = Format(
             "C M() => new C { Values = new List<int> { 1, 2 } };",

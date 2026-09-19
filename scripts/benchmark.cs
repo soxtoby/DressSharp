@@ -123,18 +123,33 @@ try
                     ["gitCommit"] = Do.GitRepo.CurrentCommit.Sha,
                     ["backgroundLoadCaveats"] = caveats
                 },
-            ["corpus"] = new JsonObject { ["version"] = manifest["version"]!.DeepClone(), ["hash"] = manifest["corpusHash"]!.DeepClone(), ["fileCount"] = fileCount },
+            ["corpus"] = new JsonObject
+                {
+                    ["version"] = manifest["version"]!.DeepClone(),
+                    ["hash"] = manifest["corpusHash"]!.DeepClone(),
+                    ["fileCount"] = fileCount
+                },
             ["tools"] = new JsonObject { ["dressSharp"] = "0.1.0", ["dotnetFormat"] = "SDK " + dotnetVersion, ["roslyn"] = "5.6.0" },
             ["profiles"] = profiles
         };
     var stem = $"{timestamp:yyyyMMddTHHmmssZ}-{mode}";
     var jsonPath = resultsDirectory / (stem + ".json");
     jsonPath.WriteText(result.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n");
-    var markdown = new List<string> { $"# Benchmark {timestamp:u}", "", $"Mode: {mode}  ", $"Corpus: {manifest["corpusHash"]}", "", "| Workers | DressSharp median | DressSharp p95 | dotnet format median | Ratio |", "| ---: | ---: | ---: | ---: | ---: |" };
+    var markdown = new List<string>
+        {
+            $"# Benchmark {timestamp:u}",
+            "",
+            $"Mode: {mode}  ",
+            $"Corpus: {manifest["corpusHash"]}",
+            "",
+            "| Workers | DressSharp median | DressSharp p95 | dotnet format median | Ratio |",
+            "| ---: | ---: | ---: | ---: | ---: |"
+        };
     foreach (var profile in profiles.Cast<JsonObject>())
     {
         var summary = profile["summary"]!.AsObject();
-        markdown.Add($"| {profile["workers"]} | {summary["dressSharp"]!["medianMilliseconds"]} ms | {summary["dressSharp"]!["p95Milliseconds"]} ms | {summary["dotnetFormat"]!["medianMilliseconds"]} ms | {summary["medianRatio"]} |");
+        markdown.Add(
+            $"| {profile["workers"]} | {summary["dressSharp"]!["medianMilliseconds"]} ms | {summary["dressSharp"]!["p95Milliseconds"]} ms | {summary["dotnetFormat"]!["medianMilliseconds"]} ms | {summary["medianRatio"]} |");
     }
 
     (resultsDirectory / (stem + ".md")).WriteLines(markdown);
@@ -228,12 +243,20 @@ static async Task<string> Capture(string command)
 
 static async Task<ProcessResult> Start(string workingDirectory, string command, string[] arguments, Dictionary<string, string?>? environment = null)
 {
-    var info = new ProcessStartInfo(command) { WorkingDirectory = workingDirectory, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+    var info = new ProcessStartInfo(command)
+        {
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
     foreach (var argument in arguments)
         info.ArgumentList.Add(argument);
     if (environment is not null)
+    {
         foreach (var pair in environment)
             info.Environment[pair.Key] = pair.Value;
+    }
     using var process = Process.Start(info) ?? throw new InvalidOperationException($"Could not start {command}.");
     var output = process.StandardOutput.ReadToEndAsync();
     var error = process.StandardError.ReadToEndAsync();

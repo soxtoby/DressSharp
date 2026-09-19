@@ -30,6 +30,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     readonly Dictionary<int, bool> _settledBoundaries = [];
     Dictionary<SyntaxNode, int>? _occurrencesByNode;
     readonly Dictionary<int, string?> _lineIndents = [];
+
     internal SyntaxWrappingSolver(
         string source,
         EffectiveTokenStream stream,
@@ -58,6 +59,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue };
         }
     }
+
     internal SyntaxWrappingPlan Finish(TriviaLayoutPlan trivia)
     {
         _trivia = trivia;
@@ -83,11 +85,11 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             var gap = trivia.HasMeaningfulGap(boundary.RightIndex)
                 ? original
                 : _emitterPlan.DesiredSpace(left, right) switch
-                {
-                    true => " ",
-                    false => "",
-                    _ => trivia.HasLineBreak(boundary.RightIndex) ? " " : original
-                };
+                    {
+                        true => " ",
+                        false => "",
+                        _ => trivia.HasLineBreak(boundary.RightIndex) ? " " : original
+                    };
             _boundaries[index] = boundary with { SingleLineGap = gap };
         }
         if (_needsWidths)
@@ -117,8 +119,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                     Node: BinaryExpressionSyntax binary
                 }
                 && binary.Ancestors().OfType<BinaryExpressionSyntax>().None()
-                ? ExistingBinaryOperandIndent(occurrence)
-                : null;
+                        ? ExistingBinaryOperandIndent(occurrence)
+                        : null;
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
@@ -154,7 +156,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 {
                     if (ladder)
                     {
-                        boundaryIndent = Indent(occurrenceIndex,
+                        boundaryIndent = Indent(
+                            occurrenceIndex,
                             _emitterPlan.IndentBlockContents != true && _trivia!.HasLineBreak(occurrence.FirstToken) ? 0 : 1);
                         multi = boundary is { BreakWhenMulti: true, OperatorIndex: >= 0 }
                             && _stream.Pieces[boundary.OperatorIndex].Token.IsKind(SyntaxKind.ColonToken);
@@ -268,26 +271,30 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 && HasUnownedLineBreak(occurrence);
             if (occurrence.Setting.ShapesOperators && HasCommentedOperator(occurrence))
                 continue;
-            if (occurrence.Setting.Mode == WrappingMode.Preserve && !hasLineBreak
+            if (occurrence.Setting.Mode == WrappingMode.Preserve
+                && !hasLineBreak
                 && occurrence.Setting.ClosingPosition is null)
                 continue;
             if (occurrence.Setting.Mode == WrappingMode.Auto
                 && (hasLineBreak || hasNestedLineBreak)
-                && !initializerLayout && !itemPerLineLayout && !occurrence.Setting.ShapesOperators
+                && !initializerLayout
+                && !itemPerLineLayout
+                && !occurrence.Setting.ShapesOperators
                 && occurrence.Node is not BaseListSyntax)
                 continue;
 
             var multi = occurrence.Setting.Mode == WrappingMode.Multi
                 || occurrence.Setting is { Mode: WrappingMode.Preserve, ClosingPosition: not null }
-                && (hasLineBreak || HasUnownedLineBreak(occurrence))
-                || occurrence.Setting.ShapesOperators && hasLineBreak
-                && occurrence.Setting.Mode is WrappingMode.Auto or WrappingMode.Preserve
+                    && (hasLineBreak || HasUnownedLineBreak(occurrence))
+                || occurrence.Setting.ShapesOperators
+                    && hasLineBreak
+                    && occurrence.Setting.Mode is WrappingMode.Auto or WrappingMode.Preserve
                 || occurrence.Setting.Mode == WrappingMode.Auto
-                && (initializerLayout || itemPerLineLayout)
-                && (hasLineBreak || hasNestedLineBreak)
+                    && (initializerLayout || itemPerLineLayout)
+                    && (hasLineBreak || hasNestedLineBreak)
                 || occurrence.Setting.Mode == WrappingMode.Compact
-                && initializerLayout
-                && hasNestedLineBreak;
+                    && initializerLayout
+                    && hasNestedLineBreak;
             var hasLineComment = false;
             var checkedLineComments = false;
             if (!multi
@@ -314,11 +321,11 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                     {
                         var boundary = _boundaries[occurrence.BoundaryStart + offset];
                         width += PlannedWidth(
-                                boundary,
-                                _trivia!,
-                                false,
-                                _lineEnding,
-                                _settings.TabWidth)
+                            boundary,
+                            _trivia!,
+                            false,
+                            _lineEnding,
+                            _settings.TabWidth)
                             - CurrentGapWidth(boundary.RightIndex);
                     }
 
@@ -327,7 +334,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 }
             }
 
-            if (!multi && occurrence.Setting.ClosingPosition is null
+            if (!multi
+                && occurrence.Setting.ClosingPosition is null
                 && (hasLineComment || !checkedLineComments && HasLineComment(occurrence)))
             {
                 if (initializerLayout && occurrence.Setting.Mode == WrappingMode.Compact)
@@ -353,7 +361,12 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 if (boundaryMulti)
                 {
                     _plannedLineBreaks[boundary.RightIndex] = Render(
-                        boundary, _trivia!, true, Indent(occurrenceIndex, 1), Indent(occurrenceIndex, 0), _lineEnding);
+                        boundary,
+                        _trivia!,
+                        true,
+                        Indent(occurrenceIndex, 1),
+                        Indent(occurrenceIndex, 0),
+                        _lineEnding);
                 }
                 else
                     _plannedLineBreaks.Remove(boundary.RightIndex);
@@ -443,8 +456,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         IsClose(boundary) && occurrence.Setting.ClosingPosition is not null && _trivia!.HasMeaningfulGap(boundary.RightIndex)
         || occurrence.Setting is { Mode: WrappingMode.Preserve, ClosingPosition: not null } && !IsClose(boundary)
         || existingMultilineList
-        && !(IsClose(boundary) && occurrence.Setting.ClosingPosition is not null)
-        && (boundary.Style == GapStyle.DelimitedClose
+            && !(IsClose(boundary) && occurrence.Setting.ClosingPosition is not null)
+            && (boundary.Style == GapStyle.DelimitedClose
             || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex));
 
     bool PlannedMultiline(Occurrence occurrence, IReadOnlyDictionary<int, string> gaps)
@@ -453,7 +466,9 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             return true;
         if (occurrence.Setting.Mode is WrappingMode.Preserve or WrappingMode.Auto
             && _trivia!.HasLineBreak(occurrence.LastToken))
+        {
             return true;
+        }
         for (var index = occurrence.FirstToken; index <= occurrence.LastToken; index++)
         {
             if (_stream.Pieces[index].Token.Text.Contains('\n'))
@@ -461,8 +476,11 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             if (index == occurrence.FirstToken)
                 continue;
             if (gaps.TryGetValue(index, out var gap) ? gap.Contains('\n')
-                : _settledBoundaries.TryGetValue(index, out var breaks) ? breaks : BreaksAt(index))
+                : _settledBoundaries.TryGetValue(index, out var breaks) ? breaks
+                : BreaksAt(index))
+            {
                 return true;
+            }
         }
         return false;
     }
@@ -487,10 +505,12 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     {
         if (occurrence.Setting.NestedStyle != "decision_ladder"
             || occurrence.Node is not ConditionalExpressionSyntax { WhenFalse: ConditionalExpressionSyntax } root)
+        {
             return false;
+        }
 
         // Only the false-branch spine can become a ladder. A nested true branch remains a tree.
-        for (var expression = root; ;)
+        for (var expression = root;; )
         {
             if (expression.Condition.DescendantNodesAndSelf().OfType<ConditionalExpressionSyntax>().Any()
                 || expression.WhenTrue.DescendantNodesAndSelf().OfType<ConditionalExpressionSyntax>().Any())
@@ -507,11 +527,14 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         {
             if (_stream.Pieces[index].Token.Text.Contains('\n') || _stream.Pieces[index].Token.Text.Contains('\r'))
                 return false;
-            if (index > occurrence.FirstToken && !owned.Contains(index)
+            if (index > occurrence.FirstToken
+                && !owned.Contains(index)
                 && (childGaps.TryGetValue(index, out var gap)
                     ? gap.Contains('\n') || gap.Contains('\r')
                     : _trivia!.HasLineBreak(index)))
+            {
                 return false;
+            }
         }
         return true;
     }
@@ -529,9 +552,13 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             if (index != occurrence.FirstToken)
             {
                 if (_plannedLineBreaks.TryGetValue(index, out var gap))
+                {
                     Advance(gap);
+                }
                 else if (_plannedWidths!.TryGet(index, out var width))
+                {
                     column += width;
+                }
                 else if (_trivia!.HasLineBreak(index) || _trivia.HasMeaningfulGap(index))
                 {
                     foreach (var item in _trivia.Trailing(index - 1))
@@ -540,12 +567,16 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                         Advance(item.ToFullString());
                 }
                 else
+                {
                     column += BaseGapWidth(index);
+                }
             }
 
             if (offset < boundaryLines.Length
                 && _boundaries[occurrence.BoundaryStart + offset].RightIndex == index)
+            {
                 boundaryLines[offset++] = lineWidths.Count;
+            }
             Advance(_stream.Pieces[index].Token.Text);
         }
 
@@ -564,7 +595,9 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                     column = 0;
                 }
                 else
+                {
                     column += character == '\t' ? _settings.TabWidth - column % _settings.TabWidth : 1;
+                }
             }
         }
     }
@@ -631,7 +664,9 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 var boundary = _boundaries[occurrence.BoundaryStart + offset];
                 if (boundary.BreakWhenMulti
                     && !(IsClose(boundary) && occurrence.Setting.ClosingPosition == "after_last_item"))
+                {
                     _settledBreaks.Add(boundary.RightIndex);
+                }
             }
         }
 
@@ -908,8 +943,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         var placedIndent = Indent(placed, 1);
         return _plannedBases[occurrenceIndex] =
             VisualWidth(placedIndent, _settings.TabWidth) > VisualWidth(structural, _settings.TabWidth)
-                ? placedIndent
-                : structural;
+            ? placedIndent
+            : structural;
     }
 
     /// <summary>
@@ -937,7 +972,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         var occurrence = _occurrences[occurrenceIndex];
         var placed = -1;
         var placedAt = -1;
-        for (var parentIndex = occurrence.Parent; parentIndex >= 0;)
+        for (var parentIndex = occurrence.Parent; parentIndex >= 0; )
         {
             var parent = _occurrences[parentIndex];
             for (var offset = 0; offset < parent.BoundaryCount; offset++)
@@ -1042,22 +1077,22 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     }
 
     static int BinaryPrecedence(SyntaxKind kind) => kind switch
-    {
-        SyntaxKind.MultiplyExpression or SyntaxKind.DivideExpression or SyntaxKind.ModuloExpression => 11,
-        SyntaxKind.AddExpression or SyntaxKind.SubtractExpression => 10,
-        SyntaxKind.LeftShiftExpression or SyntaxKind.RightShiftExpression or SyntaxKind.UnsignedRightShiftExpression => 9,
-        SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression
-            or SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression
-            or SyntaxKind.IsExpression or SyntaxKind.AsExpression => 8,
-        SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression => 7,
-        SyntaxKind.BitwiseAndExpression => 6,
-        SyntaxKind.ExclusiveOrExpression => 5,
-        SyntaxKind.BitwiseOrExpression => 4,
-        SyntaxKind.LogicalAndExpression => 3,
-        SyntaxKind.LogicalOrExpression => 2,
-        SyntaxKind.CoalesceExpression => 1,
-        _ => 0
-    };
+        {
+            SyntaxKind.MultiplyExpression or SyntaxKind.DivideExpression or SyntaxKind.ModuloExpression => 11,
+            SyntaxKind.AddExpression or SyntaxKind.SubtractExpression => 10,
+            SyntaxKind.LeftShiftExpression or SyntaxKind.RightShiftExpression or SyntaxKind.UnsignedRightShiftExpression => 9,
+            SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression
+                or SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression
+                or SyntaxKind.IsExpression or SyntaxKind.AsExpression => 8,
+            SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression => 7,
+            SyntaxKind.BitwiseAndExpression => 6,
+            SyntaxKind.ExclusiveOrExpression => 5,
+            SyntaxKind.BitwiseOrExpression => 4,
+            SyntaxKind.LogicalAndExpression => 3,
+            SyntaxKind.LogicalOrExpression => 2,
+            SyntaxKind.CoalesceExpression => 1,
+            _ => 0
+        };
 
     readonly record struct Measurement(int Width, bool HasLineComment);
 }
@@ -1066,7 +1101,7 @@ sealed class SparseGapWidths
 {
     readonly Entry[] _entries;
 
-        internal SparseGapWidths(IReadOnlyList<Boundary> boundaries)
+    internal SparseGapWidths(IReadOnlyList<Boundary> boundaries)
     {
         var entries = new Entry[boundaries.Count];
         for (var index = 0; index < boundaries.Count; index++)

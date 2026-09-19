@@ -40,7 +40,9 @@ public class DocumentFormatterTests
         repeated.SkippedOccurrences.ShouldBe(1);
 
         ValueTask<FormattedDocument> Format(string input) => formatter.Format(
-            SourceDocument.FromText("test.cs", input), CSharpParseOptions.Default, TestContext.Current.CancellationToken);
+            SourceDocument.FromText("test.cs", input),
+            CSharpParseOptions.Default,
+            TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -100,16 +102,25 @@ public class DocumentFormatterTests
     public void Auto_wrapping_preserves_large_initializers_with_nested_line_breaks(string lineEnding)
     {
         var items = string.Join(lineEnding, Enumerable.Range(0, 512).Select(index => $"            {index},"));
-        var source = string.Join(lineEnding,
-            "class C", "{", "    object Values = new[]", "        {", items,
-            "            Other(", "                1,", "                2)", "        };", "}");
+        var source = string.Join(
+            lineEnding,
+            "class C",
+            "{",
+            "    object Values = new[]",
+            "        {",
+            items,
+            "            Other(",
+            "                1,",
+            "                2)",
+            "        };",
+            "}");
         (string, string)[] preferences =
-        [
-            ("dress_array_initializer_layout", "auto"),
-            ("dress_array_initializer_indentation", "indented"),
-            ("csharp_indent_block_contents", "true"),
-            ("max_line_length", "80")
-        ];
+            [
+                ("dress_array_initializer_layout", "auto"),
+                ("dress_array_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "80")
+            ];
 
         var result = EmitterTestHarness.Format(source, preferences);
 
@@ -150,7 +161,9 @@ public class DocumentFormatterTests
             longResult.ShouldNotContain("\r");
 
         string Format(string source) => formatter.FormatSyntax(
-            CSharpSyntaxTree.ParseText(source).GetRoot(), source, CSharpParseOptions.Default);
+            CSharpSyntaxTree.ParseText(source).GetRoot(),
+            source,
+            CSharpParseOptions.Default);
 
         static IfStatementSyntax Conditional(string source) => CSharpSyntaxTree.ParseText(source)
             .GetRoot().DescendantNodes().OfType<IfStatementSyntax>().Single();

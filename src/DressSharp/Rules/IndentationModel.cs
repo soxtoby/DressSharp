@@ -159,27 +159,27 @@ sealed class IndentationModel
         if (_originalOwners.TryGetValue(node, out var original))
             return ForNode(original);
         return node.Parent switch
-        {
-            ArgumentListSyntax arguments when node is ArgumentSyntax => ForNode(arguments) + PreservedContinuation(node, arguments),
-            ArrowExpressionClauseSyntax clause when node is ConditionalExpressionSyntax or InvocationExpressionSyntax or AssignmentExpressionSyntax
-                && node == clause.Expression =>
-                ForNode(clause.Parent) + Unit(StartsAfterArrow(clause)),
-            ConditionalExpressionSyntax conditional when node == conditional.WhenTrue || node == conditional.WhenFalse =>
-                ForNode(conditional) + _plan.IndentUnit,
-            BlockSyntax block => Contents(block),
-            SwitchSectionSyntax section => CaseContents(section, node is BlockSyntax),
-            ElseClauseSyntax clause => ForNode(clause) + Unit(node is not (BlockSyntax or IfStatementSyntax)),
-            StatementSyntax statement when node is StatementSyntax => ForNode(statement) + Unit(node is not BlockSyntax),
-            BaseTypeDeclarationSyntax type when node is MemberDeclarationSyntax or EnumMemberDeclarationSyntax => Contents(type),
-            NamespaceDeclarationSyntax ns => Contents(ns),
-            AccessorListSyntax accessors => Contents(accessors),
-            InitializerExpressionSyntax initializer => Contents(initializer),
-            CollectionExpressionSyntax collection when node is CollectionElementSyntax => Contents(collection),
-            AnonymousObjectCreationExpressionSyntax anonymous => Contents(anonymous),
-            SwitchExpressionSyntax expression when node is SwitchExpressionArmSyntax => Contents(expression),
-            PropertyPatternClauseSyntax pattern => Contents(pattern),
-            _ => ForNode(node.Parent)
-        };
+            {
+                ArgumentListSyntax arguments when node is ArgumentSyntax => ForNode(arguments) + PreservedContinuation(node, arguments),
+                ArrowExpressionClauseSyntax clause when node is ConditionalExpressionSyntax or InvocationExpressionSyntax or AssignmentExpressionSyntax
+                    && node == clause.Expression =>
+                    ForNode(clause.Parent) + Unit(StartsAfterArrow(clause)),
+                ConditionalExpressionSyntax conditional when node == conditional.WhenTrue || node == conditional.WhenFalse =>
+                    ForNode(conditional) + _plan.IndentUnit,
+                BlockSyntax block => Contents(block),
+                SwitchSectionSyntax section => CaseContents(section, node is BlockSyntax),
+                ElseClauseSyntax clause => ForNode(clause) + Unit(node is not (BlockSyntax or IfStatementSyntax)),
+                StatementSyntax statement when node is StatementSyntax => ForNode(statement) + Unit(node is not BlockSyntax),
+                BaseTypeDeclarationSyntax type when node is MemberDeclarationSyntax or EnumMemberDeclarationSyntax => Contents(type),
+                NamespaceDeclarationSyntax ns => Contents(ns),
+                AccessorListSyntax accessors => Contents(accessors),
+                InitializerExpressionSyntax initializer => Contents(initializer),
+                CollectionExpressionSyntax collection when node is CollectionElementSyntax => Contents(collection),
+                AnonymousObjectCreationExpressionSyntax anonymous => Contents(anonymous),
+                SwitchExpressionSyntax expression when node is SwitchExpressionArmSyntax => Contents(expression),
+                PropertyPatternClauseSyntax pattern => Contents(pattern),
+                _ => ForNode(node.Parent)
+            };
     }
 
     internal string Brace(SyntaxNode owner)
@@ -204,7 +204,7 @@ sealed class IndentationModel
 
     internal string Contents(SyntaxNode owner) =>
         Brace(owner) + Unit(_plan.IndentBlockContents == true
-            || owner is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax or AccessorListSyntax);
+        || owner is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax or AccessorListSyntax);
 
     internal string SwitchLabel(SwitchSectionSyntax section) =>
         Brace(section.Parent!) + Unit(_plan.IndentSwitchLabels ?? _plan.IndentBlockContents ?? false);

@@ -8,24 +8,24 @@ namespace DressSharp.Rules;
 sealed class LambdaBodyRule : ISyntaxFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
-    {
-        RuleKey = RuleKey.DressLambdaBody,
-        Caption = "Lambda",
-        ExpandedCaption = RuleMetadata.Humanize(RuleKey.DressLambdaBody.ToName()),
-        GroupName = "Braces and bodies",
-        SubgroupName = "Body styles",
-        Description = "Controls lambda bodies. A single return or expression statement and its expression-bodied form represent the same expression.",
-        Values = RuleValues.From(["block", "expression"]),
-        DefaultValue = "expression",
-        Example = """
-            class Example
-            {
-                Func<int> Value = () => { return 1; };
-            }
-            """,
-        OwnedSyntax = "lambda bodies",
-        Invariant = "A single return or expression statement and its expression-bodied form represent the same expression."
-    };
+        {
+            RuleKey = RuleKey.DressLambdaBody,
+            Caption = "Lambda",
+            ExpandedCaption = RuleMetadata.Humanize(RuleKey.DressLambdaBody.ToName()),
+            GroupName = "Braces and bodies",
+            SubgroupName = "Body styles",
+            Description = "Controls lambda bodies. A single return or expression statement and its expression-bodied form represent the same expression.",
+            Values = RuleValues.From(["block", "expression"]),
+            DefaultValue = "expression",
+            Example = """
+                class Example
+                {
+                    Func<int> Value = () => { return 1; };
+                }
+                """,
+            OwnedSyntax = "lambda bodies",
+            Invariant = "A single return or expression statement and its expression-bodied form represent the same expression."
+        };
 
     public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } =
         [SyntaxKind.SimpleLambdaExpression, SyntaxKind.ParenthesizedLambdaExpression];

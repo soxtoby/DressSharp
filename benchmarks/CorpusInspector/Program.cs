@@ -22,13 +22,20 @@ var entries = Directory.EnumerateFiles(corpus, "*.cs", SearchOption.AllDirectori
         }).ToArray();
 var corpusHash = Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
     string.Join('\n', entries.Select(entry => $"{entry.path}:{entry.sha256}")))));
-var json = JsonSerializer.Serialize(new { version = 1, corpusHash, fileCount = entries.Length, files = entries }, new JsonSerializerOptions { WriteIndented = true })
+var json = JsonSerializer.Serialize(
+    new { version = 1, corpusHash, fileCount = entries.Length, files = entries },
+    new JsonSerializerOptions { WriteIndented = true })
     .Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
 
 if (args.Contains("--update", StringComparer.Ordinal))
+{
     File.WriteAllText(manifestPath, json);
+}
 else if (!File.Exists(manifestPath) || File.ReadAllText(manifestPath).Replace("\r\n", "\n", StringComparison.Ordinal) != json)
-    throw new InvalidOperationException("Materialized corpus does not match corpus/manifest.json. Run with -UpdateLock after an intentional source-manifest change.");
+{
+    throw new InvalidOperationException(
+        "Materialized corpus does not match corpus/manifest.json. Run with -UpdateLock after an intentional source-manifest change.");
+}
 
 if (entries.Length != 1000)
     throw new InvalidOperationException($"Expected 1,000 files; found {entries.Length}.");

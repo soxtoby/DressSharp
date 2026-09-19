@@ -25,12 +25,14 @@ public class AttributeTargetSpacingRuleTests
     public void Target_spacing_respects_preference_with_and_without_layout(string source, string spaced, string compact)
     {
         foreach (var layout in new[] { "unset", "always_single", "auto" })
-        foreach (var value in new[] { "true", "false", "unset" })
         {
-            var expected = value switch { "true" => spaced, "false" => compact, _ => source };
-            var result = Format(source, (Key, value), ("dress_attributes_layout", layout));
-            result.ShouldBe(expected);
-            Format(result, (Key, value), ("dress_attributes_layout", layout)).ShouldBe(result);
+            foreach (var value in new[] { "true", "false", "unset" })
+            {
+                var expected = value switch { "true" => spaced, "false" => compact, _ => source };
+                var result = Format(source, (Key, value), ("dress_attributes_layout", layout));
+                result.ShouldBe(expected);
+                Format(result, (Key, value), ("dress_attributes_layout", layout)).ShouldBe(result);
+            }
         }
         Format(source).ShouldBe(source);
     }

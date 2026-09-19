@@ -6,42 +6,43 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DressSharp.Rules;
 
-sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, NewLineKind kind, RuleValueDefinition values, string defaultValue) : IFormattingRule
+sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, NewLineKind kind, RuleValueDefinition values, string defaultValue)
+    : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
-    {
-        RuleKey = ruleKey,
-        Caption = caption,
-        ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
-        GroupName = "Braces and bodies",
-        SubgroupName = subgroupName,
-        Description = "Controls owned token boundaries. Only boundary whitespace changes.",
-        Values = values,
-        DefaultValue = defaultValue,
-        Example = kind switch
         {
-            NewLineKind.Catch or NewLineKind.Finally => "try { Work(); } catch (Exception) { Recover(); } finally { CleanUp(); }",
-            NewLineKind.ObjectInitializerMembers => "var value = new Example { First = 1, Second = 2 };",
-            NewLineKind.AnonymousTypeMembers => "var value = new { First = 1, Second = 2 };",
-            NewLineKind.QueryClauses => "var result = from item in items where item.Active select item.Name;",
-            _ => """
-            class Example
-            {
-                void Run()
+            RuleKey = ruleKey,
+            Caption = caption,
+            ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
+            GroupName = "Braces and bodies",
+            SubgroupName = subgroupName,
+            Description = "Controls owned token boundaries. Only boundary whitespace changes.",
+            Values = values,
+            DefaultValue = defaultValue,
+            Example = kind switch
                 {
-                    if (true)
+                    NewLineKind.Catch or NewLineKind.Finally => "try { Work(); } catch (Exception) { Recover(); } finally { CleanUp(); }",
+                    NewLineKind.ObjectInitializerMembers => "var value = new Example { First = 1, Second = 2 };",
+                    NewLineKind.AnonymousTypeMembers => "var value = new { First = 1, Second = 2 };",
+                    NewLineKind.QueryClauses => "var result = from item in items where item.Active select item.Name;",
+                    _ => """
+                    class Example
                     {
+                        void Run()
+                        {
+                            if (true)
+                            {
+                            }
+                            else
+                            {
+                            }
+                        }
                     }
-                    else
-                    {
-                    }
-                }
-            }
-            """
-        },
-        OwnedSyntax = "owned token boundaries",
-        Invariant = "Only boundary whitespace changes"
-    };
+                    """
+                },
+            OwnedSyntax = "owned token boundaries",
+            Invariant = "Only boundary whitespace changes"
+        };
 
     internal NewLineKind Kind => kind;
     internal bool RequiresInitializerMemberBoundary => kind is NewLineKind.ObjectInitializerMembers or NewLineKind.AnonymousTypeMembers;
@@ -68,23 +69,23 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
         SyntaxToken token,
         BraceCategories categories,
         SyntaxNode? initializerAtMemberBoundary) => kind switch
-        {
-            NewLineKind.OpenBrace => token.IsKind(SyntaxKind.OpenBraceToken) && BraceCategory(token) is { } category
+            {
+                NewLineKind.OpenBrace => token.IsKind(SyntaxKind.OpenBraceToken) && BraceCategory(token) is { } category
                 ? categories.Contains(category)
                 : null,
-            NewLineKind.Else => token.IsKind(SyntaxKind.ElseKeyword) ? categories.Enabled : null,
-            NewLineKind.Catch => token.IsKind(SyntaxKind.CatchKeyword) ? categories.Enabled : null,
-            NewLineKind.Finally => token.IsKind(SyntaxKind.FinallyKeyword) ? categories.Enabled : null,
-            NewLineKind.ObjectInitializerMembers => initializerAtMemberBoundary is InitializerExpressionSyntax initializer
+                NewLineKind.Else => token.IsKind(SyntaxKind.ElseKeyword) ? categories.Enabled : null,
+                NewLineKind.Catch => token.IsKind(SyntaxKind.CatchKeyword) ? categories.Enabled : null,
+                NewLineKind.Finally => token.IsKind(SyntaxKind.FinallyKeyword) ? categories.Enabled : null,
+                NewLineKind.ObjectInitializerMembers => initializerAtMemberBoundary is InitializerExpressionSyntax initializer
                 && initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
                     ? categories.Enabled
                     : null,
-            NewLineKind.AnonymousTypeMembers => initializerAtMemberBoundary is AnonymousObjectCreationExpressionSyntax
+                NewLineKind.AnonymousTypeMembers => initializerAtMemberBoundary is AnonymousObjectCreationExpressionSyntax
                 ? categories.Enabled
                 : null,
-            NewLineKind.QueryClauses => StartsQueryClause(token) ? categories.Enabled : null,
-            _ => null
-        };
+                NewLineKind.QueryClauses => StartsQueryClause(token) ? categories.Enabled : null,
+                _ => null
+            };
 
     internal static SyntaxNode? InitializerAtMemberBoundary(SyntaxToken token)
     {
@@ -106,11 +107,11 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
                 return null;
             var owner = node.Parent;
             var elements = owner switch
-            {
-                InitializerExpressionSyntax candidate => (IReadOnlyList<SyntaxNode>)candidate.Expressions,
-                AnonymousObjectCreationExpressionSyntax candidate => candidate.Initializers,
-                _ => null
-            };
+                {
+                    InitializerExpressionSyntax candidate => (IReadOnlyList<SyntaxNode>)candidate.Expressions,
+                    AnonymousObjectCreationExpressionSyntax candidate => candidate.Initializers,
+                    _ => null
+                };
             if (elements is not null)
                 return elements.Contains(node) ? owner : null;
         }
@@ -142,6 +143,7 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
         }
 
         internal bool Enabled { get; }
+
         internal bool Contains(string category) => _selected is null ? Enabled : _selected.Contains(category);
 
         internal static BraceCategories From(NewLineKind kind, string preference)

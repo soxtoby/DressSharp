@@ -17,11 +17,11 @@ public class RuleExampleTests
     {
         var metadata = RuleCatalog.BuiltIn.Rules.Single(rule => rule.Metadata.RuleKey.ToName() == key).Metadata;
         var values = metadata.Values.Kind switch
-        {
-            RuleValueKind.Integer => new[] { metadata.Values.Minimum!.Value.ToString(), "2", "8", "40", metadata.DefaultValue },
-            RuleValueKind.Permutation => new[] { metadata.DefaultValue, string.Join(",", metadata.DefaultValue.Split(',').Reverse()) },
-            _ => metadata.Values.Options.Select(option => option.Value).Concat(metadata.Values.SpecialValues.IsDefault ? [] : metadata.Values.SpecialValues)
-        };
+            {
+                RuleValueKind.Integer => new[] { metadata.Values.Minimum!.Value.ToString(), "2", "8", "40", metadata.DefaultValue },
+                RuleValueKind.Permutation => new[] { metadata.DefaultValue, string.Join(",", metadata.DefaultValue.Split(',').Reverse()) },
+                _ => metadata.Values.Options.Select(option => option.Value).Concat(metadata.Values.SpecialValues.IsDefault ? [] : metadata.Values.SpecialValues)
+            };
         var results = new HashSet<string>();
         foreach (var value in values.Distinct())
         {

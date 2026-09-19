@@ -13,17 +13,27 @@ public sealed class InitializerIndentationEmitterTests
     [InlineData("new List<int>", "{", "}", "dress_collection_initializer_indentation", "\r\n")]
     [InlineData("", "[", "]", "dress_collection_expression_indentation", "\n")]
     public void Large_initializers_keep_each_direct_item_indented(
-        string creation, string open, string close, string preference, string lineEnding)
+        string creation,
+        string open,
+        string close,
+        string preference,
+        string lineEnding)
     {
         var items = string.Join(lineEnding, Enumerable.Range(0, 512).Select(index => $"            {index},"));
-        var source = string.Join(lineEnding,
-            "class C", "{", $"    object Values = {creation}".TrimEnd(),
-            "        " + open, items, "        " + close + ";", "}");
+        var source = string.Join(
+            lineEnding,
+            "class C",
+            "{",
+            $"    object Values = {creation}".TrimEnd(),
+            "        " + open,
+            items,
+            "        " + close + ";",
+            "}");
         (string, string)[] preferences =
-        [
-            (preference, "indented"),
-            ("csharp_indent_block_contents", "true")
-        ];
+            [
+                (preference, "indented"),
+                ("csharp_indent_block_contents", "true")
+            ];
 
         var result = Format(source, preferences);
 
@@ -50,14 +60,16 @@ public sealed class InitializerIndentationEmitterTests
             """;
         source = source.Replace("\n", lineEnding);
 
-        var result = Format(source,
-                ("dress_collection_expression_argument_indentation", "not_indented"),
-                ("csharp_indent_block_contents", "true"));
+        var result = Format(
+            source,
+            ("dress_collection_expression_argument_indentation", "not_indented"),
+            ("csharp_indent_block_contents", "true"));
 
         result.ShouldBe(source);
-        Format(result,
-                ("dress_collection_expression_argument_indentation", "not_indented"),
-                ("csharp_indent_block_contents", "true"))
+        Format(
+            result,
+            ("dress_collection_expression_argument_indentation", "not_indented"),
+            ("csharp_indent_block_contents", "true"))
             .ShouldBe(result);
     }
 
@@ -73,7 +85,8 @@ public sealed class InitializerIndentationEmitterTests
         var expected = "class C\n{\nvoid M()\n{\n" + prefix + "    [\n\"first\"\n    ]" + suffix + "\n}\n}";
 
         Format(source, ("dress_collection_expression_indentation", "indented")).ShouldBe(source);
-        var result = Format(source,
+        var result = Format(
+            source,
             ("dress_collection_expression_indentation", "not_indented"),
             ("dress_collection_expression_argument_indentation", "indented"));
         result.ShouldBe(expected);
@@ -96,7 +109,8 @@ public sealed class InitializerIndentationEmitterTests
         var expected = source.Replace("\n[", "\n    [").Replace("\n]", "\n    ]");
 
         Format(source, ("dress_collection_expression_argument_indentation", "indented")).ShouldBe(source);
-        var result = Format(source,
+        var result = Format(
+            source,
             ("dress_collection_expression_indentation", "indented"),
             ("dress_collection_expression_argument_indentation", "not_indented"));
         result.ShouldBe(expected);
@@ -106,15 +120,16 @@ public sealed class InitializerIndentationEmitterTests
     [Fact]
     public void Nested_initializer_uses_the_indent_from_a_planned_parent_line()
     {
-        Format("""
+        Format(
+            """
                 class C
                 {
                     object M() => N(first, [1, 2]);
                 }
                 """,
-                ("dress_arguments_layout", "always_multi"),
-                ("dress_collection_expression_argument_indentation", "not_indented"),
-                ("csharp_indent_block_contents", "true"))
+            ("dress_arguments_layout", "always_multi"),
+            ("dress_collection_expression_argument_indentation", "not_indented"),
+            ("csharp_indent_block_contents", "true"))
             .ShouldBe("""
                 class C
                 {
@@ -130,17 +145,18 @@ public sealed class InitializerIndentationEmitterTests
     public void Auto_layout_keeps_nested_initializer_items_stable()
     {
         (string, string)[] preferences =
-        [
-            ("max_line_length", "180"),
-            ("dress_object_initializer_layout", "auto"),
-            ("dress_collection_initializer_layout", "auto"),
-            ("csharp_new_line_before_open_brace", "all"),
-            ("csharp_indent_block_contents", "true"),
-            ("dress_object_initializer_indentation", "indented"),
-            ("dress_collection_initializer_indentation", "indented")
-        ];
+            [
+                ("max_line_length", "180"),
+                ("dress_object_initializer_layout", "auto"),
+                ("dress_collection_initializer_layout", "auto"),
+                ("csharp_new_line_before_open_brace", "all"),
+                ("csharp_indent_block_contents", "true"),
+                ("dress_object_initializer_indentation", "indented"),
+                ("dress_collection_initializer_indentation", "indented")
+            ];
 
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
                 void M()
@@ -206,19 +222,20 @@ public sealed class InitializerIndentationEmitterTests
         var source = sourceTemplate.Replace("RAW_SUFFIX", suffix).ReplaceLineEndings(lineEnding);
         var expected = expectedTemplate.Replace("RAW_SUFFIX", suffix).ReplaceLineEndings(lineEnding);
         (string, string)[] preferences =
-        [
-            ("csharp_indent_block_contents", "true"),
-            ("dress_object_initializer_indentation", "indented")
-        ];
+            [
+                ("csharp_indent_block_contents", "true"),
+                ("dress_object_initializer_indentation", "indented")
+            ];
 
         var result = Format(source, preferences);
 
         result.ShouldBe(expected);
         RawValue(result).ShouldBe(RawValue(source));
         Format(result, preferences).ShouldBe(result);
-        Format(result,
-                ("csharp_indent_block_contents", "true"),
-                ("dress_object_initializer_indentation", "not_indented"))
+        Format(
+            result,
+            ("csharp_indent_block_contents", "true"),
+            ("dress_object_initializer_indentation", "not_indented"))
             .ShouldBe(source);
 
         static string RawValue(string text) => CSharpSyntaxTree.ParseText(text)
@@ -231,7 +248,8 @@ public sealed class InitializerIndentationEmitterTests
     [Fact]
     public void Initializer_setting_preserves_unrelated_source_indentation()
     {
-        Format("""
+        Format(
+            """
             class C
               {
                   C M() => new C
@@ -257,7 +275,8 @@ public sealed class InitializerIndentationEmitterTests
     public void Configures_object_initializer_indentation()
     {
         const string key = "dress_object_initializer_indentation";
-        var indented = Format("""
+        var indented = Format(
+            """
             class C
             {
             C M() => new C
@@ -297,12 +316,13 @@ public sealed class InitializerIndentationEmitterTests
     public void Configures_nested_anonymous_object_initializer_indentation()
     {
         (string, string)[] preferences =
-        [
-            ("csharp_indent_block_contents", "true"),
-            ("dress_object_initializer_indentation", "indented")
-        ];
+            [
+                ("csharp_indent_block_contents", "true"),
+                ("dress_object_initializer_indentation", "indented")
+            ];
 
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
                 object M() => new
@@ -337,7 +357,8 @@ public sealed class InitializerIndentationEmitterTests
     public void Configures_collection_initializer_indentation()
     {
         const string key = "dress_collection_initializer_indentation";
-        var indented = Format("""
+        var indented = Format(
+            """
             class C
             {
             List<int> M() => new List<int>
@@ -374,7 +395,8 @@ public sealed class InitializerIndentationEmitterTests
     public void Configures_array_initializer_indentation()
     {
         const string key = "dress_array_initializer_indentation";
-        var indented = Format("""
+        var indented = Format(
+            """
             class C
             {
             int[] M() => new[]
@@ -411,7 +433,8 @@ public sealed class InitializerIndentationEmitterTests
     public void Configures_with_initializer_indentation()
     {
         const string key = "dress_with_initializer_indentation";
-        var indented = Format("""
+        var indented = Format(
+            """
             record C(int X)
             {
             C M() => this with
@@ -448,7 +471,8 @@ public sealed class InitializerIndentationEmitterTests
     public void Configures_collection_expression_indentation()
     {
         const string key = "dress_collection_expression_indentation";
-        var indented = Format("""
+        var indented = Format(
+            """
             class C
             {
             int[] M() =>
@@ -516,7 +540,8 @@ public sealed class InitializerIndentationEmitterTests
             }
             """);
 
-        Format("""
+        Format(
+            """
             record C(int X)
             {
             C ObjectSingle = new C { X = 1 };
@@ -542,7 +567,8 @@ public sealed class InitializerIndentationEmitterTests
             }
             """,
             (key, "unset")).ShouldBe(baseline);
-        Format("""
+        Format(
+            """
             record C(int X)
             {
             C ObjectSingle = new C { X = 1 };
@@ -568,7 +594,8 @@ public sealed class InitializerIndentationEmitterTests
             }
             """,
             (key, "indented")).ShouldBe(baseline);
-        Format("""
+        Format(
+            """
             record C(int X)
             {
             C ObjectSingle = new C { X = 1 };
@@ -662,12 +689,13 @@ public sealed class InitializerIndentationEmitterTests
     public void Syntax_wrapping_preserves_comment_before_indented_closing_delimiter()
     {
         (string, string)[] preferences =
-        [
-            ("dress_object_initializer_layout", "expanded"),
-            ("dress_object_initializer_indentation", "indented")
-        ];
+            [
+                ("dress_object_initializer_layout", "expanded"),
+                ("dress_object_initializer_indentation", "indented")
+            ];
 
-        var result = Format("""
+        var result = Format(
+            """
             class C
             {
             C M() => new C

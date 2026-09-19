@@ -82,9 +82,11 @@ static class RuleValues
     static string Humanize(string value)
     {
         var words = value.Split('_', StringSplitOptions.RemoveEmptyEntries);
-        return string.Join(' ', words.Select((word, index) => index == 0
-            ? char.ToUpperInvariant(word[0]) + word[1..]
-            : word));
+        return string.Join(
+            ' ',
+            words.Select((word, index) => index == 0
+                ? char.ToUpperInvariant(word[0]) + word[1..]
+                : word));
     }
 }
 
@@ -94,7 +96,10 @@ sealed record RuleMetadata
 
     public required RuleKey RuleKey { get; init; }
     public required string Caption { get; init; }
-    public string ExpandedCaption { get => _expandedCaption ?? Caption; init => _expandedCaption = value; }
+    public string ExpandedCaption
+    {
+        get => _expandedCaption ?? Caption; init => _expandedCaption = value;
+    }
     public required string GroupName { get; init; }
     public string? SubgroupName { get; init; }
     public required string Description { get; init; }
@@ -108,6 +113,7 @@ sealed record RuleMetadata
     internal ImmutableArray<string> AcceptedValueForms => Values.Kind == RuleValueKind.Integer
         ? [Values.Minimum == 0 ? "non-negative integer" : "positive integer", .. Values.SpecialValues.IsDefault ? [] : Values.SpecialValues]
         : [.. Values.Options.Select(option => option.Value), .. Values.SpecialValues.IsDefault ? [] : Values.SpecialValues];
+
     internal bool Accepts(string value) => Values.Accepts(value);
 
     internal static string Humanize(string value)
@@ -115,9 +121,11 @@ sealed record RuleMetadata
         var words = value.Split('_', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length > 1 && words[0] is "csharp" or "dotnet" or "dress")
             words = words[1..];
-        return string.Join(' ', words.Select((word, index) => index == 0
-            ? char.ToUpperInvariant(word[0]) + word[1..]
-            : word));
+        return string.Join(
+            ' ',
+            words.Select((word, index) => index == 0
+                ? char.ToUpperInvariant(word[0]) + word[1..]
+                : word));
     }
 
 }

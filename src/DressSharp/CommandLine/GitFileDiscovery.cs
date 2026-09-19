@@ -22,9 +22,11 @@ sealed class GitFileDiscovery
             return null;
 
         if (result.ExitCode != 0)
-            return result.StandardError.Contains("not a git repository", StringComparison.OrdinalIgnoreCase) 
-                ? null 
+        {
+            return result.StandardError.Contains("not a git repository", StringComparison.OrdinalIgnoreCase)
+                ? null
                 : throw new FileSelectionException($"Git file discovery failed: {result.StandardError.Trim()}");
+        }
 
         return result.StandardOutput
             .Split('\0', StringSplitOptions.RemoveEmptyEntries)

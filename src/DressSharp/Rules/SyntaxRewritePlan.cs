@@ -179,7 +179,9 @@ sealed class MemberRuleSet
         {
             if (configuration.Preferences.TryGetValue(rule.Metadata.RuleKey, out var preference)
                 && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase))
+            {
                 enabled.Add((rule, preference));
+            }
         }
 
         var kindBits = new Dictionary<int, ulong>();

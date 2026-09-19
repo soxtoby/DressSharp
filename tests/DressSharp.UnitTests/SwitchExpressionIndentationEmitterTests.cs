@@ -10,13 +10,14 @@ public sealed class SwitchExpressionIndentationEmitterTests
     public void Indents_switch_expression_braces_and_arms()
     {
         (string, string)[] preferences =
-        [
-            ("dress_switch_expression_indentation", "indented"),
-            ("csharp_indent_braces", "false"),
-            ("csharp_indent_block_contents", "true")
-        ];
+            [
+                ("dress_switch_expression_indentation", "indented"),
+                ("csharp_indent_braces", "false"),
+                ("csharp_indent_block_contents", "true")
+            ];
 
-        var result = Format("""
+        var result = Format(
+            """
             static string? LineEnding(string? value) => value switch
             {
             "lf" => "\n",
@@ -50,7 +51,8 @@ public sealed class SwitchExpressionIndentationEmitterTests
             };
             """;
 
-        Format(source,
+        Format(
+            source,
             ("dress_switch_expression_indentation", "not_indented"),
             ("csharp_indent_braces", "true"),
             ("csharp_indent_block_contents", "true")).ShouldBe(source);
@@ -68,7 +70,8 @@ public sealed class SwitchExpressionIndentationEmitterTests
     [InlineData("var result = value switch\n    {\n#if DEBUG\n        true => 1,\n#endif\n        _ => 0\n    };")]
     [InlineData("var result = value switch\n    {\n        true =>,\n        _ => 0\n    };")]
     public void Configured_rule_preserves_unsafe_syntax_from_the_general_brace_rule(string source) =>
-        Format(source,
+        Format(
+            source,
             ("dress_switch_expression_indentation", "indented"),
             ("csharp_indent_braces", "false")).ShouldBe(source);
 
@@ -77,12 +80,14 @@ public sealed class SwitchExpressionIndentationEmitterTests
     {
         const string source = "var result = value switch\n    {\n        true => 1,\n        false => 0\n    };";
 
-        Format(source,
-                ("dress_switch_expression_indentation", "unset"),
-                ("csharp_indent_braces", "false"),
-                ("csharp_indent_block_contents", "true"))
-            .ShouldBe(Format(source,
-                ("csharp_indent_braces", "false"),
-                ("csharp_indent_block_contents", "true")));
+        Format(
+            source,
+            ("dress_switch_expression_indentation", "unset"),
+            ("csharp_indent_braces", "false"),
+            ("csharp_indent_block_contents", "true"))
+            .ShouldBe(Format(
+            source,
+            ("csharp_indent_braces", "false"),
+            ("csharp_indent_block_contents", "true")));
     }
 }

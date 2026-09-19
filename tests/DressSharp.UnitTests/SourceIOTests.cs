@@ -136,13 +136,13 @@ public sealed class SourceIOTests : IDisposable
     static byte[] Encode(SourceEncoding encoding, string text)
     {
         Encoding encoder = encoding switch
-        {
-            SourceEncoding.Utf8 => new UTF8Encoding(false),
-            SourceEncoding.Latin1 => Encoding.Latin1,
-            SourceEncoding.Utf16LittleEndian => new UnicodeEncoding(false, true),
-            SourceEncoding.Utf16BigEndian => new UnicodeEncoding(true, true),
-            _ => throw new ArgumentOutOfRangeException(nameof(encoding))
-        };
+            {
+                SourceEncoding.Utf8 => new UTF8Encoding(false),
+                SourceEncoding.Latin1 => Encoding.Latin1,
+                SourceEncoding.Utf16LittleEndian => new UnicodeEncoding(false, true),
+                SourceEncoding.Utf16BigEndian => new UnicodeEncoding(true, true),
+                _ => throw new ArgumentOutOfRangeException(nameof(encoding))
+            };
         return [.. encoder.GetPreamble(), .. encoder.GetBytes(text)];
     }
 

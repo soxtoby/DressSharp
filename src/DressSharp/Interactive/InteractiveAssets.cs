@@ -70,7 +70,7 @@ sealed class InteractiveAsset(byte[] content, bool gzipCompressed)
             var quality = parts.Skip(1).FirstOrDefault(part => part.StartsWith("q=", StringComparison.OrdinalIgnoreCase));
             return quality is null
                 || double.TryParse(quality.AsSpan(2), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsed)
-                && parsed > 0;
+                    && parsed > 0;
         }
 
         return false;

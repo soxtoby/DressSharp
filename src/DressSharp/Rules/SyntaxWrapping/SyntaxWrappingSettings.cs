@@ -54,7 +54,9 @@ sealed class SyntaxWrappingSettings
         return new(byKind, enabled);
 
         string? Preference(RuleKey key) => configuration.Preferences.TryGetValue(key, out var value)
-            && !value.Equals("unset", StringComparison.OrdinalIgnoreCase) ? value.ToLowerInvariant() : null;
+            && !value.Equals("unset", StringComparison.OrdinalIgnoreCase)
+                ? value.ToLowerInvariant()
+                : null;
 
         void Configure(SyntaxWrappingKind kind, string? nestedStyle, string? indentationStyle = null)
         {
@@ -62,11 +64,11 @@ sealed class SyntaxWrappingSettings
                 return;
             var setting = byKind[(int)kind] ?? new Setting(WrappingMode.Preserve, maximumLineLength);
             byKind[(int)kind] = setting with
-            {
-                NestedStyle = nestedStyle,
-                IndentationStyle = indentationStyle,
-                OperatorPlacement = placement
-            };
+                {
+                    NestedStyle = nestedStyle,
+                    IndentationStyle = indentationStyle,
+                    OperatorPlacement = placement
+                };
             enabled = true;
         }
     }
@@ -78,6 +80,7 @@ sealed class SyntaxWrappingSettings
         internal string? IndentationStyle { get; init; }
         internal string? OperatorPlacement { get; init; }
         internal bool ShapesOperators => NestedStyle is not null || IndentationStyle is not null || OperatorPlacement is not null;
+
         internal static Setting For(string preference, int maximumLineLength) => new(
             preference.Equals("compact", StringComparison.OrdinalIgnoreCase)
                 ? WrappingMode.Compact

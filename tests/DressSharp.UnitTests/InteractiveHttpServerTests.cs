@@ -30,22 +30,27 @@ public sealed class InteractiveHttpServerTests : IDisposable
         using var response = await client.PostAsJsonAsync(
             "/api/preview",
             new
-        {
-            source = "class C { void M(int a,int b) {} }",
-            preferences = new[]
                 {
-                    new
-                { key = "csharp_space_after_comma",
-                    local = new
-                    { kind = "explicit",
-                        value = "true" },
-                    inherited = new
-                    { kind = "absent",
-                        value = (string?)null } }
-                }
-        },
-            TestContext.Current.CancellationToken
-        );
+                    source = "class C { void M(int a,int b) {} }",
+                    preferences = new[]
+                        {
+                            new
+                                {
+                                    key = "csharp_space_after_comma",
+                                    local = new
+                                        {
+                                            kind = "explicit",
+                                            value = "true"
+                                        },
+                                    inherited = new
+                                        {
+                                            kind = "absent",
+                                            value = (string?)null
+                                        }
+                                }
+                        }
+                },
+            TestContext.Current.CancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         using var result = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
         result.RootElement.GetProperty("text").GetString().ShouldContain("int a, int b");
@@ -194,10 +199,10 @@ public sealed class InteractiveHttpServerTests : IDisposable
                 Content = JsonContent.Create(new
                     {
                         edits = new[]
-                        {
-                            new { key = "indent_style", kind = "explicit", value = "tab" },
-                            new { key = "indent_size", kind = "explicit", value = "invalid" },
-                        }
+                            {
+                                new { key = "indent_style", kind = "explicit", value = "tab" },
+                                new { key = "indent_size", kind = "explicit", value = "invalid" },
+                            }
                     })
             };
         invalidRequest.Headers.Add("X-DressSharp-CSRF", token);

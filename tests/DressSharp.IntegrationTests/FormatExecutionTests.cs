@@ -14,8 +14,12 @@ public sealed class FormatExecutionTests : IDisposable
     public FormatExecutionTests()
     {
         Directory.CreateDirectory(_directory);
-        File.WriteAllText(Path.Combine(_directory, "App.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
-        File.WriteAllText(Path.Combine(_directory, ".editorconfig"), "root = true\n[*.cs]\ncsharp_space_after_comma = true\nend_of_line = lf\ninsert_final_newline = true\n");
+        File.WriteAllText(
+            Path.Combine(_directory, "App.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        File.WriteAllText(
+            Path.Combine(_directory, ".editorconfig"),
+            "root = true\n[*.cs]\ncsharp_space_after_comma = true\nend_of_line = lf\ninsert_final_newline = true\n");
     }
 
     [Fact]
@@ -149,8 +153,10 @@ public sealed class FormatExecutionTests : IDisposable
     [Fact]
     public async Task Closing_position_uses_the_effective_per_file_preference()
     {
-        await File.AppendAllTextAsync(Path.Combine(_directory, ".editorconfig"),
-            "dress_arguments_closing_delimiter_position = own_line\n[A.cs]\ndress_arguments_closing_delimiter_position = after_last_item\n", Token);
+        await File.AppendAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            "dress_arguments_closing_delimiter_position = own_line\n[A.cs]\ndress_arguments_closing_delimiter_position = after_last_item\n",
+            Token);
         const string source = "class C { void M() { Call(\n    value\n); } }\n";
         var attached = Source(source, "A.cs");
         var ownLine = Source(source, "B.cs");
@@ -176,7 +182,11 @@ public sealed class FormatExecutionTests : IDisposable
         var output = new StringWriter();
         var error = new StringWriter();
         var selected = new[] { new SelectedFile(first, "A.cs"), new SelectedFile(second, "B.cs") };
-        new FormatExecutor(_directory, output, error).Run(new(CommandKind.Format, [], false, null), selected, Token).ShouldFailWith<DressSharp.Configuration.ConfigurationException>();
+        new FormatExecutor(_directory, output, error)
+            .Run(new(CommandKind.Format, [], false, null), selected, Token)
+            .ShouldFailWith<DressSharp
+            .Configuration
+            .ConfigurationException>();
 
         (await File.ReadAllTextAsync(first, Token)).ShouldBe(firstSource);
         (await File.ReadAllTextAsync(second, Token)).ShouldBe(secondSource);
@@ -194,7 +204,7 @@ public sealed class FormatExecutionTests : IDisposable
         result.Output.ShouldMatch($"^Formatted 0 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$");
         ExactAssert.Text(
             "warning: no EditorConfig preferences to apply; run 'dotnet dress init' to initialize .editorconfig."
-                + Environment.NewLine,
+            + Environment.NewLine,
             result.Error);
     }
 
@@ -217,7 +227,9 @@ public sealed class FormatExecutionTests : IDisposable
         var output = new StringWriter();
         var error = new StringWriter();
         var exitCode = await new FormatExecutor(_directory, output, error).Run(
-            new(kind, [], verbose, null), [new SelectedFile(path, Path.GetFileName(path))], Token);
+            new(kind, [], verbose, null),
+            [new SelectedFile(path, Path.GetFileName(path))],
+            Token);
         return (exitCode, output.ToString(), error.ToString());
     }
 

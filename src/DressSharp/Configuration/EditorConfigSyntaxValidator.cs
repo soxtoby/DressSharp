@@ -9,8 +9,10 @@ static class EditorConfigSyntaxValidator
         var preambleLength = bytes.StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }) ? 3 : 0;
         if (preambleLength == 0
             && (bytes.StartsWith(new byte[] { 0xFF, 0xFE })
-                || bytes.StartsWith(new byte[] { 0xFE, 0xFF })))
+            || bytes.StartsWith(new byte[] { 0xFE, 0xFF })))
+        {
             throw new ConfigurationException($"{path}: EditorConfig files must be UTF-8 encoded.");
+        }
 
         string text;
         try
@@ -70,7 +72,9 @@ static class EditorConfigSyntaxValidator
             throw Error(path, lineNumber, "root must appear before the first section");
         if (!value.Equals("true", StringComparison.OrdinalIgnoreCase)
             && !value.Equals("false", StringComparison.OrdinalIgnoreCase))
+        {
             throw Error(path, lineNumber, "root must be true or false");
+        }
     }
 
     static ConfigurationException Error(string path, int line, string message) => new($"{path}({line}): {message}.");

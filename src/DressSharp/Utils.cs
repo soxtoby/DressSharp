@@ -1,4 +1,4 @@
-﻿namespace DressSharp;
+namespace DressSharp;
 
 static class Utils
 {

@@ -20,4 +20,5 @@ var version = package.NameWithoutExtension!["DressSharp.".Length..];
 if (manifest.ReadText().Contains("\"dresssharp\"", StringComparison.OrdinalIgnoreCase))
     await Do.Exec("dotnet tool uninstall DressSharp");
 
-await Do.Exec($"dotnet tool install DressSharp --version {version.QuotedArgument()} --add-source {packages.QuotedArgument()} --ignore-failed-sources --no-cache");
+await Do.Exec(
+    $"dotnet tool install DressSharp --version {version.QuotedArgument()} --add-source {packages.QuotedArgument()} --ignore-failed-sources --no-cache");

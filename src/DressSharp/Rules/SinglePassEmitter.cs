@@ -389,9 +389,9 @@ sealed class SinglePassEmitter
         {
             pair.Reset(left, right);
             if (DesiredSpace(
-                    pair,
-                    boundaryBeforeLeft,
-                    leftPiece.IsOriginal && rightPiece.IsOriginal) != false)
+                pair,
+                boundaryBeforeLeft,
+                leftPiece.IsOriginal && rightPiece.IsOriginal) != false)
             {
                 Append(" ");
             }
@@ -448,11 +448,11 @@ sealed class SinglePassEmitter
         // Indentation only restates the whitespace after a line break; where the source kept two
         // tokens on one line, no indentation rule has an opinion about them.
         if (EmitUpToLastLineBreak(
-                index,
-                leftPiece.Source,
-                left,
-                rightPiece.Source,
-                right))
+            index,
+            leftPiece.Source,
+            left,
+            rightPiece.Source,
+            right))
         {
             WriteIndent(right);
             return;
@@ -463,9 +463,9 @@ sealed class SinglePassEmitter
         // over whitespace nobody asked about.
         pair.Reset(left, right);
         if (DesiredSpace(
-                pair,
-                boundaryBeforeLeft,
-                leftPiece.IsOriginal && rightPiece.IsOriginal) is not { } desired)
+            pair,
+            boundaryBeforeLeft,
+            leftPiece.IsOriginal && rightPiece.IsOriginal) is not { } desired)
         {
             CopyGap(index);
             return;
@@ -618,9 +618,9 @@ sealed class SinglePassEmitter
     bool OwnsItsLine(SyntaxToken token) =>
         (_plan.IndentBlockContents is not null || _plan.AlignComments)
         && ((_indentation.DirectContentFor(token) is { } content
-                && content.GetFirstToken(includeZeroWidth: true) == token)
-            || (token.Parent is SwitchLabelSyntax label
-                && label.GetFirstToken(includeZeroWidth: true) == token));
+            && content.GetFirstToken(includeZeroWidth: true) == token)
+        || (token.Parent is SwitchLabelSyntax label
+            && label.GetFirstToken(includeZeroWidth: true) == token));
 
     bool HoldsOnlyComments(int index)
     {
@@ -840,7 +840,7 @@ sealed class SinglePassEmitter
     /// </summary>
     static bool Shaped(string text, int open, int close, string openIndent)
     {
-        for (var position = open; position < close;)
+        for (var position = open; position < close; )
         {
             var next = text.AsSpan(position, close - position).IndexOfAny('\n', '\r');
             if (next < 0)
@@ -908,7 +908,9 @@ sealed class SinglePassEmitter
         if (token.Parent is not ParameterListSyntax parameters)
             return;
         if (token == parameters.OpenParenToken)
+        {
             _parameterListStartLines[parameters] = _lineVersion;
+        }
         else if (token == parameters.CloseParenToken)
         {
             if (_parameterListStartLines.GetValueOrDefault(parameters, _lineVersion) != _lineVersion)
@@ -934,7 +936,9 @@ sealed class SinglePassEmitter
     {
         if (token.IsKind(SyntaxKind.OpenBraceToken)
             && PropertyPatternBraceIndent(token) is { } propertyPatternIndent)
+        {
             return propertyPatternIndent;
+        }
 
         if (SwitchExpressionIndentFor(token) is { } switchExpressionIndent)
             return switchExpressionIndent;
@@ -950,11 +954,11 @@ sealed class SinglePassEmitter
             && (!_checkMalformedRegions || !IsUnsafeOriginal(labeledStatement)))
         {
             return labelIndentation switch
-            {
-                LabelIndentationStyle.FlushLeft => "",
-                LabelIndentationStyle.OneLessThanCurrent => RemoveIndentUnit(_contentIndents[^1]),
-                _ => _contentIndents[^1]
-            };
+                {
+                    LabelIndentationStyle.FlushLeft => "",
+                    LabelIndentationStyle.OneLessThanCurrent => RemoveIndentUnit(_contentIndents[^1]),
+                    _ => _contentIndents[^1]
+                };
         }
 
         if (_plan.IndentSwitchLabels is not null
@@ -1002,11 +1006,9 @@ sealed class SinglePassEmitter
             return continuationIndent;
         }
 
-        return token.IsKind(SyntaxKind.CloseBraceToken) && _braceIndents.Count != 0
-            ? _braceIndents.Peek()
-            : token.Parent is ElseClauseSyntax or CatchClauseSyntax or FinallyClauseSyntax
-                ? _indentation.ForNode(token.Parent)
-                : _contentIndents[^1];
+        return token.IsKind(SyntaxKind.CloseBraceToken) && _braceIndents.Count != 0 ? _braceIndents.Peek()
+            : token.Parent is ElseClauseSyntax or CatchClauseSyntax or FinallyClauseSyntax ? _indentation.ForNode(token.Parent)
+            : _contentIndents[^1];
     }
 
     string? SwitchExpressionIndentFor(SyntaxToken token)
@@ -1021,7 +1023,9 @@ sealed class SinglePassEmitter
 
         return token == expression.OpenBraceToken
             ? _previousLineIndent + (indented ? _plan.IndentUnit : "")
-            : _braceIndents.TryPeek(out var braceIndent) ? braceIndent : null;
+            : _braceIndents.TryPeek(out var braceIndent)
+                ? braceIndent
+                : null;
     }
 
     static SwitchExpressionSyntax? SwitchExpressionFor(SyntaxToken token) =>
@@ -1052,7 +1056,9 @@ sealed class SinglePassEmitter
 
         if (token.Parent is BlockSyntax { Parent: AnonymousFunctionExpressionSyntax function }
             && _indentation.TryGet(function, out var functionIndent))
+        {
             return functionIndent;
+        }
 
         if (_plan.IndentBlockContents is not null && token.Parent is { } braceOwner)
             return _indentation.ForNode(braceOwner);
@@ -1281,8 +1287,8 @@ sealed class SinglePassEmitter
             || _indentation.DirectContentFor(token) is not { } content
             || BeginsAt(content, token)
             || token.Parent?.FirstAncestorOrSelf<StatementSyntax>() is { } nestedStatement
-            && nestedStatement != content
-            && BeginsAt(nestedStatement, token)
+                && nestedStatement != content
+                && BeginsAt(nestedStatement, token)
             || !ReferenceEquals(content.SyntaxTree, token.Parent?.SyntaxTree))
         {
             return null;
@@ -1447,9 +1453,9 @@ sealed class SinglePassEmitter
             braceIndent ??= token.Parent is SwitchExpressionSyntax
                 ? _lineIndent
                 : CaseBlockIndent(token)
-                ?? (_plan.IndentBraces is { } indentBraces
-                    ? BraceBaseIndent(token) + (indentBraces ? _plan.IndentUnit : "")
-                    : _lineIndent);
+                    ?? (_plan.IndentBraces is { } indentBraces
+                        ? BraceBaseIndent(token) + (indentBraces ? _plan.IndentUnit : "")
+                        : _lineIndent);
             _braceIndents.Push(braceIndent);
             _indentation.RememberBrace(token.Parent!, braceIndent);
             _contentIndents.Add(_plan.IndentBlockContents is not null
@@ -1470,7 +1476,9 @@ sealed class SinglePassEmitter
 
         if (InitializerIndentationRule.FindDelimiter(token) is { } delimiter
             && ReferenceEquals(frame.Initializer, delimiter.Initializer))
+        {
             return frame.Indent;
+        }
 
         if (_plan.IndentBlockContents is { } indentBlockContents
             && StartsDirectInitializerItem(frame.Initializer, token))
@@ -1505,8 +1513,8 @@ sealed class SinglePassEmitter
         if ((_plan.Trigger(pair.Left.RawKind) | _plan.Trigger(pair.Right.RawKind)) == 0
             || boundaryBeforeLeft
             || originalOccurrence
-            && _checkMalformedRegions
-            && _context.IsUnsafe(TextSpan.FromBounds(pair.Left.FullSpan.Start, pair.Right.FullSpan.End)))
+                && _checkMalformedRegions
+                && _context.IsUnsafe(TextSpan.FromBounds(pair.Left.FullSpan.Start, pair.Right.FullSpan.End)))
         {
             return null;
         }
@@ -1551,7 +1559,7 @@ sealed class SinglePassEmitter
     static bool IsWrappedExpressionOperator(SyntaxToken token) =>
         token.Parent is BinaryExpressionSyntax binary && token == binary.OperatorToken
         || token.Parent is ConditionalExpressionSyntax conditional
-        && (token == conditional.QuestionToken || token == conditional.ColonToken);
+            && (token == conditional.QuestionToken || token == conditional.ColonToken);
 
     void Copy(string source, int start, int end)
     {

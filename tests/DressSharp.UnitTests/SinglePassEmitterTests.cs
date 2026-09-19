@@ -11,7 +11,9 @@ public class SinglePassEmitterTests
     [InlineData("    using System;\n    public class Receipt;", "using System;\npublic class Receipt;")]
     [InlineData("    extern alias X;\n    public class Receipt;", "extern alias X;\npublic class Receipt;")]
     [InlineData("    [Obsolete]\n    public class Receipt;", "[Obsolete]\npublic class Receipt;")]
-    [InlineData("    public class Receipt\n    {\n        int value;\n    }\n    public class Other;", "public class Receipt\n{\n    int value;\n}\npublic class Other;")]
+    [
+        InlineData("    public class Receipt\n    {\n        int value;\n    }\n    public class Other;", "public class Receipt\n{\n    int value;\n}\npublic class Other;")
+    ]
     public void File_scoped_namespace_contents_obey_indentation(string sourceContents, string expectedContents)
     {
         var source = $"namespace Example;\n{sourceContents}";
@@ -25,8 +27,8 @@ public class SinglePassEmitterTests
     public void Orders_modifiers_on_the_detached_member_root()
     {
         Format(
-                "class C { static public int M() => 1; }",
-                ("csharp_preferred_modifier_order", "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"))
+            "class C { static public int M() => 1; }",
+            ("csharp_preferred_modifier_order", "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"))
             .ShouldBe("class C { public static int M() => 1; }");
     }
 
@@ -34,16 +36,17 @@ public class SinglePassEmitterTests
     public void Malformed_sibling_does_not_suppress_emitter_rules_in_rewritten_member()
     {
         Format(
-                "class C { int BrokenNam = ; static public int M() => 1+2; }",
-                ("csharp_preferred_modifier_order", "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"),
-                ("csharp_space_around_binary_operators", "before_and_after"))
+            "class C { int BrokenNam = ; static public int M() => 1+2; }",
+            ("csharp_preferred_modifier_order", "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async"),
+            ("csharp_space_around_binary_operators", "before_and_after"))
             .ShouldBe("class C { int BrokenNam = ; public static int M() => 1 + 2; }");
     }
 
     [Fact]
     public void Generated_expression_body_owns_spaces_around_its_arrow()
     {
-        Format("""
+        Format(
+            """
             class C
             {
                 int M(int value)
@@ -64,7 +67,8 @@ public class SinglePassEmitterTests
     [Fact]
     public void Generated_void_expression_body_discards_statement_indentation()
     {
-        Format("""
+        Format(
+            """
             sealed class SystemInteractiveBrowser : IInteractiveBrowser
             {
                 public void Open(Uri address)
@@ -168,17 +172,17 @@ public class SinglePassEmitterTests
     public void Auto_object_initializer_layout_keeps_fitting_anonymous_object_on_one_line()
     {
         Format(
-                """
+            """
                 static async Task WriteError(HttpListenerResponse response, int status, string code, string message) =>
                     await WriteJson(response, status, new { code, message });
                 """,
-                ("csharp_new_line_before_open_brace", "anonymous_types"),
-                ("csharp_new_line_before_members_in_anonymous_types", "true"),
-                ("csharp_indent_block_contents", "true"),
-                ("csharp_indent_braces", "false"),
-                ("dress_object_initializer_indentation", "indented"),
-                ("dress_object_initializer_layout", "auto"),
-                ("max_line_length", "160"))
+            ("csharp_new_line_before_open_brace", "anonymous_types"),
+            ("csharp_new_line_before_members_in_anonymous_types", "true"),
+            ("csharp_indent_block_contents", "true"),
+            ("csharp_indent_braces", "false"),
+            ("dress_object_initializer_indentation", "indented"),
+            ("dress_object_initializer_layout", "auto"),
+            ("max_line_length", "160"))
             .ShouldBe("""
                 static async Task WriteError(HttpListenerResponse response, int status, string code, string message) =>
                     await WriteJson(response, status, new { code, message });
@@ -201,7 +205,9 @@ public class SinglePassEmitterTests
     [Fact]
     public void Orders_using_lists_in_nested_namespaces()
     {
-        var result = Format("namespace A { using Zoo; using System; namespace B { using Zoo; using System.Text; class C { } } }", ("dotnet_sort_system_directives_first", "true"));
+        var result = Format(
+            "namespace A { using Zoo; using System; namespace B { using Zoo; using System.Text; class C { } } }",
+            ("dotnet_sort_system_directives_first", "true"));
         result.ShouldBe("namespace A { using System; using Zoo; namespace B { using System.Text; using Zoo; class C { } } }");
     }
 

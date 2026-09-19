@@ -33,9 +33,7 @@ try
         if (files.Length != count)
             throw new InvalidOperationException($"{name} has only {files.Length} eligible files.");
         foreach (var file in files)
-        {
             file.CopyTo(corpus / name / checkout.RelativePathTo(file), new() { CreateDirectories = true });
-        }
     }
 
     var command = $"dotnet run --project {(Do.RootDirectory / "benchmarks/CorpusInspector/CorpusInspector.csproj").QuotedArgument()} -- {corpus.QuotedArgument()} {(benchmarkRoot / "corpus/manifest.json").QuotedArgument()}";

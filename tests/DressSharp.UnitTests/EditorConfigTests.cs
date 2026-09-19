@@ -14,9 +14,15 @@ public sealed class EditorConfigTests : IDisposable
     [Fact]
     public async Task Resolver_applies_traversal_sections_precedence_and_unset()
     {
-        await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "root = true\n[*.cs]\nmax_line_length = 100\nindent_style = space\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            "root = true\n[*.cs]\nmax_line_length = 100\nindent_style = space\n",
+            TestContext.Current.CancellationToken);
         var child = Directory.CreateDirectory(Path.Combine(_directory, "src")).FullName;
-        await File.WriteAllTextAsync(Path.Combine(child, ".editorconfig"), "[*.cs]\nmax_line_length = 180\nindent_style = unset\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            Path.Combine(child, ".editorconfig"),
+            "[*.cs]\nmax_line_length = 180\nindent_style = unset\n",
+            TestContext.Current.CancellationToken);
         var source = Path.Combine(child, "Example.cs");
 
         var result = Resolve(source);
@@ -46,7 +52,10 @@ public sealed class EditorConfigTests : IDisposable
     [Fact]
     public async Task Resolver_ignores_shadowed_invalid_and_unknown_values()
     {
-        await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "[*.cs]\nindent_style = invalid\nfuture_key = !anything!\nindent_style = tab\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, ".editorconfig"),
+            "[*.cs]\nindent_style = invalid\nfuture_key = !anything!\nindent_style = tab\n",
+            TestContext.Current.CancellationToken);
 
         var result = Resolve(Path.Combine(_directory, "Example.cs"));
 
@@ -178,9 +187,7 @@ public sealed class EditorConfigTests : IDisposable
         text.ShouldContain("dress_braces_for_multiline_statement_header = true\n");
         text.ShouldNotContain("dress_control_flow_braces");
         foreach (var (key, value) in PreferenceCatalog.Defaults)
-        {
             text.ShouldContain($"{key.ToName()} = {value}\n");
-        }
     }
 
     [Fact]

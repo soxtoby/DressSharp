@@ -200,5 +200,7 @@ sealed class DocumentFormatter
 }
 
 sealed record TransformedDocument(string Text, int SkippedOccurrences);
+
 sealed record EmittedDocument(string Text, int SkippedOccurrences);
+
 sealed record FormattedDocument(ReadOnlyMemory<byte> Content, int SkippedOccurrences, SourceEncoding Encoding);

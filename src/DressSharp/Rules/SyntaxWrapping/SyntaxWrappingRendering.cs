@@ -21,7 +21,11 @@ static class SyntaxWrappingRendering
         return false;
     }
 
-    internal readonly record struct Boundary(int RightIndex, GapStyle Style, int OperatorIndex = -1, bool BreakWhenMulti = true,
+    internal readonly record struct Boundary(
+        int RightIndex,
+        GapStyle Style,
+        int OperatorIndex = -1,
+        bool BreakWhenMulti = true,
         string? SingleLineGap = null);
 
     internal enum GapStyle
@@ -67,7 +71,7 @@ static class SyntaxWrappingRendering
         var candidates = emitterPlan.Trigger(left.RawKind) | emitterPlan.Trigger(right.RawKind);
         var desired = (candidates == 0 ? null : emitterPlan.DesiredSpace(left, right, candidates))
             ?? leftTrailing.Count != 0
-            || rightLeading.Count != 0;
+                || rightLeading.Count != 0;
         return desired ? 1 : 0;
     }
 
