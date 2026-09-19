@@ -10,7 +10,7 @@ A file is read once, planned, and written once. Output that a second run would m
 - Measure a line from the column it will be written at; the source column stands in only where no preference will move the line.
 - Record a decision when it is made. A record kept only while something measures vanishes exactly when nothing measures.
 
-A layout change is done when the pinned corpus formats to a fixpoint under the default preferences, its output is byte-identical to before except where the change intends otherwise, and the commit message says how many files changed and why. The shared layout prototype is generated from the emitter's source, so a change to the emitter's shape carries its generator anchors in the same commit.
+A layout change is done when the pinned corpus formats to a fixpoint under the default preferences, its output is byte-identical to before except where the change intends otherwise, and the commit message says how many files changed and why.
 
 ## Per-file cost
 
