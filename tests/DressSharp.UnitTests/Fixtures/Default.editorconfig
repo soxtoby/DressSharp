@@ -46,6 +46,7 @@ dress_space_after_collection_spread_operator = true
 dress_space_after_attribute_target_colon = true
 csharp_preserve_single_line_blocks = true
 csharp_preserve_single_line_statements = true
+dress_preserve_trivial_single_line_blocks = false
 dotnet_sort_system_directives_first = true
 dotnet_separate_import_directive_groups = false
 dress_arguments_layout = auto

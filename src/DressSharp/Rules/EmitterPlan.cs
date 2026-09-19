@@ -34,6 +34,7 @@ sealed class EmitterPlan
         bool preserveSingleLineBlocks,
         bool expandSingleLineBlocks,
         bool separateSingleLineStatements,
+        bool preserveTrivialSingleLineBlocks,
         bool?[] initializerIndentations,
         bool[] initializerLayouts,
         EmbeddedStatementSettings embeddedStatements,
@@ -60,6 +61,7 @@ sealed class EmitterPlan
         PreserveSingleLineBlocks = preserveSingleLineBlocks;
         ExpandSingleLineBlocks = expandSingleLineBlocks;
         SeparateSingleLineStatements = separateSingleLineStatements;
+        PreserveTrivialSingleLineBlocks = preserveTrivialSingleLineBlocks;
         _initializerIndentations = initializerIndentations;
         _initializerLayouts = initializerLayouts;
         EmbeddedStatements = embeddedStatements;
@@ -83,6 +85,12 @@ sealed class EmitterPlan
     internal bool PreserveSingleLineBlocks { get; }
     internal bool ExpandSingleLineBlocks { get; }
     internal bool SeparateSingleLineStatements { get; }
+
+    /// <summary>
+    /// Whether expanding single-line blocks leaves alone the ones with nothing in them worth a
+    /// line: an empty block and an accessor list of auto accessors.
+    /// </summary>
+    internal bool PreserveTrivialSingleLineBlocks { get; }
     internal EmbeddedStatementSettings EmbeddedStatements { get; }
     internal string? ParametersClosingDelimiterPosition { get; }
     internal string? MultilineParameterListOpenBracePosition { get; }
@@ -204,6 +212,7 @@ sealed class EmitterPlan
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == true,
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == false,
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineStatements) == false,
+            OptionalBoolean(configuration, RuleKey.DressPreserveTrivialSingleLineBlocks) == true,
             initializerIndentations,
             initializerLayouts,
             EmbeddedStatementSettings.From(configuration),

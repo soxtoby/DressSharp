@@ -56,6 +56,7 @@ enum RuleKey
     DressSpaceAfterAttributeTargetColon,
     CSharpPreserveSingleLineBlocks,
     CSharpPreserveSingleLineStatements,
+    DressPreserveTrivialSingleLineBlocks,
     DotnetSortSystemDirectivesFirst,
     DotnetSeparateImportDirectiveGroups,
     DressArgumentsLayout,

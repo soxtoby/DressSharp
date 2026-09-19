@@ -430,7 +430,8 @@ sealed class BracketSpacingRule(RuleKey ruleKey, string caption, string? subgrou
 enum SingleLinePreservationKind
 {
     Blocks,
-    Statements
+    Statements,
+    TrivialBlocks
 }
 
 sealed class SingleLinePreservationRule(RuleKey ruleKey, string caption, string? subgroupName, SingleLinePreservationKind kind) : IFormattingRule
@@ -442,16 +443,31 @@ sealed class SingleLinePreservationRule(RuleKey ruleKey, string caption, string?
         ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
         GroupName = "Braces and bodies",
         SubgroupName = subgroupName,
-        Description = $"Controls {(kind == SingleLinePreservationKind.Blocks ? "existing single-line blocks and accessor lists" : "adjacent statements and member declarations")}. {(kind == SingleLinePreservationKind.Blocks ? "False expands safe single-line blocks and accessor lists" : "False separates safe adjacent statements and members")}.",
+        Description = $"Controls {OwnedSyntax(kind)}. {Invariant(kind)}.",
         Values = RuleValues.From(["true", "false"]),
-        DefaultValue = "true",
-        Example = "class Example { void Run() { Work(); } void Work() { } }",
-        OwnedSyntax = kind == SingleLinePreservationKind.Blocks
-            ? "existing single-line blocks and accessor lists"
-            : "adjacent statements and member declarations",
-        Invariant = kind == SingleLinePreservationKind.Blocks
-            ? "False expands safe single-line blocks and accessor lists"
-            : "False separates safe adjacent statements and members"
+        DefaultValue = kind == SingleLinePreservationKind.TrivialBlocks ? "false" : "true",
+        Example = kind == SingleLinePreservationKind.TrivialBlocks
+            ? "class Example { bool Ready { get; } void Run() { } void Work() { Ready = true; } }"
+            : "class Example { void Run() { Work(); } void Work() { } }",
+        ExamplePreferences = kind == SingleLinePreservationKind.TrivialBlocks
+            ? ImmutableDictionary<RuleKey, string>.Empty.Add(RuleKey.CSharpPreserveSingleLineBlocks, "false")
+            : ImmutableDictionary<RuleKey, string>.Empty,
+        OwnedSyntax = OwnedSyntax(kind),
+        Invariant = Invariant(kind)
+    };
+
+    static string OwnedSyntax(SingleLinePreservationKind kind) => kind switch
+    {
+        SingleLinePreservationKind.Blocks => "existing single-line blocks and accessor lists",
+        SingleLinePreservationKind.Statements => "adjacent statements and member declarations",
+        _ => "existing single-line empty blocks and auto-accessor lists"
+    };
+
+    static string Invariant(SingleLinePreservationKind kind) => kind switch
+    {
+        SingleLinePreservationKind.Blocks => "False expands safe single-line blocks and accessor lists",
+        SingleLinePreservationKind.Statements => "False separates safe adjacent statements and members",
+        _ => "True keeps empty blocks and accessor lists without bodies on one line when single-line blocks expand"
     };
 }
 

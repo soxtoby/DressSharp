@@ -62,9 +62,12 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
         if (EmbeddedStatementBreak(token) is { } placed)
             return placed;
 
-        if (plan.PreserveSingleLineBlocks
+        // A block kept on one line keeps its opening brace where it is, whatever the brace rules
+        // say; a trivial block kept on one line while the others expand is kept the same way.
+        if ((plan.PreserveSingleLineBlocks || plan.PreserveTrivialSingleLineBlocks)
             && token.IsKind(SyntaxKind.OpenBraceToken)
             && SingleLineBraceOwner(token, true) is { } owner
+            && (plan.PreserveSingleLineBlocks || IsTrivial(owner))
             && StaysSafeSingleLine(owner))
         {
             return false;
@@ -167,7 +170,41 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
     /// to expand, whatever else this pass does inside it.
     /// </summary>
     internal bool IsSafeSingleLine(SyntaxNode container) =>
-        IsSingleLine(container) && IsSafePreservationContainer(container);
+        IsSingleLine(container)
+        && !(plan.PreserveTrivialSingleLineBlocks && IsTrivial(container))
+        && IsSafePreservationContainer(container);
+
+    /// <summary>
+    /// Whether a container has nothing in it worth a line of its own: no statement, member,
+    /// section, or accessor body. An accessor list of auto accessors is trivial however many
+    /// accessors it has, because they share a line even once the list expands.
+    /// </summary>
+    static bool IsTrivial(SyntaxNode container)
+    {
+        switch (container)
+        {
+            case BlockSyntax block:
+                return block.Statements.Count == 0;
+            case AccessorListSyntax accessors:
+                foreach (var accessor in accessors.Accessors)
+                {
+                    if (accessor.Body is not null || accessor.ExpressionBody is not null)
+                        return false;
+                }
+
+                return true;
+            case TypeDeclarationSyntax type:
+                return type.Members.Count == 0;
+            case EnumDeclarationSyntax @enum:
+                return @enum.Members.Count == 0;
+            case NamespaceDeclarationSyntax @namespace:
+                return @namespace.Members.Count == 0 && @namespace.Usings.Count == 0 && @namespace.Externs.Count == 0;
+            case SwitchStatementSyntax @switch:
+                return @switch.Sections.Count == 0;
+            default:
+                return false;
+        }
+    }
 
     /// <summary>
     /// Whether this container is safe to lay out and stays on one line once written. This is

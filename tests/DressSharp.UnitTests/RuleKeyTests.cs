@@ -29,6 +29,7 @@ public sealed class RuleKeyTests
     [InlineData(RuleKey.DressSwitchExpressionIndentation, "dress_switch_expression_indentation")]
     [InlineData(RuleKey.DressParametersClosingDelimiterPosition, "dress_parameters_closing_delimiter_position")]
     [InlineData(RuleKey.DressMultilineParameterListOpenBracePosition, "dress_multiline_parameter_list_open_brace_position")]
+    [InlineData(RuleKey.DressPreserveTrivialSingleLineBlocks, "dress_preserve_trivial_single_line_blocks")]
     [InlineData(RuleKey.InsertFinalNewline, "insert_final_newline")]
     internal void Names_convert_to_the_expected_editorconfig_spelling(RuleKey key, string expected) =>
         key.ToName().ShouldBe(expected);

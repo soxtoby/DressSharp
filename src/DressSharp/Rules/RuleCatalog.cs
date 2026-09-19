@@ -121,7 +121,8 @@ sealed class RuleCatalog
         SingleLinePreservationRule[] preservationRules =
         [
             new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineBlocks, "Blocks", "Preserve single line", SingleLinePreservationKind.Blocks),
-            new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineStatements, "Statements", "Preserve single line", SingleLinePreservationKind.Statements)
+            new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineStatements, "Statements", "Preserve single line", SingleLinePreservationKind.Statements),
+            new SingleLinePreservationRule(RuleKey.DressPreserveTrivialSingleLineBlocks, "Trivial blocks", "Preserve single line", SingleLinePreservationKind.TrivialBlocks)
         ];
         InitializerIndentationRule[] initializerIndentationRules =
         [

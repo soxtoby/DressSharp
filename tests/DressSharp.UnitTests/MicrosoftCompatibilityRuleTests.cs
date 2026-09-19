@@ -464,6 +464,114 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Fact]
+    public void Preserving_trivial_blocks_keeps_empty_blocks_and_auto_accessor_lists_while_expanding_the_rest()
+    {
+        (string, string)[] preferences =
+        [
+            ("csharp_preserve_single_line_blocks", "false"),
+            ("csharp_preserve_single_line_statements", "false"),
+            ("dress_preserve_trivial_single_line_blocks", "true")
+        ];
+        var first = Format("""
+            namespace Empty { }
+            class Marker { }
+            class C
+            {
+            bool Ready { get; } = true;
+            int Auto { get; private set; }
+            int Field { get => field; set => field = value; }
+            int Mixed { get; set { field = value; } }
+            void Empty() { }
+            void Body() { Work(); Work(); }
+            void Braced(bool go) { if (go) Work(); else { Work(); return; } }
+            }
+            """, preferences);
+        first.ShouldBe("""
+            namespace Empty { }
+            class Marker { }
+            class C
+            {
+            bool Ready { get; } = true;
+            int Auto { get; private set; }
+            int Field {
+            get => field; set => field = value;
+            }
+            int Mixed {
+            get; set {
+            field = value;
+            }
+            }
+            void Empty() { }
+            void Body() {
+            Work();
+            Work();
+            }
+            void Braced(bool go) {
+            if (go) Work(); else {
+            Work();
+            return;
+            }
+            }
+            }
+            """);
+        Format(first, preferences).ShouldBe(first);
+    }
+
+    [Fact]
+    public void Preserved_trivial_blocks_keep_their_opening_brace_on_the_same_line()
+    {
+        (string, string)[] preferences =
+        [
+            ("csharp_preserve_single_line_blocks", "false"),
+            ("csharp_preserve_single_line_statements", "false"),
+            ("dress_preserve_trivial_single_line_blocks", "true"),
+            ("csharp_new_line_before_open_brace", "all"),
+            ("csharp_new_line_before_else", "true"),
+            ("csharp_indent_block_contents", "true"),
+            ("indent_style", "space"),
+            ("indent_size", "4")
+        ];
+        var first = Format("""
+            class C
+            {
+                bool Ready { get; } = true;
+                void Empty() { }
+                void Body(bool go) { if (go) { Work(); } else { Work(); return; } }
+            }
+            """, preferences);
+        first.ShouldBe("""
+            class C
+            {
+                bool Ready { get; } = true;
+                void Empty() { }
+                void Body(bool go)
+                {
+                    if (go)
+                    {
+                        Work();
+                    }
+                    else
+                    {
+                        Work();
+                        return;
+                    }
+                }
+            }
+            """);
+        Format(first, preferences).ShouldBe(first);
+    }
+
+    [Fact]
+    public void Preserving_trivial_blocks_does_nothing_while_blocks_are_preserved()
+    {
+        const string source = "class C { bool Ready { get; } void Empty() { } void Body() { Work(); } }";
+        Format(source,
+                ("csharp_preserve_single_line_blocks", "true"),
+                ("dress_preserve_trivial_single_line_blocks", "true"))
+            .ShouldBe(source);
+    }
+
+    [Fact]
     public void Accessor_list_expansion_skips_comments_and_malformed_accessors()
     {
         var first = Format(
