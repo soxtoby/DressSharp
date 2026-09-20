@@ -32,16 +32,24 @@ var resultsDirectory = (benchmarkRoot / "results").EnsureDirectoryExists();
 var timestamp = DateTimeOffset.UtcNow;
 
 await (Bun.Run with { Target = "build:production", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
-await (DotNet.Build with
-    {
-        Targets = [Do.RootDirectory / "src/DressSharp/DressSharp.csproj"],
-        Configuration = "Release",
-        NoLogo = true
-    });
+// The shipped tool is a platform package, precompiled for its runtime identifier, so the
+// benchmark measures a publish for this machine rather than the portable build output.
+var published = Do.RootDirectory / "artifacts/benchmark-publish" / RuntimeInformation.RuntimeIdentifier;
+var publish = await Start(
+    Do.RootDirectory,
+    "dotnet",
+    [
+        "publish", Do.RootDirectory / "src/DressSharp/DressSharp.csproj", "--configuration", "Release",
+        "--runtime", RuntimeInformation.RuntimeIdentifier, "--self-contained", "false", "--output", published, "--nologo"
+    ]);
+if (publish.ExitCode != 0)
+    throw new InvalidOperationException($"Publish failed: {publish.StandardOutput}{publish.StandardError}");
 
 if (!corpus.IsExistingDirectory)
 {
-    await Do.Exec("dotnet do materialize-corpus");
+    var materialize = await Start(Do.RootDirectory, "dotnet", ["do", "materialize-corpus"]);
+    if (materialize.ExitCode != 0)
+        throw new InvalidOperationException($"Corpus materialization failed: {materialize.StandardError}");
 }
 else
 {
@@ -174,7 +182,7 @@ try
             Dictionary<string, string?>? environment = null;
             if (tool == "DressSharp")
             {
-                arguments = [Do.RootDirectory / "src/DressSharp/bin/Release/net10.0/DressSharp.dll", mode];
+                arguments = [published / "DressSharp.dll", mode];
                 environment = new() { ["DRESSSHARP_BENCHMARK_WORKERS"] = workers.ToString(), ["DRESSSHARP_BENCHMARK_TIMING"] = timingPath };
             }
             else

@@ -16,6 +16,22 @@ dotnet new tool-manifest
 dotnet tool install DressSharp
 ```
 
+## Hooks
+
+`--staged` and `--changed` select only the files Git reports as changed, so a hook formats what was touched instead of the repository. For a pre-commit hook, format the staged files and stage the result again:
+
+```sh
+dotnet dress format --staged && git diff --name-only --cached -- '*.cs' | xargs -r git add
+```
+
+For a hook that runs after an editor or agent writes, format everything changed since the last commit:
+
+```sh
+dotnet dress format --changed
+```
+
+Both require a repository-pinned or global install of the current version.
+
 ## Development
 
 Build, test, and format DressSharp from the current checkout:

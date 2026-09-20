@@ -1730,6 +1730,29 @@ public class SyntaxWrappingRuleTests
         defaults[RuleKey.MaxLineLength].ShouldBe("160");
     }
 
+    [Fact]
+    public void Auto_base_list_measures_the_joined_line_rather_than_the_source_line()
+    {
+        const string wrapped = """
+            sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, NewLineKind kind, RuleValueDefinition values, string defaultValue)
+                : IFormattingRule
+            {
+            }
+            """;
+        const string joined = """
+            sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, NewLineKind kind, RuleValueDefinition values, string defaultValue) : IFormattingRule
+            {
+            }
+            """;
+        (string Key, string Value)[] tight = [("dress_base_type_lists_layout", "auto"), ("max_line_length", "160")];
+        (string Key, string Value)[] loose = [("dress_base_type_lists_layout", "auto"), ("max_line_length", "200")];
+
+        Format(wrapped, tight).ShouldBe(wrapped);
+        Format(joined, tight).ShouldBe(wrapped);
+        Format(wrapped, loose).ShouldBe(joined);
+        Format(joined, loose).ShouldBe(joined);
+    }
+
     static string Format(string source, params (string Key, string Value)[] preferences) =>
         EmitterTestHarness.Format(source, preferences);
 }

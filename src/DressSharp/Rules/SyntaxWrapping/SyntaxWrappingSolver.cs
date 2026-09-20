@@ -713,7 +713,11 @@ sealed class SyntaxWrappingSolver : IWrappedItems
 
     int VisualStartColumn(Occurrence occurrence)
     {
-        if (occurrence is { Node: InitializerExpressionSyntax, FirstToken: > 0 })
+        // The first break of an initializer or base list is the one being decided, so its start
+        // column is where the opening token lands when joined to the previous token, not where the
+        // source happens to hold it. Measuring from the source line would join a colon that then
+        // fails to fit and wrap it again on the next run.
+        if (occurrence is { Node: InitializerExpressionSyntax or BaseListSyntax, FirstToken: > 0 })
         {
             var previous = occurrence.FirstToken - 1;
             return VisualStartColumn(previous)
