@@ -9,6 +9,9 @@ static class InteractiveAssets
     internal static byte[] Index { get; } = Read("index.html");
     internal static InteractiveAsset JavaScript { get; } = ReadJavaScript();
     internal static byte[] Css { get; } = Read("app.css");
+    internal static byte[] Icon { get; } = Read("dresssharp.svg");
+    internal static byte[] FaviconSvg { get; } = Read("favicon.svg");
+    internal static byte[] FaviconIco { get; } = Read("favicon.ico");
 
     static InteractiveAsset ReadJavaScript()
     {

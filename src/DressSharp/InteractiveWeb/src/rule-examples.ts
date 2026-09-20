@@ -32,8 +32,8 @@ export class RuleExamples {
     }
 
     private position() {
-        const rail = document.querySelector(".settings-rail")?.getBoundingClientRect();
-        const left = window.innerWidth > 900 && rail ? rail.right + 12 : 20;
+        const panel = document.querySelector<HTMLElement>(".preferences");
+        const left = window.innerWidth > 900 && panel && !panel.hidden ? panel.getBoundingClientRect().right + 12 : 20;
         this.element.style.setProperty("--example-left", `${left}px`);
     }
 

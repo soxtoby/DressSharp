@@ -20,8 +20,8 @@ let saved = false;
 let saveError = "";
 let selectionRules: Set<string> | null = null;
 let selectionLabel = "";
+let activeGroup: string | null = null;
 const touched = new Set<string>();
-const expanded = new Set<string>();
 const examples = new RuleExamples();
 
 start().catch(fatal);
@@ -78,15 +78,25 @@ function render() {
     const relatedFilter = el("span", "related-filter", [selectionRules === null ? "" : `${selectionRules.size} related`]);
     relatedFilter.hidden = selectionRules === null;
     relatedFilter.title = selectionLabel;
-    const list = el("div", "group-list");
-    for (const [groupName, rules] of groupRules(matching)) {
-        const details = document.createElement("details");
-        details.open = selectionRules !== null || query.length > 0 || expanded.has(groupName);
-        details.addEventListener("toggle", () => {
-            if (query || selectionRules !== null) return;
-            if (details.open) expanded.add(groupName); else expanded.delete(groupName);
+    const filtering = query.length > 0 || selectionRules !== null;
+    const chips = el("nav", "chips");
+    chips.setAttribute("aria-label", "Preference groups");
+    for (const [groupName, rules] of groupRules(bootstrap.catalog.rules)) {
+        const chip = el("button", "chip", [groupName, el("small", "", [String(rules.length)])]);
+        chip.type = "button";
+        chip.setAttribute("aria-pressed", String(!filtering && groupName === activeGroup));
+        chip.addEventListener("click", () => {
+            activeGroup = activeGroup === groupName && !filtering ? null : groupName;
+            if (filtering) { query = ""; preview.clearSelectionRules(); }
+            render();
         });
-        details.append(el("summary", "group-heading", [el("span", "", [groupName]), el("span", "group-count", [String(rules.length)])]));
+        chips.append(chip);
+    }
+    const list = el("div", "group-list");
+    const shown = filtering ? groupRules(matching) : new Map([...groupRules(matching)].filter(([name]) => name === activeGroup));
+    for (const [groupName, rules] of shown) {
+        const group = el("section", "group");
+        if (filtering) group.append(el("h2", "group-heading", [el("span", "", [groupName]), el("small", "", [String(rules.length)])]));
         const subgroups = new Map<string, Rule[]>([["", []]]);
         for (const rule of rules) {
             const subgroup = rule.subgroup ?? "";
@@ -95,13 +105,12 @@ function render() {
         }
         for (const [subgroup, subgroupRules] of subgroups) {
             if (!subgroupRules.length) continue;
-            const section = subgroup ? el("section", "rule-subgroup", [el("h2", "subgroup-heading", [subgroup])]) : details;
-            for (const rule of subgroupRules) section.append(ruleRow(rule, preferences.get(rule.key)!));
-            if (subgroup) details.append(section);
+            if (subgroup) group.append(el("h3", "subgroup-heading", [subgroup]));
+            for (const rule of subgroupRules) group.append(ruleRow(rule, preferences.get(rule.key)!));
         }
-        list.append(details);
+        list.append(group);
     }
-    if (!matching.length) list.append(el("p", "empty", [selectionRules?.size === 0
+    if (filtering && !matching.length) list.append(el("p", "empty", [selectionRules?.size === 0
         ? "No individual setting changes these lines. Settings already satisfied or overridden by other settings may not appear."
         : "No preferences match."]));
     const invalid = hasInvalidEdits();
@@ -118,28 +127,41 @@ function render() {
     const stop = el("button", "quiet", ["Stop server"]);
     stop.addEventListener("click", stopServer);
 
+    const closePanel = el("button", "icon close-panel", ["×"]);
+    closePanel.type = "button";
+    closePanel.title = "Close preferences";
+    closePanel.setAttribute("aria-label", closePanel.title);
+    closePanel.addEventListener("click", () => {
+        activeGroup = null;
+        query = "";
+        preview.clearSelectionRules();
+        render();
+    });
+    const panel = el("aside", "preferences", [el("div", "panel-scroll", [
+        el("div", "panel-toolbar", [el("h1", "", [filtering ? "Matching preferences" : activeGroup ?? "Preferences"]), closePanel]),
+        list,
+    ])]);
+    panel.hidden = !filtering && activeGroup === null;
+
     const shell = el("div", "shell", [
         el("header", "app-header", [
-            el("div", "brand", [el("span", "brand-mark", ["D#"]), el("span", "", ["DressSharp ", el("small", "", ["interactive"])])]),
-            el("div", "target", [el("span", "status-dot"), el("span", "", [el("small", "", ["Target"]), snapshot.targetPath])]),
-            el("div", "header-actions", [el("span", "catalog-version", [`Catalog v${bootstrap.catalog.version}`]), stop]),
+            el("div", "brand", [brandMark(), el("span", "", ["DressSharp ", el("small", "", ["interactive"])])]),
+            el("div", "search", [el("span", "", ["⌕"]), search, relatedFilter, clearFilters]),
+            el("div", "header-actions", [...(saveError ? [el("span", "save-error", [saveError])] : []), save, stop]),
+            chips,
         ]),
         notices,
-        el("main", "workbench-grid", [
-            el("aside", "settings-rail", [
-                el("div", "rail-toolbar", [el("div", "", [el("h1", "", ["Preferences"]), el("span", "rule-count", [`${bootstrap.catalog.rules.length} rules`]), ...(saveError ? [el("span", "save-error", [saveError])] : [])]), save]),
-                el("div", "search", [el("span", "", ["⌕"]), search, relatedFilter, clearFilters]),
-                list,
-            ]),
-            el("section", "canvas"),
-        ]),
+        el("main", "workbench", [panel, el("section", "canvas")]),
     ]);
+    chips.append(
+        el("div", "target", [el("span", "status-dot"), el("span", "", [el("small", "", ["Target"]), snapshot.targetPath])]),
+        el("span", "catalog-version", [`Catalog v${bootstrap.catalog.version}`]));
     if (!root.querySelector(".shell")) {
         shell.querySelector(".canvas")!.replaceWith(preview.element);
         root.replaceChildren(shell);
         preview.mount();
     } else {
-        for (const selector of [".app-header", ".notices", ".settings-rail"]) {
+        for (const selector of [".app-header", ".notices", ".preferences"]) {
             const current = root.querySelector<HTMLElement>(selector)!;
             const replacement = shell.querySelector<HTMLElement>(selector)!;
             const scrollTop = current.scrollTop;
@@ -359,5 +381,6 @@ function option(value: string, label: string) { const node = document.createElem
 function input(type: string, placeholder: string) { const node = document.createElement("input"); node.type = type; node.placeholder = placeholder; node.setAttribute("aria-label", placeholder); return node; }
 function notice(text: string, action?: HTMLElement) { return el("div", "notice", [el("span", "", [text]), ...(action ? [action] : [])]); }
 function setDisabled(node: HTMLButtonElement | HTMLInputElement | HTMLSelectElement, disabled: boolean) { node.disabled = disabled; }
-function fatal(error: unknown) { const message = error instanceof Error ? error.message : String(error); root.replaceChildren(el("main", "fatal", [el("span", "brand-mark", ["D#"]), el("h1", "", ["DressSharp could not start."]), el("pre", "", [message])])); }
+function brandMark() { const node = el("img", "brand-mark"); node.src = "/dresssharp.svg"; node.alt = ""; node.width = 30; node.height = 30; return node; }
+function fatal(error: unknown) { const message = error instanceof Error ? error.message : String(error); root.replaceChildren(el("main", "fatal", [brandMark(), el("h1", "", ["DressSharp could not start."]), el("pre", "", [message])])); }
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, children: Array<Node | string> = []) { const node = document.createElement(tag); if (className) node.className = className; node.append(...children); return node; }

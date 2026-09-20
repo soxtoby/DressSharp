@@ -55,8 +55,8 @@ class PreviewDiff extends FileDiff {
 }
 
 const editorCss = `
-:host { --diffs-light-addition-color: #c93742 !important; --diffs-light-deletion-color: #23864d !important;
-    --diffs-bg: #faf9f3 !important; background-color: #faf9f3 !important; }
+:host { --diffs-light-addition-color: #7d1f2f !important; --diffs-light-deletion-color: #12716b !important;
+    --diffs-bg: #ffffff !important; background-color: #ffffff !important; }
 pre[data-diff] { min-height: 100%; font-size: 12px; tab-size: 4; }
 pre[data-diff-type="split"] > [data-additions] { grid-column: 1; grid-row: 1; }
 pre[data-diff-type="split"] > [data-deletions] { grid-column: 2; grid-row: 1; }
@@ -71,8 +71,8 @@ pre[data-diff-type="split"] > [data-deletions] { grid-column: 2; grid-row: 1; }
     pre[data-diff-type="split"] > [data-deletions] { order: 2; width: 100%; }
     [data-additions], [data-deletions] { position: relative; padding-top: 30px; }
     [data-additions]::before, [data-deletions]::before { position: absolute; top: 0; left: 0; padding: 8px; }
-    [data-additions]::before { content: "Source · editable"; color: #a92f38; }
-    [data-deletions]::before { content: "Formatted output · read only"; color: #1f6548; }
+    [data-additions]::before { content: "Source · editable"; color: #7d1f2f; }
+    [data-deletions]::before { content: "Formatted output · read only"; color: #12716b; }
 }`;
 
 export class Preview {

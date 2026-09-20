@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <mask id="hash" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <path fill="white" d="M0 0h64v64H0z"/>
+      <path stroke="black" stroke-width="6" d="M26 17v30m12-30v30M17 26h30M17 38h30"/>
+    </mask>
+  </defs>
+  <path fill="#d8b458" mask="url(#hash)" d="M8 11C3 8 0 11 0 16v32c0 5 3 8 8 5l16-9h16l16 9c5 3 8 0 8-5V16c0-5-3-8-8-5l-16 9H24z"/>
+</svg>

@@ -157,6 +157,18 @@ sealed class InteractiveHttpServer : IInteractiveServer
                 return;
             }
 
+            if (context.Request.HttpMethod == "GET" && path is "/dresssharp.svg" or "/favicon.svg" or "/favicon.ico")
+            {
+                var (contentType, content) = path switch
+                    {
+                        "/dresssharp.svg" => ("image/svg+xml", InteractiveAssets.Icon),
+                        "/favicon.svg" => ("image/svg+xml", InteractiveAssets.FaviconSvg),
+                        _ => ("image/x-icon", InteractiveAssets.FaviconIco)
+                    };
+                await Write(context.Response, 200, contentType, content);
+                return;
+            }
+
             if (context.Request.HttpMethod == "GET" && path == "/api/bootstrap")
             {
                 await Write(context.Response, 200, "application/json; charset=utf-8", CreateBootstrap());
@@ -223,7 +235,7 @@ sealed class InteractiveHttpServer : IInteractiveServer
                 return;
             }
 
-            if (path is "/" or "/app.js" or "/app.css" or "/api/bootstrap" or "/api/configuration" or "/api/shutdown" or "/api/preview")
+            if (path is "/" or "/app.js" or "/app.css" or "/dresssharp.svg" or "/favicon.svg" or "/favicon.ico" or "/api/bootstrap" or "/api/configuration" or "/api/shutdown" or "/api/preview")
             {
                 context.Response.Headers[HttpResponseHeader.Allow] = path is "/api/shutdown" or "/api/preview" ? "POST"
                     : path is "/api/configuration" ? "GET, POST"

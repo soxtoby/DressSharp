@@ -41,9 +41,14 @@
     <EmbeddedResource Include="InteractiveWeb/dist/app.js.gz" LogicalName="DressSharp.Interactive.app.js.gz"
                       Condition="'$(Configuration)' == 'Release'" />
     <EmbeddedResource Include="InteractiveWeb/dist/app.css" LogicalName="DressSharp.Interactive.app.css" />
+    <EmbeddedResource Include="InteractiveWeb/dist/dresssharp.svg" LogicalName="DressSharp.Interactive.dresssharp.svg" />
+    <EmbeddedResource Include="InteractiveWeb/dist/favicon.svg" LogicalName="DressSharp.Interactive.favicon.svg" />
+    <EmbeddedResource Include="InteractiveWeb/dist/favicon.ico" LogicalName="DressSharp.Interactive.favicon.ico" />
   </ItemGroup>
   <Target Name="RequireInteractiveAssets" BeforeTargets="PrepareForBuild"
           Condition="!Exists('InteractiveWeb/dist/index.html') Or !Exists('InteractiveWeb/dist/app.css')
+                     Or !Exists('InteractiveWeb/dist/dresssharp.svg') Or !Exists('InteractiveWeb/dist/favicon.svg')
+                     Or !Exists('InteractiveWeb/dist/favicon.ico')
                      Or ('$(Configuration)' == 'Release' And !Exists('InteractiveWeb/dist/app.js.gz'))
                      Or ('$(Configuration)' != 'Release' And !Exists('InteractiveWeb/dist/app.js'))">
     <Error Text="Interactive browser assets are missing. Run 'dotnet do build-interactive' before building DressSharp." />

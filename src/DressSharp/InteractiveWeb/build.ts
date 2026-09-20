@@ -26,6 +26,8 @@ if (!result.success) {
 await Promise.all([
     copyFile("src/index.html", "dist/index.html"),
     copyFile("src/app.css", "dist/app.css"),
+    ...["dresssharp.svg", "favicon.svg", "favicon.ico"].map(name =>
+        copyFile(`../../../assets/brand/${name}`, `dist/${name}`)),
 ]);
 
 if (compress) {
