@@ -61,6 +61,41 @@ public sealed class ParseContextResolverTests : IDisposable
     }
 
     [Fact]
+    public async Task Only_ancestor_projects_are_evaluated_when_they_own_every_file()
+    {
+        var file = File("src/App/Program.cs");
+        var project = File("src/App/App.csproj");
+        var outer = File("Directory.csproj");
+        File("other/Other.csproj");
+        var evaluator = new FakeEvaluator
+            {
+                [project, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest")),
+                [outer, null] = Success(("TargetFramework", "net10.0"), ("LangVersion", "latest")),
+            };
+
+        var result = await Resolve(evaluator, file);
+
+        result.CanFormat.ShouldBe(true);
+        evaluator.Targets.ShouldMatch([outer, project]);
+    }
+
+    [Fact]
+    public async Task Linked_file_is_found_by_scanning_remaining_projects()
+    {
+        var file = File("shared/Shared.cs");
+        var project = File("src/App/App.csproj");
+        var evaluator = new FakeEvaluator
+            {
+                [project, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "LINKED")),
+            };
+
+        var result = await Resolve(evaluator, file);
+
+        result.CanFormat.ShouldBe(true);
+        result.Options!.PreprocessorSymbolNames.ShouldContain("LINKED");
+    }
+
+    [Fact]
     public async Task Failed_owned_project_is_skipped()
     {
         var file = File("Program.cs");
@@ -131,7 +166,8 @@ public sealed class ParseContextResolverTests : IDisposable
     string File(string name)
     {
         Directory.CreateDirectory(root);
-        var path = Path.Combine(root, name);
+        var path = Path.GetFullPath(Path.Combine(root, name));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         System.IO.File.WriteAllText(path, "");
         return path;
     }
@@ -156,6 +192,8 @@ public sealed class ParseContextResolverTests : IDisposable
 
         internal List<string> Configurations { get; } = [];
 
+        internal List<string> Targets { get; } = [];
+
         internal MSBuildEvaluation this[string target, string? framework]
         {
             set => evaluations[(target, framework)] = value;
@@ -164,6 +202,8 @@ public sealed class ParseContextResolverTests : IDisposable
         public ValueTask<MSBuildEvaluation> EvaluateAsync(string target, string configuration, string? targetFramework, CancellationToken cancellationToken)
         {
             Configurations.Add(configuration);
+            lock (Targets)
+                Targets.Add(target);
             return ValueTask.FromResult(evaluations[(target, targetFramework)]);
         }
     }

@@ -16,8 +16,19 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
     {
         var selected = paths.Select(Path.GetFullPath).Distinct(PathComparer).ToArray();
         var contexts = selected.ToDictionary(path => path, _ => new List<ProjectContext>(), PathComparer);
-        var projects = Directory.EnumerateFiles(_discoveryRoot, "*.csproj", SearchOption.AllDirectories).Order(PathComparer);
-        await Task.WhenAll(projects.Select(project => AddProjectContextsAsync(project, configuration ?? "Debug", contexts, cancellationToken).AsTask()));
+
+        // A project nearly always owns the files beneath its own directory, so the projects on the
+        // way up from each selected file are asked first. Enumerating every project under the root
+        // and consulting the cache for each costs more than formatting a handful of files, and is
+        // only needed when a file is linked into a project that lives somewhere else.
+        var ancestors = AncestorProjects(selected);
+        await EvaluateAsync(ancestors, configuration ?? "Debug", contexts, cancellationToken);
+        if (contexts.Values.Any(projectContexts => projectContexts.Count == 0))
+        {
+            var remaining = Directory.EnumerateFiles(_discoveryRoot, "*.csproj", SearchOption.AllDirectories)
+                .Where(project => !ancestors.Contains(project));
+            await EvaluateAsync(remaining, configuration ?? "Debug", contexts, cancellationToken);
+        }
         foreach (var projectContexts in contexts.Values)
             projectContexts.Sort((left, right) => PathComparer.Compare(left.Project, right.Project));
 
@@ -31,6 +42,30 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
         }
         return results;
     }
+
+    HashSet<string> AncestorProjects(IEnumerable<string> paths)
+    {
+        var projects = new HashSet<string>(PathComparer);
+        var visited = new HashSet<string>(PathComparer);
+        foreach (var path in paths)
+        {
+            for (var directory = Path.GetDirectoryName(path);
+                 directory is not null && IsUnder(directory, _discoveryRoot) && visited.Add(directory);
+                 directory = Path.GetDirectoryName(directory))
+            {
+                if (Directory.Exists(directory))
+                    projects.UnionWith(Directory.EnumerateFiles(directory, "*.csproj", SearchOption.TopDirectoryOnly));
+            }
+        }
+        return projects;
+    }
+
+    Task EvaluateAsync(
+        IEnumerable<string> projects,
+        string configuration,
+        IReadOnlyDictionary<string, List<ProjectContext>> contexts,
+        CancellationToken cancellationToken) =>
+        Task.WhenAll(projects.Order(PathComparer).Select(project => AddProjectContextsAsync(project, configuration, contexts, cancellationToken).AsTask()));
 
     async ValueTask AddProjectContextsAsync(
         string project,

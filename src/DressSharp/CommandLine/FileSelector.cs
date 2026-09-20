@@ -9,11 +9,16 @@ sealed class FileSelector(string invocationDirectory, GitFileDiscovery? git = nu
     readonly string _invocationDirectory = Path.GetFullPath(invocationDirectory);
     readonly GitFileDiscovery _git = git ?? new();
 
-    internal async Task<IReadOnlyList<SelectedFile>> Select(IReadOnlyList<string> includes, CancellationToken cancellationToken = default)
+    internal Task<IReadOnlyList<SelectedFile>> Select(IReadOnlyList<string> includes, CancellationToken cancellationToken = default) =>
+        Select(includes, SelectionScope.All, cancellationToken);
+
+    internal async Task<IReadOnlyList<SelectedFile>> Select(IReadOnlyList<string> includes, SelectionScope scope, CancellationToken cancellationToken)
     {
         var matcher = CreateMatcher(includes);
-        var discovered = await _git.TryListAsync(_invocationDirectory, cancellationToken)
-            ?? EnumerateFiles();
+        var discovered = scope == SelectionScope.All
+            ? await _git.TryListAsync(_invocationDirectory, cancellationToken) ?? EnumerateFiles()
+            : await _git.TryListChangedAsync(_invocationDirectory, scope, cancellationToken)
+                ?? throw new FileSelectionException($"Option '--{scope.ToString().ToLowerInvariant()}' requires a Git worktree.");
         var candidates = discovered
             .Where(IsCSharp)
             .Where(path => !IsVcsPath(path))

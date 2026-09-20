@@ -160,6 +160,69 @@ public sealed class FileSelectorTests : IDisposable
         (await Select()).ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Staged_scope_selects_only_files_whose_index_differs_from_head()
+    {
+        Write("committed.cs", "class Committed {}");
+        Write("staged.cs", "class Staged {}");
+        Write("removed.cs", "class Removed {}");
+        Commit("committed.cs", "staged.cs", "removed.cs");
+        Write("staged.cs", "class Staged { }");
+        Write("unstaged.cs", "class Unstaged {}");
+        RunGit(_directory, "add", "--", "staged.cs");
+        RunGit(_directory, "rm", "--quiet", "--", "removed.cs");
+
+        var selected = await Select(SelectionScope.Staged);
+
+        selected.Select(file => file.DisplayPath).ShouldMatch(["staged.cs"]);
+    }
+
+    [Fact]
+    public async Task Changed_scope_selects_modified_and_untracked_files_and_honours_includes()
+    {
+        Write("committed.cs", "class Committed {}");
+        Write("modified.cs", "class Modified {}");
+        Commit("committed.cs", "modified.cs");
+        Write("modified.cs", "class Modified { }");
+        Write("src/untracked.cs", "class Untracked {}");
+        Write(".gitignore", "ignored.cs\n");
+        Write("ignored.cs", "class Ignored {}");
+
+        (await Select(SelectionScope.Changed)).Select(file => file.DisplayPath)
+            .ShouldMatch(["modified.cs", "src/untracked.cs"]);
+        (await Select(SelectionScope.Changed, "src/**/*.cs")).Select(file => file.DisplayPath)
+            .ShouldMatch(["src/untracked.cs"]);
+    }
+
+    [Fact]
+    public async Task Changed_scope_treats_every_file_as_new_before_the_first_commit()
+    {
+        Write("tracked.cs", "class Tracked {}");
+        RunGit(_directory, "add", "--", "tracked.cs");
+        Write("untracked.cs", "class Untracked {}");
+
+        var selected = await Select(SelectionScope.Changed);
+
+        selected.Select(file => file.DisplayPath).ShouldMatch(["tracked.cs", "untracked.cs"]);
+    }
+
+    [Fact]
+    public async Task Scoped_selection_requires_a_git_worktree()
+    {
+        var root = Directory.CreateDirectory(
+            Path.Combine(Path.GetTempPath(), "DressSharp.UnitTests.Fallback", Guid.NewGuid().ToString("N"))).FullName;
+        try
+        {
+            var exception = await Assert.ThrowsAsync<FileSelectionException>(
+                () => new FileSelector(root).Select([], SelectionScope.Staged, TestContext.Current.CancellationToken));
+            exception.Message.ShouldContain("--staged");
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("-")]
@@ -179,6 +242,15 @@ public sealed class FileSelectorTests : IDisposable
 
     Task<IReadOnlyList<SelectedFile>> Select(params string[] includes) =>
         new FileSelector(_directory).Select(includes, TestContext.Current.CancellationToken);
+
+    Task<IReadOnlyList<SelectedFile>> Select(SelectionScope scope, params string[] includes) =>
+        new FileSelector(_directory).Select(includes, scope, TestContext.Current.CancellationToken);
+
+    void Commit(params string[] files)
+    {
+        RunGit(_directory, ["add", "--", .. files]);
+        RunGit(_directory, "-c", "user.name=DressSharp", "-c", "user.email=tests@dresssharp.invalid", "commit", "--quiet", "--no-gpg-sign", "-m", "commit");
+    }
 
     void Write(string relativePath, string text) =>
         Write(_directory, relativePath, text);

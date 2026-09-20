@@ -21,6 +21,7 @@ static class Program
         interactiveApplication ??= InteractiveApplication.CreateDefault();
         error ??= Console.Error;
         var includes = CreateIncludeOption();
+        var scope = CreateScopeOptions();
         var verbose = new Option<bool>("--verbose") { Description = "List changed files and report an empty selection.", Recursive = true };
         var configuration = new Option<string?>("--configuration")
             {
@@ -31,7 +32,7 @@ static class Program
         var root = new RootCommand("Format C# using explicit syntax-only preferences.")
             {
                 TreatUnmatchedTokensAsErrors = true,
-                Options = { includes, verbose, configuration },
+                Options = { includes, scope.Staged, scope.Changed, verbose, configuration },
                 Subcommands =
                     {
                         CreateFileCommand("format", "Format selected C# files.", CommandKind.Format, verbose, configuration),
@@ -44,12 +45,21 @@ static class Program
         {
             command.Validators.Add(result =>
                 {
-                    if (result.GetResult(includes) is not null)
-                        result.AddError("Option '--include' must follow an explicit command.");
+                    foreach (var option in new Option[] { includes, scope.Staged, scope.Changed })
+                    {
+                        if (result.GetResult(option) is not null)
+                            result.AddError($"Option '{option.Name}' must follow an explicit command.");
+                    }
                 });
         }
+        root.Validators.Add(scope.Validate);
         root.SetAction(parseResult => RunSelectionAsync(
-            new CommandRequest(CommandKind.Format, parseResult.GetValue(includes) ?? [], parseResult.GetValue(verbose), parseResult.GetValue(configuration)),
+            new CommandRequest(
+                CommandKind.Format,
+                parseResult.GetValue(includes) ?? [],
+                parseResult.GetValue(verbose),
+                parseResult.GetValue(configuration),
+                scope.Read(parseResult)),
             Environment.CurrentDirectory));
 
         return root;
@@ -127,16 +137,36 @@ static class Program
         Option<string?> configuration)
     {
         var includes = CreateIncludeOption();
-        var command = new Command(name, description) { includes };
+        var scope = CreateScopeOptions();
+        var command = new Command(name, description) { includes, scope.Staged, scope.Changed };
         command.TreatUnmatchedTokensAsErrors = true;
+        command.Validators.Add(scope.Validate);
         command.SetAction(parseResult => RunSelectionAsync(
             new CommandRequest(
                 kind,
                 parseResult.GetValue(includes) ?? [],
                 parseResult.GetValue(verbose),
-                parseResult.GetValue(configuration)),
+                parseResult.GetValue(configuration),
+                scope.Read(parseResult)),
             Environment.CurrentDirectory));
         return command;
+    }
+
+    static ScopeOptions CreateScopeOptions() => new(
+        new("--staged") { Description = "Select only files whose staged content differs from HEAD." },
+        new("--changed") { Description = "Select only files changed since HEAD, including untracked files." });
+
+    sealed record ScopeOptions(Option<bool> Staged, Option<bool> Changed)
+    {
+        internal void Validate(CommandResult result)
+        {
+            if (result.GetResult(Staged) is not null && result.GetResult(Changed) is not null)
+                result.AddError("Options '--staged' and '--changed' cannot be combined.");
+        }
+
+        internal SelectionScope Read(ParseResult result) => result.GetValue(Staged) ? SelectionScope.Staged
+            : result.GetValue(Changed) ? SelectionScope.Changed
+            : SelectionScope.All;
     }
 
     static Option<string[]> CreateIncludeOption() => new("--include")
@@ -150,7 +180,7 @@ static class Program
     {
         try
         {
-            var selected = await new FileSelector(invocationDirectory).Select(request.Includes);
+            var selected = await new FileSelector(invocationDirectory).Select(request.Includes, request.Scope, CancellationToken.None);
             if (request.Verbose && selected.Count == 0)
                 await Console.Out.WriteLineAsync("No eligible C# files selected.");
             return await new FormatExecutor(invocationDirectory).Run(request, selected);

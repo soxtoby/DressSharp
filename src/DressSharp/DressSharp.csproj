@@ -24,6 +24,12 @@
          barely reached: a thousand files finish in about five sixths of the time without it, and
          three files finish faster too. -->
     <TieredPGO>false</TieredPGO>
+    <!-- A hook run is a few files, so the time is spent compiling the formatter rather than running
+         it. Precompiling the package for each platform removes most of that: a one-file check
+         finishes in about six tenths of the wall time and CPU time, a thousand files in about
+         three quarters of the wall time and half the CPU time, for a package twice the size. -->
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="editorconfig" />

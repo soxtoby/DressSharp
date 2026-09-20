@@ -54,6 +54,26 @@ public sealed class CommandTests
     }
 
     [Theory]
+    [InlineData("format --staged")]
+    [InlineData("check --changed")]
+    [InlineData("--staged")]
+    [InlineData("format --staged --include src/**/*.cs")]
+    public void Scope_options_are_accepted(string commandLine)
+    {
+        Program.CreateCommand().Parse(commandLine).Errors.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("format --staged --changed")]
+    [InlineData("--staged format")]
+    [InlineData("init --staged")]
+    [InlineData("interactive --changed")]
+    public void Scope_options_are_rejected_where_meaningless(string commandLine)
+    {
+        Program.CreateCommand().Parse(commandLine).Errors.ShouldNotBeEmpty();
+    }
+
+    [Theory]
     [InlineData("source.cs")]
     [InlineData("--unknown")]
     [InlineData("format --force")]
