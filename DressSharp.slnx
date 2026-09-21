@@ -6,9 +6,13 @@
     <Project Path="tests/DressSharp.UnitTests/DressSharp.UnitTests.csproj" />
   </Folder>
   <Project Path="src/DressSharp/DressSharp.csproj" />
+  <Folder Name="/tools/">
+    <Project Path="tools/DressSharp.Docs/DressSharp.Docs.csproj" />
+  </Folder>
   <Folder Name="/scripts/">
     <File Path="scripts/benchmark.cs" />
     <File Path="scripts/build-interactive.cs" />
+    <File Path="scripts/build-docs.cs" />
     <File Path="scripts/build.cs" />
     <File Path="scripts/install-local.cs" />
     <File Path="scripts/materialize-corpus.cs" />

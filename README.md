@@ -52,3 +52,7 @@ dotnet tool run dotnet-dress -- --version
 The package installs one command: `dotnet dress`.
 
 See [CLI and configuration](docs/cli-and-configuration.md) and the [compatibility policy](docs/compatibility.md).
+
+## Documentation site
+
+`./do build-docs` generates the static site into `artifacts/site`: a landing page, the CLI and compatibility documents, and a reference for every preference in the built-in rule catalog. Each rule's example is formatted by the real formatter under every accepted value, so the reference cannot drift from the code. The `Docs` workflow publishes the same output to GitHub Pages on every push to `master`; enable Pages with the "GitHub Actions" source once in the repository settings.

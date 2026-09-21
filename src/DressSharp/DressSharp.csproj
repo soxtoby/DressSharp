@@ -62,5 +62,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DressSharp.UnitTests" />
     <InternalsVisibleTo Include="DressSharp.IntegrationTests" />
+    <InternalsVisibleTo Include="DressSharp.Docs" />
   </ItemGroup>
 </Project>
