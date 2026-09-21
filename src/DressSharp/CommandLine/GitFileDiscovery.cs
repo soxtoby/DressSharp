@@ -28,6 +28,17 @@ sealed class GitFileDiscovery
         return [.. modified, .. untracked];
     }
 
+    /// <summary>
+    /// Stages <paramref name="paths"/> so that a pre-commit hook needs no second command to
+    /// carry a rewrite into the commit.
+    /// </summary>
+    internal async ValueTask StageAsync(string directory, IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        if (paths.Count == 0)
+            return;
+        await TryRunAsync(directory, ["add", "--", .. paths], cancellationToken);
+    }
+
     static async ValueTask<IReadOnlyList<string>?> TryRunAsync(
         string directory,
         string[] arguments,

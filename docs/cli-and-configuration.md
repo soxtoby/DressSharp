@@ -16,11 +16,7 @@ The root command aliases `format`. An omitted include selects `**/*.cs` beneath 
 
 Inside a Git worktree, DressSharp selects tracked files plus nonignored untracked files using Git's standard excludes, including nested `.gitignore`, `.git/info/exclude`, and the user's global excludes. Outside a Git worktree it searches the filesystem directly. Both modes include only ordinary `.cs` files and exclude generated files, `.csx`, VCS directories, and linked paths. Overlapping includes are deduplicated.
 
-`--staged` narrows the selection to files whose staged content differs from `HEAD`, for a pre-commit hook. `--changed` narrows it to files whose working tree differs from `HEAD` plus nonignored untracked files, for a hook that runs after an editor or agent writes. Both combine with `--include`, require a Git worktree, and treat every file as changed in a repository with no commits. Format only what is staged, then stage the result again, so that staged and unstaged hunks stay separate:
-
-```sh
-dotnet dress format --staged && git diff --name-only --cached -- '*.cs' | xargs -r git add
-```
+`--staged` narrows the selection to files whose staged content differs from `HEAD`, for a pre-commit hook. `--changed` narrows it to files whose working tree differs from `HEAD` plus nonignored untracked files, for a hook that runs after an editor or agent writes. Both combine with `--include`, require a Git worktree, and treat every file as changed in a repository with no commits. `format --staged` also stages each file it rewrites, so a pre-commit hook is that one command. A file holding both staged and unstaged hunks is formatted and staged whole.
 
 `format` writes changed files and reports the changed count and elapsed time. `check` writes nothing and lists files requiring changes. `--verbose` lists changed files and reports an empty selection. `--configuration` selects the MSBuild configuration; the default is `Debug`.
 

@@ -18,10 +18,10 @@ dotnet tool install DressSharp
 
 ## Hooks
 
-`--staged` and `--changed` select only the files Git reports as changed, so a hook formats what was touched instead of the repository. For a pre-commit hook, format the staged files and stage the result again:
+`--staged` and `--changed` select only the files Git reports as changed, so a hook formats what was touched instead of the repository. A pre-commit hook is one line; `format --staged` stages what it rewrites:
 
 ```sh
-dotnet dress format --staged && git diff --name-only --cached -- '*.cs' | xargs -r git add
+dotnet dress format --staged
 ```
 
 For a hook that runs after an editor or agent writes, format everything changed since the last commit:
@@ -30,7 +30,7 @@ For a hook that runs after an editor or agent writes, format everything changed 
 dotnet dress format --changed
 ```
 
-Both require a repository-pinned or global install of the current version.
+Both require a repository-pinned or global install of the current version. This repository's `.claude/settings.json` and `.codex/hooks.json` run the second form from Claude Code and Codex after `dotnet tool restore`.
 
 ## Development
 

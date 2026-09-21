@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [{ "type": "command", "command": "dotnet dress format --changed" }]
+      }
+    ]
+  }
+}

@@ -224,12 +224,57 @@ public sealed class FormatExecutionTests : IDisposable
         ExactAssert.Text("Program.cs: skipped 1 malformed occurrence(s)." + Environment.NewLine, error);
     }
 
-    async Task<(int ExitCode, string Output, string Error)> Run(CommandKind kind, string path, bool verbose = false)
+    [Fact]
+    public async Task Staged_format_stages_the_rewrite()
+    {
+        Git("init", "--quiet");
+        Git("config", "user.email", "test@example.com");
+        Git("config", "user.name", "Test");
+        var path = Source("class C { void M(int a,int b) { } }\n");
+        Git("add", "--", "Program.cs");
+        Git("commit", "--quiet", "--message", "initial");
+        Source("class C { void M(int a,int b,int c) { } }\n");
+        Git("add", "--", "Program.cs");
+
+        var (exitCode, _, error) = await Run(CommandKind.Format, path, scope: SelectionScope.Staged);
+
+        exitCode.ShouldBe(0);
+        ExactAssert.Text(string.Empty, error);
+        Git("diff", "--quiet", "--", "Program.cs");
+        Git("show", ":Program.cs").ShouldBe("class C { void M(int a, int b, int c) { } }\n");
+    }
+
+    string Git(params string[] arguments)
+    {
+        var startInfo = new System.Diagnostics.ProcessStartInfo("git")
+            {
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            };
+        startInfo.ArgumentList.Add("-C");
+        startInfo.ArgumentList.Add(_directory);
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+        using var process = System.Diagnostics.Process.Start(startInfo)!;
+        var output = process.StandardOutput.ReadToEnd();
+        var errorText = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        (process.ExitCode == 0).ShouldBe(true, errorText);
+        return output;
+    }
+
+    async Task<(int ExitCode, string Output, string Error)> Run(
+        CommandKind kind,
+        string path,
+        bool verbose = false,
+        SelectionScope scope = SelectionScope.All)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         var exitCode = await new FormatExecutor(_directory, output, error).Run(
-            new(kind, [], verbose, null),
+            new(kind, [], verbose, null, scope),
             [new SelectedFile(path, Path.GetFileName(path))],
             Token);
         return (exitCode, output.ToString(), error.ToString());
@@ -244,5 +289,10 @@ public sealed class FormatExecutionTests : IDisposable
 
     static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    public void Dispose() => Directory.Delete(_directory, true);
+    public void Dispose()
+    {
+        foreach (var file in Directory.EnumerateFiles(_directory, "*", SearchOption.AllDirectories))
+            File.SetAttributes(file, FileAttributes.Normal);
+        Directory.Delete(_directory, true);
+    }
 }
