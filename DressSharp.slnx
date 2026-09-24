@@ -11,12 +11,11 @@
   </Folder>
   <Folder Name="/scripts/">
     <File Path="scripts/benchmark.cs" />
-    <File Path="scripts/build-interactive.cs" />
     <File Path="scripts/build-docs.cs" />
+    <File Path="scripts/build-interactive.cs" />
     <File Path="scripts/build.cs" />
     <File Path="scripts/install-local.cs" />
     <File Path="scripts/materialize-corpus.cs" />
-    <File Path="scripts/prototype-interactive.cs" />
     <File Path="scripts/run.cs" />
     <File Path="scripts/test.cs" />
   </Folder>

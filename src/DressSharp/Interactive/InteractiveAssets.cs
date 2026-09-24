@@ -6,12 +6,22 @@ namespace DressSharp.Interactive;
 
 static class InteractiveAssets
 {
-    internal static byte[] Index { get; } = Read("index.html");
-    internal static InteractiveAsset JavaScript { get; } = ReadJavaScript();
-    internal static byte[] Css { get; } = Read("app.css");
-    internal static byte[] Icon { get; } = Read("dresssharp.svg");
-    internal static byte[] FaviconSvg { get; } = Read("favicon.svg");
-    internal static byte[] FaviconIco { get; } = Read("favicon.ico");
+    internal static byte[] Index => field ??= Read("index.html");
+    internal static InteractiveAsset JavaScript => field ??= ReadJavaScript();
+    internal static byte[] Css => field ??= Read("app.css");
+    internal static byte[] Icon => field ??= Read("dresssharp.svg");
+    internal static byte[] FaviconSvg => field ??= Read("favicon.svg");
+    internal static byte[] FaviconIco => field ??= Read("favicon.ico");
+
+    /// <summary>A checkout builds without the browser assets; only the interactive command needs them.</summary>
+    internal static void EnsureBuilt()
+    {
+        using var index = Open("index.html");
+        if (index is null)
+            throw new InvalidOperationException(MissingMessage);
+    }
+
+    const string MissingMessage = "The interactive browser assets were not built into this DressSharp. Run 'dotnet do build-interactive', then build again.";
 
     static InteractiveAsset ReadJavaScript()
     {
@@ -24,7 +34,7 @@ static class InteractiveAssets
     static byte[] Read(string name)
     {
         using var stream = Open(name)
-            ?? throw new InvalidOperationException($"Embedded interactive asset '{name}' is missing. Run 'dotnet do build-interactive'.");
+            ?? throw new InvalidOperationException(MissingMessage);
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);
         return buffer.ToArray();

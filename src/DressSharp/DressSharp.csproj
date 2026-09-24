@@ -40,24 +40,16 @@
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
+  <!-- The browser assets are embedded when they have been built. Without them the formatter builds and
+       runs, and only the interactive command reports that they are missing; a package must carry them. -->
   <ItemGroup>
-    <EmbeddedResource Include="InteractiveWeb/dist/index.html" LogicalName="DressSharp.Interactive.index.html" />
-    <EmbeddedResource Include="InteractiveWeb/dist/app.js" LogicalName="DressSharp.Interactive.app.js"
-                      Condition="'$(Configuration)' != 'Release'" />
-    <EmbeddedResource Include="InteractiveWeb/dist/app.js.gz" LogicalName="DressSharp.Interactive.app.js.gz"
-                      Condition="'$(Configuration)' == 'Release'" />
-    <EmbeddedResource Include="InteractiveWeb/dist/app.css" LogicalName="DressSharp.Interactive.app.css" />
-    <EmbeddedResource Include="InteractiveWeb/dist/dresssharp.svg" LogicalName="DressSharp.Interactive.dresssharp.svg" />
-    <EmbeddedResource Include="InteractiveWeb/dist/favicon.svg" LogicalName="DressSharp.Interactive.favicon.svg" />
-    <EmbeddedResource Include="InteractiveWeb/dist/favicon.ico" LogicalName="DressSharp.Interactive.favicon.ico" />
+    <EmbeddedResource Include="InteractiveWeb/dist/*" LogicalName="DressSharp.Interactive.%(Filename)%(Extension)" />
   </ItemGroup>
-  <Target Name="RequireInteractiveAssets" BeforeTargets="PrepareForBuild"
-          Condition="!Exists('InteractiveWeb/dist/index.html') Or !Exists('InteractiveWeb/dist/app.css')
-                     Or !Exists('InteractiveWeb/dist/dresssharp.svg') Or !Exists('InteractiveWeb/dist/favicon.svg')
-                     Or !Exists('InteractiveWeb/dist/favicon.ico')
-                     Or ('$(Configuration)' == 'Release' And !Exists('InteractiveWeb/dist/app.js.gz'))
-                     Or ('$(Configuration)' != 'Release' And !Exists('InteractiveWeb/dist/app.js'))">
-    <Error Text="Interactive browser assets are missing. Run 'dotnet do build-interactive' before building DressSharp." />
+  <!-- The production build empties dist and writes the compressed script last, so its presence
+       means the whole production build is there. -->
+  <Target Name="RequireInteractiveAssets" BeforeTargets="GenerateNuspec"
+          Condition="!Exists('InteractiveWeb/dist/app.js.gz')">
+    <Error Text="A DressSharp package needs the production interactive assets. Run 'dotnet do build-interactive' before packing." />
   </Target>
   <ItemGroup>
     <InternalsVisibleTo Include="DressSharp.UnitTests" />

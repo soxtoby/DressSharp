@@ -3,7 +3,6 @@
 using DotNetDo;
 using static DotNetDo.Tools;
 
-[assembly: TaskDescription("Build the interactive assets and .NET solution.")]
+[assembly: TaskDescription("Build the .NET solution.")]
 
-await (Bun.Run with { Target = "build", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
 await DotNet.Build;

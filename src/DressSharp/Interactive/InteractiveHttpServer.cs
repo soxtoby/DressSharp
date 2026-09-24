@@ -58,6 +58,7 @@ sealed class InteractiveHttpServer : IInteractiveServer
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        InteractiveAssets.EnsureBuilt();
         var configuration = await InteractiveEditorConfig.LoadAsync(configPath, invocationDirectory, cancellationToken);
         Exception? lastFailure = null;
         for (var attempt = 0; attempt < 10; attempt++)

@@ -3,6 +3,8 @@ import { gzipSync } from "node:zlib";
 
 const compress = process.argv.includes("--compress");
 
+// dist holds exactly what DressSharp embeds, so it starts empty.
+await rm("dist", {recursive: true, force: true});
 await mkdir("dist", {recursive: true});
 
 const result = await Bun.build({
@@ -32,6 +34,5 @@ await Promise.all([
 
 if (compress) {
     await writeFile("dist/app.js.gz", gzipSync(await readFile("dist/app.js"), {level: 9}));
-} else {
-    await rm("dist/app.js.gz", {force: true});
+    await rm("dist/app.js");
 }
