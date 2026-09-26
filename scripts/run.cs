@@ -7,7 +7,8 @@ using static DotNetDo.Tools;
 
 var project = Do.Solution["DressSharp"];
 
-await (Bun.Run with { Target = "build", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
+await (Bun.Install with { FrozenLockfile = true });
+await (Bun.Run with { Target = "interactive:build" });
 
 var arguments = Do.TrailingArguments.Select(argument => argument.QuotedArgument()).JoinWith(" ");
 await Do.Exec($"dotnet run --project {project.Path.QuotedArgument()} -- {arguments}");

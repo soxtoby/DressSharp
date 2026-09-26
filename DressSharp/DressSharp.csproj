@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>DressSharp</AssemblyName>
+    <RootNamespace>DressSharp</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>dotnet-dress</ToolCommandName>
+    <PackageId>DressSharp</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Simon Oxtoby</Authors>
+    <Description>A syntax-only, explicitly configured C# formatter.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)..\dist\packages</PackageOutputPath>
+    <!-- Formatting a repository allocates syntax nodes on every worker at once, and collection was
+         measured at roughly a third of active CPU under the workstation collector. -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- A run is one short burst of allocation across every processor. Letting the collector
+         discover that shape costs more than the memory holding every heap open saves: a thousand
+         files finish in about nine tenths of the time with the adaptation turned off. -->
+    <GarbageCollectionAdaptationMode>0</GarbageCollectionAdaptationMode>
+    <!-- Guided optimization watches code run so that it can compile it better the second time. A
+         run reads each file once and exits, so the watching is paid for and the better code is
+         barely reached: a thousand files finish in about five sixths of the time without it, and
+         three files finish faster too. -->
+    <TieredPGO>false</TieredPGO>
+    <!-- A hook run is a few files, so the time is spent compiling the formatter rather than running
+         it. Precompiling the package for each platform removes most of that: a one-file check
+         finishes in about six tenths of the wall time and CPU time, a thousand files in about
+         three quarters of the wall time and half the CPU time, for a package twice the size. -->
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="editorconfig" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <!-- The browser assets are embedded when they have been built. Without them the formatter builds and
+       runs, and only the interactive command reports that they are missing; a package must carry them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../dist/interactive/*" LogicalName="DressSharp.Interactive.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <!-- The production build empties dist and writes the compressed script last, so its presence
+       means the whole production build is there. -->
+  <Target Name="RequireInteractiveAssets" BeforeTargets="GenerateNuspec"
+          Condition="!Exists('../dist/interactive/app.js.gz')">
+    <Error Text="A DressSharp package needs the production interactive assets. Run 'dotnet do build-interactive' before packing." />
+  </Target>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DressSharp.UnitTests" />
+    <InternalsVisibleTo Include="DressSharp.IntegrationTests" />
+    <!-- The build-docs script names its assembly so that it can read the rule catalog. -->
+    <InternalsVisibleTo Include="DressSharp.Docs" />
+  </ItemGroup>
+</Project>

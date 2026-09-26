@@ -1,0 +1,18 @@
+{
+  "name": "dresssharp",
+  "private": true,
+  "workspaces": ["DressSharp.Interactive", "site"],
+  "scripts": {
+    "interactive:build": "bun run --cwd DressSharp.Interactive build",
+    "interactive:build:production": "bun run --cwd DressSharp.Interactive build:production",
+    "interactive:check": "bun run --cwd DressSharp.Interactive check",
+    "site:dev": "bun run --cwd site dev",
+    "site:build": "bun run --cwd site build"
+  },
+  "engines": {
+    "bun": "1.4.0"
+  },
+  "patchedDependencies": {
+    "@pierre/diffs@1.4.1": "DressSharp.Interactive/patches/@pierre%2Fdiffs@1.4.1.patch"
+  }
+}

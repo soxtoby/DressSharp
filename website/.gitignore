@@ -1,8 +1,0 @@
-node_modules/
-.astro/
-# Written by tools/DressSharp.Docs; see ./do build-docs.
-public/
-src/generated/
-src/content/docs/rules/
-src/content/docs/cli.md
-src/content/docs/compatibility.md

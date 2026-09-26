@@ -1,0 +1,5 @@
+.astro/
+# Written by ./do build-docs.
+public/
+src/generated/
+src/content/docs/rules/

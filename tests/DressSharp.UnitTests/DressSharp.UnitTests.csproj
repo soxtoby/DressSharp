@@ -8,7 +8,7 @@
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/DressSharp/DressSharp.csproj" />
+    <ProjectReference Include="../../DressSharp/DressSharp.csproj" />
     <ProjectReference Include="../DressSharp.TestSupport/DressSharp.TestSupport.csproj" />
   </ItemGroup>
   <ItemGroup>

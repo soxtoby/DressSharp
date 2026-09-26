@@ -1,5 +1,8 @@
 #!/usr/bin/env dotnet
 #:package DotNetDo.Core@0.8.0
+#:package Microsoft.CodeAnalysis.CSharp@5.9.0
+#:include corpus/CorpusManifest.cs
+#:include corpus/CorpusProject.cs
 using DotNetDo;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -26,21 +29,31 @@ if (mode is not ("check" or "format"))
 if (fileCount is < 1 or > 1000)
     throw new ArgumentOutOfRangeException(nameof(fileCount));
 
-var benchmarkRoot = Do.RootDirectory / ".benchmarks";
+var benchmarkRoot = Do.RootDirectory / "benchmarks";
 var corpus = benchmarkRoot / "corpus" / "files";
 var resultsDirectory = (benchmarkRoot / "results").EnsureDirectoryExists();
 var timestamp = DateTimeOffset.UtcNow;
 
-await (Bun.Run with { Target = "build:production", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
+await (Bun.Install with { FrozenLockfile = true });
+await (Bun.Run with { Target = "interactive:build:production" });
 // The shipped tool is a platform package, precompiled for its runtime identifier, so the
 // benchmark measures a publish for this machine rather than the portable build output.
-var published = Do.RootDirectory / "artifacts/benchmark-publish" / RuntimeInformation.RuntimeIdentifier;
+var published = Do.RootDirectory / "dist/benchmark-publish" / RuntimeInformation.RuntimeIdentifier;
 var publish = await Start(
     Do.RootDirectory,
     "dotnet",
     [
-        "publish", Do.RootDirectory / "src/DressSharp/DressSharp.csproj", "--configuration", "Release",
-        "--runtime", RuntimeInformation.RuntimeIdentifier, "--self-contained", "false", "--output", published, "--nologo"
+        "publish",
+        Do.RootDirectory / "DressSharp/DressSharp.csproj",
+        "--configuration",
+        "Release",
+        "--runtime",
+        RuntimeInformation.RuntimeIdentifier,
+        "--self-contained",
+        "false",
+        "--output",
+        published,
+        "--nologo"
     ]);
 if (publish.ExitCode != 0)
     throw new InvalidOperationException($"Publish failed: {publish.StandardOutput}{publish.StandardError}");
@@ -53,17 +66,15 @@ if (!corpus.IsExistingDirectory)
 }
 else
 {
-    (benchmarkRoot / "corpus/Corpus.csproj").CopyTo(corpus / "Corpus.csproj", new() { Overwrite = true });
-    var inspector = Do.RootDirectory / "benchmarks/CorpusInspector/CorpusInspector.csproj";
-    var manifest = benchmarkRoot / "corpus/manifest.json";
-    await Do.Exec($"dotnet run --project {inspector.QuotedArgument()} -- {corpus.QuotedArgument()} {manifest.QuotedArgument()}");
+    (corpus / CorpusProject.Name).WriteText(CorpusProject.Content);
+    CorpusManifest.Verify(corpus, benchmarkRoot / "corpus/manifest.json", update: false);
 }
 
 var benchmarkCorpus = Do.CreateTempDirectory("DressSharp-corpus-");
 try
 {
     var benchmarkFiles = (benchmarkCorpus / "files").EnsureDirectoryExists();
-    (corpus / "Corpus.csproj").CopyTo(benchmarkCorpus / "Corpus.csproj");
+    (corpus / CorpusProject.Name).CopyTo(benchmarkCorpus / CorpusProject.Name);
     (corpus / ".editorconfig").CopyTo(benchmarkCorpus / ".editorconfig");
     (Do.RootDirectory / ".gitignore").CopyTo(benchmarkCorpus / ".gitignore");
 
@@ -75,7 +86,7 @@ try
     await Do.Exec($"git -C {benchmarkCorpus.QuotedArgument()} init --quiet");
     await (DotNet.Restore with
         {
-            Targets = [benchmarkCorpus / "Corpus.csproj"]
+            Targets = [benchmarkCorpus / CorpusProject.Name]
         });
 
     var logicalCores = Environment.ProcessorCount;
@@ -187,7 +198,7 @@ try
             }
             else
             {
-                var values = new List<string> { "format", runRoot / "Corpus.csproj", "--no-restore", "--verbosity", "quiet" };
+                var values = new List<string> { "format", runRoot / CorpusProject.Name, "--no-restore", "--verbosity", "quiet" };
                 if (mode == "check")
                     values.Add("--verify-no-changes");
                 arguments = [.. values];

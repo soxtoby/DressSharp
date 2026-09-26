@@ -1,0 +1,19 @@
+{
+  "name": "dresssharp-interactive",
+  "private": true,
+  "scripts": {
+    "build": "bun run typecheck && bun run build.ts",
+    "build:production": "bun run typecheck && bun run build.ts --compress",
+    "check": "bun run typecheck && bun test",
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "@types/react": "19.3.0",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@pierre/diffs": "1.4.1",
+    "shiki": "4.4.3"
+  }
+}

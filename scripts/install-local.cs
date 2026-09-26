@@ -5,10 +5,11 @@ using static DotNetDo.Tools;
 
 [assembly: TaskDescription("Pack DressSharp and install it from the local package as a repository tool.")]
 
-var packages = (Do.RootDirectory / "artifacts/packages").EnsureDirectoryExists();
+var packages = (Do.RootDirectory / "dist/packages").EnsureDirectoryExists();
 var manifest = Do.RootDirectory / ".config/dotnet-tools.json";
 
-await (Bun.Run with { Target = "build:production", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
+await (Bun.Install with { FrozenLockfile = true });
+await (Bun.Run with { Target = "interactive:build:production" });
 await (DotNet.Pack with
     {
         Output = packages

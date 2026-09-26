@@ -1,0 +1,7 @@
+[install]
+# Astro bundles native Markdown bindings into its build output, which can only resolve their
+# platform packages from one flat node_modules.
+linker = "hoisted"
+
+[run]
+bun = true

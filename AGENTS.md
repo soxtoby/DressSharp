@@ -26,6 +26,10 @@ Cost is work per token and per member across a thousand files. Shapes that have 
 
 The runtime settings in the project file and the worker count are measured choices, each commented with its measurement. Re-measure before changing one.
 
+## Where files go
+
+Put experiments, traces, logs, and screenshots in `scratch/`. `dist/` holds only what a `./do` task builds, so any of it can be deleted and rebuilt.
+
 ## Measuring
 
-Before claiming a speedup, run `.benchmarks/protocol-v1.md`. Report CPU time beside wall time, since a change can win one while losing the other, and report a change that removes work by construction as that, with the numbers as evidence rather than the claim.
+Before claiming a speedup, run `benchmarks/protocol-v1.md`. Report CPU time beside wall time, since a change can win one while losing the other, and report a change that removes work by construction as that, with the numbers as evidence rather than the claim.

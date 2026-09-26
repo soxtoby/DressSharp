@@ -5,5 +5,8 @@ using static DotNetDo.Tools;
 
 [assembly: TaskDescription("Build the solution and run tests.")]
 
-await (Bun.Run with { Target = "check", WorkingDirectory = Do.RootDirectory / "src" / "DressSharp" / "InteractiveWeb" });
+await (Bun.Install with { FrozenLockfile = true });
+await (Bun.Run with { Target = "interactive:check" });
+// The interactive server tests serve the embedded assets, so a clean checkout needs them built.
+await (Bun.Run with { Target = "interactive:build" });
 await DotNet.Test;

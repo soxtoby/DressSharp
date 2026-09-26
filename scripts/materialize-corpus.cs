@@ -1,11 +1,14 @@
 #!/usr/bin/env dotnet
 #:package DotNetDo.Core@0.8.0
+#:package Microsoft.CodeAnalysis.CSharp@5.9.0
+#:include corpus/CorpusManifest.cs
+#:include corpus/CorpusProject.cs
 using DotNetDo;
 
 [assembly: TaskDescription("Materialize and verify the pinned 1,000-file benchmark corpus, optionally updating its lock.")]
 
 var update = Do.Param("update", false, "Update the corpus lock manifest.").Value;
-var benchmarkRoot = Do.RootDirectory / ".benchmarks";
+var benchmarkRoot = Do.RootDirectory / "benchmarks";
 var definition = (benchmarkRoot / "corpus/sources.json").ReadJson()!["sources"]!.AsArray();
 var corpus = benchmarkRoot / "corpus/files";
 var scratch = Do.CreateTempDirectory("DressSharp-corpus-");
@@ -13,7 +16,7 @@ var scratch = Do.CreateTempDirectory("DressSharp-corpus-");
 try
 {
     corpus.RecreateDirectory();
-    (benchmarkRoot / "corpus/Corpus.csproj").CopyTo(corpus / "Corpus.csproj");
+    (corpus / CorpusProject.Name).WriteText(CorpusProject.Content);
     (Do.RootDirectory / "tests/DressSharp.UnitTests/Fixtures/Default.editorconfig").CopyTo(corpus / ".editorconfig");
 
     foreach (var sourceNode in definition)
@@ -36,10 +39,7 @@ try
             file.CopyTo(corpus / name / checkout.RelativePathTo(file), new() { CreateDirectories = true });
     }
 
-    var command = $"dotnet run --project {(Do.RootDirectory / "benchmarks/CorpusInspector/CorpusInspector.csproj").QuotedArgument()} -- {corpus.QuotedArgument()} {(benchmarkRoot / "corpus/manifest.json").QuotedArgument()}";
-    if (update)
-        command += " --update";
-    await Do.Exec(command);
+    CorpusManifest.Verify(corpus, benchmarkRoot / "corpus/manifest.json", update);
 }
 finally
 {

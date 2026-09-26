@@ -5,10 +5,7 @@
     <Project Path="tests/DressSharp.TestSupport/DressSharp.TestSupport.csproj" />
     <Project Path="tests/DressSharp.UnitTests/DressSharp.UnitTests.csproj" />
   </Folder>
-  <Project Path="src/DressSharp/DressSharp.csproj" />
-  <Folder Name="/tools/">
-    <Project Path="tools/DressSharp.Docs/DressSharp.Docs.csproj" />
-  </Folder>
+  <Project Path="DressSharp/DressSharp.csproj" />
   <Folder Name="/scripts/">
     <File Path="scripts/benchmark.cs" />
     <File Path="scripts/build-docs.cs" />
@@ -18,5 +15,14 @@
     <File Path="scripts/materialize-corpus.cs" />
     <File Path="scripts/run.cs" />
     <File Path="scripts/test.cs" />
+  </Folder>
+  <Folder Name="/scripts/corpus/">
+    <File Path="scripts/corpus/CorpusManifest.cs" />
+    <File Path="scripts/corpus/CorpusProject.cs" />
+  </Folder>
+  <Folder Name="/scripts/docs/">
+    <File Path="scripts/docs/ContentWriter.cs" />
+    <File Path="scripts/docs/LineDiff.cs" />
+    <File Path="scripts/docs/RuleDocumentation.cs" />
   </Folder>
 </Solution>

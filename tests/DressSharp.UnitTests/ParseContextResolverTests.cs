@@ -145,7 +145,7 @@ public sealed class ParseContextResolverTests : IDisposable
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory.GetFiles("DressSharp.slnx").Length == 0)
             directory = directory.Parent!;
-        var projectRoot = Path.Combine(directory.FullName, "src", "DressSharp");
+        var projectRoot = Path.Combine(directory.FullName, "DressSharp");
         var file = Path.Combine(projectRoot, "Program.cs");
 
         var results = await new ParseContextResolver(projectRoot).Resolve([file], null, TestContext.Current.CancellationToken);

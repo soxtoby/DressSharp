@@ -34,7 +34,7 @@ jobs:
           DOCS_BASE: ${{ steps.pages.outputs.base_path }}
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: artifacts/site
+          path: dist/site
 
   deploy:
     needs: build

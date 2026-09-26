@@ -51,8 +51,25 @@ dotnet tool run dotnet-dress -- --version
 
 The package installs one command: `dotnet dress`.
 
-See [CLI and configuration](docs/cli-and-configuration.md) and the [compatibility policy](docs/compatibility.md).
+See [CLI and configuration](site/src/content/docs/cli.md) and the [compatibility policy](site/src/content/docs/compatibility.md).
 
 ## Documentation site
 
-`./do build-docs` builds the static site into `artifacts/site` with [Astro Starlight](https://starlight.astro.build/) under Bun. The site in `website/` holds the landing page; `tools/DressSharp.Docs` writes the rest into it before each build: the CLI and compatibility documents from `docs/`, and a reference for every preference in the built-in rule catalog. Each rule's example is formatted by the real formatter under every accepted value, so the reference cannot drift from the code. After one `./do build-docs`, `bun run dev` in `website/` serves the site with live reload. The `Docs` workflow publishes the same output to GitHub Pages on every push to `master`; enable Pages with the "GitHub Actions" source once in the repository settings.
+`./do build-docs` builds the static site into `dist/site` with [Astro Starlight](https://starlight.astro.build/) under Bun. The site in `site/` holds the hand-written pages; `scripts/build-docs.cs` adds a reference for every preference in the built-in rule catalog before each build. Each rule's example is formatted by the real formatter under every accepted value, so the reference cannot drift from the code. After one `./do build-docs`, `bun run site:dev` serves the site with live reload. The `Docs` workflow publishes the same output to GitHub Pages on every push to `master`; enable Pages with the "GitHub Actions" source once in the repository settings.
+
+## Repository layout
+
+| Path | Holds |
+| --- | --- |
+| `DressSharp/` | The formatter and `dotnet dress` tool |
+| `DressSharp.Interactive/` | The browser app `dotnet dress interactive` embeds, with its Playwright checks in `e2e/` |
+| `site/` | The Starlight documentation site |
+| `tests/` | The .NET test projects |
+| `scripts/` | `./do` tasks; `docs/` and `corpus/` hold the files the tasks include |
+| `assets/` | Logo and favicons |
+| `docs/` | Design notes and architecture decision records |
+| `benchmarks/` | The benchmark protocol, result schema, and pinned corpus definition; the materialized corpus and results are gitignored |
+| `dist/` | Build outputs, gitignored; every directory is rebuilt by a `./do` task |
+| `scratch/` | Experiments, traces, logs, and screenshots, gitignored |
+
+The root `package.json` is a Bun workspace over `DressSharp.Interactive` and `site`, so `bun install` and `bun run` work from the root as `./do` does.

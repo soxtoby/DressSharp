@@ -1,8 +1,12 @@
-artifacts/
+# Build outputs; every directory here is rebuilt by a ./do task.
+dist/
+# Experiments, traces, logs, and screenshots.
+scratch/
+TestResults/
 bin/
 obj/
-dist/
-TestResults/
+node_modules/
 *.user
-.benchmarks/corpus/files/
-.benchmarks/results/
+benchmarks/corpus/files/
+benchmarks/results/
+.idea/
