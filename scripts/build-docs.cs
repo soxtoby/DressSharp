@@ -3,9 +3,11 @@
 using DotNetDo;
 using static DotNetDo.Tools;
 
-[assembly: TaskDescription("Generate the static documentation site into artifacts/site, forwarding arguments after --.")]
+[assembly: TaskDescription("Generate the rule pages and build the Starlight site into artifacts/site.")]
 
 var project = Do.Solution["tools/DressSharp.Docs"];
+var website = Do.RootDirectory / "website";
 
-var arguments = Do.TrailingArguments.Select(argument => argument.QuotedArgument()).JoinWith(" ");
-await Do.Exec($"dotnet run --project {project.Path.QuotedArgument()} -- {arguments}");
+await Do.Exec($"dotnet run --project {project.Path.QuotedArgument()}");
+await (Bun.Install with { FrozenLockfile = true, WorkingDirectory = website });
+await (Bun.Run with { Target = "build", WorkingDirectory = website });

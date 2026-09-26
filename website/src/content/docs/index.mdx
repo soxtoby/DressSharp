@@ -1,0 +1,53 @@
+---
+title: DressSharp
+description: DressSharp formats C# according to explicit, independently selectable preferences.
+template: splash
+hero:
+  tagline: Every line where you said it should be. DressSharp formats C# according to explicit, independently selectable preferences. It reads syntax only, never types, and does nothing you did not ask for.
+  actions:
+    - text: Browse the rules
+      link: rules/
+      icon: right-arrow
+    - text: CLI & configuration
+      link: cli/
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+import Showcase from "../../generated/showcase.mdx";
+import Catalog from "../../generated/catalog.mdx";
+
+## Install, write the Defaults, format
+
+```sh
+dotnet tool install --global DressSharp
+dotnet dress init
+dotnet dress
+```
+
+Or pin it per repository with `dotnet tool install DressSharp` and format only what Git touched: `dotnet dress format --staged`.
+
+<Showcase />
+
+<CardGrid>
+  <Card title="Explicit, never implicit">
+    A missing or `unset` preference makes no change. There is no hidden house style underneath your EditorConfig; `dotnet dress init` writes every supported key with its Default so the whole contract is in one file you can read.
+  </Card>
+  <Card title="Syntax only">
+    The formatter never asks for type or semantic information, so it needs no compilation, no restore, and no design-time build. It resolves the language version and preprocessor symbols from your project and leaves malformed or disabled regions untouched.
+  </Card>
+  <Card title="Speaks EditorConfig">
+    Standard `csharp_*` and `dotnet_*` keys work as they do in Visual Studio. Where the standard stops, `dress_*` keys pick up: list wrapping, closing-delimiter placement, initializer indentation, comment alignment, blank lines, and more.
+  </Card>
+  <Card title="Built for hooks">
+    `--staged` and `--changed` select only the files Git reports as touched, so a pre-commit hook or an agent hook is one line. The package ships precompiled per platform so a one-file check is fast enough to run on every write.
+  </Card>
+  <Card title="Interactive configuration">
+    `dotnet dress interactive` opens an offline workbench in your browser. Change a preference, watch real formatter output update, select lines to see which rules touched them, and save straight to your EditorConfig.
+  </Card>
+  <Card title="Safe on disk">
+    Unchanged files keep their bytes. Changed files are replaced atomically in the same directory, refused if they changed since they were read, and symlink targets are protected. Encoding and line endings only change when you set them.
+  </Card>
+</CardGrid>
+
+<Catalog />
