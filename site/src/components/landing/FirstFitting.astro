@@ -1,0 +1,152 @@
+---
+// The landing example before and after one run with the Default preferences, under a tape measure with a chalk line at
+// the Default max_line_length. The build writes all three into landing.json, so the cut here is always the real one.
+import { Code } from "astro:components";
+import landing from "../../generated/landing.json";
+
+const { before, after, maxLineLength } = landing;
+const lines = (code: string) => code.split("\n");
+const longest = (code: string) => Math.max(...lines(code).map((line) => line.length));
+const rulerColumns = Math.ceil(Math.max(longest(before), longest(after), maxLineLength) / 10) * 10;
+---
+
+<div class="landing-bleed band">
+  <section class="fitting" data-state="before" style={`--ruler-columns: ${rulerColumns}; --chalk: ${maxLineLength};`}>
+    <header>
+      <div>
+        <h2>The first fitting</h2>
+        <p>
+          One run of <code>dotnet dress</code> with the default rules. The chalk line is <code>max_line_length = {maxLineLength}</code>.
+        </p>
+      </div>
+      <div class="toggle" role="group" aria-label="Show code">
+        <button type="button" data-show="before" aria-pressed="true">Off the rack</button>
+        <button type="button" data-show="after" aria-pressed="false">Tailored</button>
+      </div>
+    </header>
+    <div class="scroll">
+      <div class="ruler" aria-hidden="true">
+        {
+          Array.from({ length: rulerColumns / 10 + 1 }, (_, index) => (
+            <span style={`--column: ${index * 10}`}>
+              <small>{index * 10}</small>
+            </span>
+          ))
+        }
+      </div>
+      <div class="cloth">
+        <div class="pane before"><Code code={before} lang="cs" theme="css-variables" /></div>
+        <div class="pane after" aria-hidden="true"><Code code={after} lang="cs" theme="css-variables" /></div>
+        <div class="chalk" aria-hidden="true"></div>
+      </div>
+    </div>
+    <footer>
+      <span class="status" data-for="before">
+        Off the rack: {lines(before).length} lines, the longest {longest(before)} columns{longest(before) > maxLineLength && ", past the chalk line"}.
+      </span>
+      <span class="status" data-for="after">
+        Tailored: {lines(after).length} lines, the longest {longest(after)} columns.
+      </span>
+      <button type="button" class="run" data-run>▸ dotnet dress</button>
+    </footer>
+  </section>
+</div>
+
+<script>
+  const fitting = document.querySelector<HTMLElement>(".fitting")!;
+  const show = (state: string) => {
+    fitting.dataset.state = state;
+    for (const button of fitting.querySelectorAll<HTMLButtonElement>("[data-show]"))
+      button.setAttribute("aria-pressed", String(button.dataset.show === state));
+    for (const pane of fitting.querySelectorAll<HTMLElement>(".pane"))
+      pane.setAttribute("aria-hidden", String(!pane.classList.contains(state)));
+  };
+  for (const button of fitting.querySelectorAll<HTMLButtonElement>("[data-show]"))
+    button.addEventListener("click", () => show(button.dataset.show!));
+  // Reset to the source first, so the cut plays from the top on every run.
+  fitting.querySelector("[data-run]")!.addEventListener("click", () => {
+    show("before");
+    requestAnimationFrame(() => requestAnimationFrame(() => show("after")));
+  });
+</script>
+
+<style>
+  .band {
+    --astro-code-foreground: #e9e7e1;
+    --astro-code-background: transparent;
+    --astro-code-token-keyword: #d8b458;
+    --astro-code-token-string: #9fd3c7;
+    --astro-code-token-string-expression: #9fd3c7;
+    --astro-code-token-constant: #e8a0aa;
+    --astro-code-token-function: #f5f5f3;
+    --astro-code-token-parameter: #c9c9cf;
+    --astro-code-token-comment: #8a8b93;
+    --astro-code-token-punctuation: #9a9ba3;
+    --astro-code-token-link: #d8b458;
+    background:
+      linear-gradient(to bottom, transparent 0 6rem, var(--page) 6rem),
+      repeating-linear-gradient(90deg, transparent 0 23px, rgba(255, 255, 255, .035) 23px 24px),
+      var(--jacket);
+  }
+  .fitting {
+    position: relative;
+    z-index: 1;
+    width: min(100vw - 3rem, 80rem);
+    margin-inline: auto;
+    overflow: hidden;
+    color: var(--jacket-fg);
+    background: #1f2025;
+    border: 1px solid #45464e;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(10, 10, 14, .45);
+  }
+  .fitting > header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.4rem; border-bottom: 1px solid #3a3b42; }
+  h2 { margin: 0; color: #fff; font: 700 1.3rem var(--serif); }
+  header p { margin: .25rem 0 0; color: var(--jacket-muted); font-size: .85rem; }
+  header code { color: var(--gold); background: none; font-family: var(--mono); }
+  .toggle { display: flex; flex: none; padding: 3px; background: var(--jacket-well); border-radius: 999px; }
+  .toggle button { padding: .45rem .9rem; color: var(--jacket-muted); background: none; border: 0; border-radius: 999px; cursor: pointer; font: 650 .8rem var(--sans); }
+  .toggle button[aria-pressed="true"] { color: var(--jacket); background: var(--gold); }
+
+  /* The ruler, the code, and the chalk line share one font, so a column on the tape is a column in the code. */
+  .scroll { overflow-x: auto; font: 12px/1.6 var(--mono); }
+  .ruler {
+    position: relative;
+    width: calc(var(--ruler-columns) * 1ch + 3rem);
+    height: 30px;
+    padding-left: 1.5rem;
+    color: #3b3222;
+    background:
+      linear-gradient(to right, #3b3222 1px, transparent 1px) 0 100% / 10ch 14px repeat-x content-box,
+      linear-gradient(to right, #3b3222 1px, transparent 1px) 0 100% / 5ch 9px repeat-x content-box,
+      linear-gradient(to right, rgba(59, 50, 34, .6) 1px, transparent 1px) 0 100% / 1ch 5px repeat-x content-box,
+      #e7cf86;
+    background-origin: content-box;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .25);
+  }
+  .ruler span { position: absolute; top: 2px; left: calc(1.5rem + var(--column) * 1ch); }
+  .ruler small { display: block; transform: translateX(3px); font: 700 9px var(--mono); }
+
+  .cloth { position: relative; display: grid; width: calc(var(--ruler-columns) * 1ch + 3rem); padding: 1.1rem 0 1.4rem; }
+  .pane { grid-area: 1 / 1; padding-left: 1.5rem; transition: clip-path .9s cubic-bezier(.6, 0, .3, 1); }
+  .pane :global(pre), .pane :global(code) { margin: 0; overflow: visible !important; font: inherit; font-variant-ligatures: none; }
+  .before { clip-path: inset(0 0 0 0); }
+  .after { clip-path: inset(0 0 100% 0); }
+  [data-state="after"] .before { clip-path: inset(100% 0 0 0); }
+  [data-state="after"] .after { clip-path: inset(0 0 0 0); }
+  .chalk { position: absolute; top: 0; bottom: 0; left: calc(1.5rem + var(--chalk) * 1ch); border-left: 2px dashed rgba(216, 180, 88, .55); pointer-events: none; }
+  .chalk::after { content: "✂"; position: absolute; top: 2px; left: 4px; color: var(--gold); font-size: 12px; }
+
+  .fitting footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 1.4rem; background: #26272d; border-top: 1px solid #3a3b42; font-size: .85rem; }
+  .status { color: var(--jacket-muted); }
+  [data-state="before"] .status[data-for="after"], [data-state="after"] .status[data-for="before"] { display: none; }
+  .run { padding: .5rem .9rem; color: var(--gold); background: none; border: 1px solid rgba(216, 180, 88, .5); border-radius: 6px; cursor: pointer; font: .82rem var(--mono); }
+  .run:hover { color: var(--jacket); background: var(--gold); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pane { transition: none; }
+  }
+  @media (max-width: 40rem) {
+    .fitting > header { flex-direction: column; align-items: start; }
+  }
+</style>

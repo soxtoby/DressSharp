@@ -1,0 +1,83 @@
+---
+// Sells dotnet dress interactive, with a screenshot of it framed as the fitting-room mirror.
+import { Image } from "astro:assets";
+import screenshot from "../../assets/fitting-room.png";
+
+const points = [
+  { title: "Watch every change land", body: "Flip a rule and the preview re-cuts on the spot, your original beside the result." },
+  { title: "Try it on your own code", body: "Paste in the code you actually write, not a tidy sample." },
+  { title: "Ask why a line moved", body: "Select any lines to see just the rules that shaped them." },
+  { title: "Save when it fits", body: "One click writes your choices straight into your EditorConfig." },
+];
+---
+
+<section class="landing-bleed studio">
+  <div class="landing-wrap head">
+    <div>
+      <p class="kicker">dotnet dress interactive</p>
+      <h2>Try it on in the <em>fitting room</em>.</h2>
+    </div>
+    <p>
+      Choosing formatting rules from a list of settings is guesswork. The fitting room opens your EditorConfig in the
+      browser, fully offline, with code in the mirror, so you see exactly what every rule does before you commit to it.
+    </p>
+  </div>
+  <figure class="mirror">
+    <Image
+      src={screenshot}
+      widths={[720, 1440, 2160, screenshot.width]}
+      sizes="min(100vw - 3rem, 84rem)"
+      alt="DressSharp interactive with the Wrapping rules open: parameters set to always multi, and the preview showing the parameter list re-cut one to a line."
+    />
+  </figure>
+  <div class="landing-wrap">
+    <ol class="points">
+      {
+        points.map((point) => (
+          <li>
+            <strong>{point.title}</strong>
+            <p>{point.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+    <p class="cta">
+      <code>dotnet dress interactive</code>
+      <a href="cli/">See the command line guide →</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .studio { padding: 6rem 0 5rem; color: var(--ink); background: var(--page); }
+  .head { display: grid; grid-template-columns: 1.1fr 1fr; gap: 4rem; align-items: end; }
+  .kicker { margin: 0 0 1rem; color: var(--burgundy); font: 600 .78rem var(--mono); letter-spacing: .08em; }
+  h2 { margin: 0; color: var(--ink); font: 700 clamp(2.4rem, 4.4vw, 3.6rem)/1.05 var(--serif); letter-spacing: -.02em; }
+  h2 em { color: var(--burgundy); font-weight: 400; }
+  .head > p { margin: 0; color: var(--prose); font-size: 1.08rem; line-height: 1.65; }
+
+  .mirror {
+    width: min(100vw - 3rem, 84rem);
+    margin: 3rem auto 3.5rem;
+    padding: 10px;
+    background: linear-gradient(145deg, #e9cf82, #b8923a 40%, #e7cf86 70%, #a8842f);
+    border-radius: 16px;
+    box-shadow: 0 40px 80px rgba(28, 28, 32, .28), 0 4px 10px rgba(28, 28, 32, .12);
+  }
+  .mirror img { display: block; width: 100%; height: auto; border-radius: 8px; }
+
+  .points { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.5rem; margin: 0; padding: 0; list-style: none; counter-reset: point; }
+  .points li { padding-top: 1.1rem; border-top: 2px dashed var(--frame); counter-increment: point; }
+  .points strong { display: block; color: var(--ink); font: 700 1.25rem/1.2 var(--serif); }
+  .points strong::before { content: counter(point, decimal-leading-zero) " "; color: var(--gold); font-weight: 400; }
+  .points p { margin: .5rem 0 0; color: var(--prose); font-size: .95rem; line-height: 1.55; }
+  .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; margin: 3rem 0 0; }
+  .cta code { padding: .7rem 1.1rem; color: var(--gold); background: var(--jacket); border-radius: 8px; font: .95rem var(--mono); }
+  .cta code::before { content: "$ "; color: var(--jacket-muted); }
+  .cta a { color: var(--burgundy); font-weight: 700; border-bottom: 1px solid currentColor; }
+
+  @media (max-width: 60rem) {
+    .head { grid-template-columns: 1fr; gap: 1.5rem; }
+    .points { grid-template-columns: 1fr 1fr; }
+  }
+</style>

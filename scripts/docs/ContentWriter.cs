@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using DressSharp.Interactive;
@@ -9,10 +11,10 @@ namespace DressSharp.Docs;
 
 /// <summary>
 /// Writes the generated part of the Starlight site in <c>site/</c>: a page per rule group, the
-/// rules index, the landing page's formatted showcase, and the brand assets.
+/// rules index, the landing page's data, and the brand assets.
 /// Starlight renders, highlights, and navigates; this only decides what the pages say.
 /// </summary>
-sealed class ContentWriter(string root, string version)
+sealed class ContentWriter(string root)
 {
     const string HeroSource = """
         using System.Linq;
@@ -53,8 +55,7 @@ sealed class ContentWriter(string root, string version)
         }
 
         CopyBrand();
-        await Write(Path.Combine(Generated, "showcase.mdx"), Showcase(hero), cancellationToken);
-        await Write(Path.Combine(Generated, "catalog.mdx"), Catalog(groups), cancellationToken);
+        await Write(Path.Combine(Generated, "landing.json"), Landing(hero, groups), cancellationToken);
         await Write(Path.Combine(Rules, "index.md"), RulesIndex(groups), cancellationToken);
         for (var i = 0; i < groups.Length; i++)
             await Write(Path.Combine(Rules, Slug(groups[i].Name) + ".mdx"), GroupPage(groups[i], i), cancellationToken);
@@ -74,32 +75,28 @@ sealed class ContentWriter(string root, string version)
     static Task Write(string path, string content, CancellationToken cancellationToken) =>
         File.WriteAllTextAsync(path, content, cancellationToken);
 
-    // ---- Landing partials -------------------------------------------------------------------------
+    // ---- Landing data -----------------------------------------------------------------------------
 
-    static string Showcase(PreviewResult hero) =>
-        $"""
-        ## Before and after
-
-        {Fence("cs", "title=\"Before\"", HeroSource)}
-
-        {Fence("cs", "title=\"After one run of dotnet dress with the Default preferences\"", hero.Text)}
-
-        """;
-
-    string Catalog(ImmutableArray<RuleGroup> groups)
+    /// <summary>
+    /// The landing page's data: the example before and after one run with the Default preferences, the Default line
+    /// length it is cut to, and the rule groups the pattern book links to.
+    /// </summary>
+    static string Landing(PreviewResult hero, ImmutableArray<RuleGroup> groups)
     {
-        var page = new StringBuilder();
-        page.Append("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n");
-        page.Append($"## Rule catalog\n\nGenerated from the built-in catalog, version {CatalogReader.Version}, of DressSharp {Text(version)}. ");
-        page.Append("Every example is real formatter output for the example in the rule's own metadata.\n\n<CardGrid>\n");
-        foreach (var group in groups)
-        {
-            var count = group.Rules.Count();
-            page.Append(
-                $"  <LinkCard title={Attribute(group.Name)} description={Attribute($"{count} {(count == 1 ? "preference" : "preferences")}")} href={Attribute($"rules/{Slug(group.Name)}/")} />\n");
-        }
-        return page.Append("</CardGrid>\n").ToString();
+        var lineLength = groups.SelectMany(group => group.Rules).Single(rule => rule.Key == "max_line_length").Metadata.DefaultValue;
+        var landing = new JsonObject
+            {
+                ["before"] = Lines(HeroSource),
+                ["after"] = Lines(hero.Text),
+                ["maxLineLength"] = int.Parse(lineLength, CultureInfo.InvariantCulture),
+                ["groups"] = new JsonArray([
+                        .. groups.Select(group => new JsonObject { ["name"] = group.Name, ["slug"] = Slug(group.Name), ["rules"] = group.Rules.Count() })
+                    ])
+            };
+        return landing.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
     }
+
+    static string Lines(string code) => string.Join('\n', Split(code)).TrimEnd('\n');
 
     // ---- Rule pages -------------------------------------------------------------------------------
 

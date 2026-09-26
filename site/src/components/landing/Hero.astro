@@ -1,0 +1,98 @@
+---
+// Overrides Starlight's Hero, which only the landing page uses: the title, tagline and actions come from its
+// frontmatter; the three fittings beside them are the landing page's getting-started steps.
+import { Icon } from "@astrojs/starlight/components";
+
+const { data } = Astro.locals.starlightRoute.entry;
+const { title = data.title, tagline, actions = [] } = data.hero ?? {};
+
+const fittings = [
+  {
+    verb: "Measure",
+    command: "dotnet dress init",
+    note: "Writes every rule, set to its default, into your EditorConfig. The whole fit is in one file you can read and change.",
+  },
+  {
+    verb: "Cut",
+    command: "dotnet dress",
+    note: "Formats your code to those measurements, and only those. A rule you leave unset changes nothing.",
+  },
+  {
+    verb: "Alter",
+    command: "dotnet dress format --staged",
+    note: "Hook it into your commits or your coding agent, and everything you touch arrives already pressed.",
+  },
+];
+---
+
+<section class="landing landing-bleed hero">
+  <div class="landing-wrap grid">
+    <div>
+      <p class="kicker">DressSharp · bespoke C# formatting</p>
+      <h1 id="_top" data-page-title set:html={title} />
+      {tagline && <p class="tagline" set:html={tagline} />}
+      <div class="actions">
+        {
+          actions.map(({ link, text, variant, icon }) => (
+            <a class:list={["action", variant === "minimal" ? "minimal" : "primary"]} href={link}>
+              {text}
+              {icon?.type === "icon" && <Icon name={icon.name} />}
+              {icon?.type === "raw" && <Fragment set:html={icon.html} />}
+            </a>
+          ))
+        }
+      </div>
+      <code class="install">dotnet tool install --global DressSharp</code>
+    </div>
+    <ol class="fittings">
+      {
+        fittings.map((fitting, index) => (
+          <li>
+            <span class="step">{String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>{fitting.verb}</strong>
+              <code>{fitting.command}</code>
+              <p>{fitting.note}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  .hero {
+    padding: 4.5rem 0 3rem;
+    color: var(--jacket-fg);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 23px, rgba(255, 255, 255, .035) 23px 24px),
+      radial-gradient(ellipse at 20% 0%, #34353d, var(--jacket) 60%);
+  }
+  .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 4rem; align-items: center; }
+  .kicker { margin: 0 0 1.25rem; color: var(--gold); font: 600 .75rem var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+  h1 { margin: 0; color: #fff; font: 700 clamp(2.6rem, 5vw, 4.2rem)/1.02 var(--serif); letter-spacing: -.02em; }
+  h1 :global(em) { color: var(--gold); font-weight: 400; }
+  .tagline { max-width: 34rem; margin: 1.5rem 0 2rem; color: #cfcfd4; font-size: 1.1rem; line-height: 1.6; }
+  .actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+  .action { display: inline-flex; align-items: center; gap: .5rem; padding: .75rem 1.2rem; border-radius: 8px; font-weight: 700; }
+  .action :global(svg) { width: 1.1em; height: 1.1em; }
+  .primary { color: var(--jacket); background: var(--gold); }
+  .primary:hover { color: var(--jacket); background: #e6c774; }
+  .minimal { color: var(--jacket-fg); box-shadow: inset 0 0 0 1px var(--jacket-line); }
+  .minimal:hover { color: #fff; box-shadow: inset 0 0 0 1px var(--jacket-fg); }
+  .install { display: inline-block; margin-top: 1.75rem; color: var(--jacket-muted); background: none; font: .85rem var(--mono); }
+  .install::before { content: "$ "; color: var(--gold); }
+
+  .fittings { margin: 0; padding: 0; list-style: none; border-left: 2px dashed rgba(216, 180, 88, .45); }
+  .fittings li { display: grid; grid-template-columns: auto 1fr; gap: 1rem; padding: 0 0 1.6rem 1.4rem; }
+  .fittings li:last-child { padding-bottom: 0; }
+  .step { color: var(--gold); font: 400 1.6rem/1 var(--serif); }
+  .fittings strong { display: block; color: #fff; font: 700 1.15rem var(--serif); }
+  .fittings code { display: inline-block; margin: .35rem 0; padding: .2rem .5rem; color: var(--gold); background: var(--jacket-well); border-radius: 4px; font: .82rem var(--mono); }
+  .fittings p { margin: 0; color: var(--jacket-muted); font-size: .88rem; line-height: 1.5; }
+
+  @media (max-width: 60rem) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>

@@ -1,0 +1,147 @@
+---
+// The rule groups, each as a cloth swatch. Groups and their rule counts come from the catalog through landing.json;
+// the summary and cloth are chosen here, and a group without them fails the build rather than render bare.
+import landing from "../../generated/landing.json";
+
+const cloths: Record<string, { cloth: string; summary: string }> = {
+  file: { cloth: "chalkstripe", summary: "Line endings, charset, final newlines and trailing whitespace." },
+  indentation: { cloth: "pinstripe", summary: "Tabs or spaces, and how blocks, braces, switches and lambdas indent." },
+  wrapping: { cloth: "herringbone", summary: "Line length, and how arguments, parameters, initializers and expressions wrap." },
+  "braces-and-bodies": { cloth: "glencheck", summary: "Brace placement, namespace style, expression bodies and modifier order." },
+  spacing: { cloth: "birdseye", summary: "Spaces around operators, commas, keywords, brackets and calls." },
+  "using-directives": { cloth: "silk", summary: "How using directives are ordered and grouped." },
+  "blank-lines": { cloth: "windowpane", summary: "Blank lines around types, between members, and how many in a row." },
+  comments: { cloth: "tweed", summary: "Comment spacing, alignment and XML documentation layout." },
+};
+
+const groups = landing.groups.map((group) => {
+  const swatch = cloths[group.slug];
+  if (!swatch) throw new Error(`The pattern book has no cloth or summary for the rule group "${group.name}".`);
+  return { ...group, ...swatch };
+});
+---
+
+<section class="landing-bleed book">
+  <div class="landing-wrap">
+    <header>
+      <h2>The pattern book</h2>
+      <p>Every rule, grouped by what it shapes. Open a group to see what each setting does to your code.</p>
+    </header>
+    <div class="swatches">
+      {
+        groups.map((group) => (
+          <a href={`rules/${group.slug}/`}>
+            <span class:list={["cloth", group.cloth]} />
+            <h3>{group.name}</h3>
+            <p>{group.summary}</p>
+            <small>
+              {group.rules} {group.rules === 1 ? "rule" : "rules"} →
+            </small>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .book { padding: 5.5rem 0 6rem; color: var(--ink); background: var(--page); }
+  header { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin-bottom: 3rem; }
+  h2 { margin: 0; color: var(--ink); font: 700 2.4rem var(--serif); }
+  header p { max-width: 28rem; margin: 0; color: var(--prose); font-size: 1.02rem; line-height: 1.6; }
+  .swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3.5rem 2rem; }
+  .swatches a { display: flex; flex-direction: column; color: var(--ink); }
+  .swatches a:hover .cloth { transform: translateY(-4px) rotate(-1.2deg); }
+  .swatches a:hover h3 { color: var(--burgundy); }
+  h3 { margin: 1.2rem 0 .45rem; color: var(--ink); font: 700 1.7rem/1.1 var(--serif); letter-spacing: -.01em; transition: color .15s; }
+  .swatches p { flex: 1; margin: 0 0 .8rem; color: var(--prose); font-size: .92rem; line-height: 1.55; }
+  small { color: var(--burgundy); font: 600 .75rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+
+  /* A swatch cut with pinking shears along the bottom edge. */
+  .cloth {
+    --pink: 6px;
+    position: relative;
+    display: block;
+    height: 150px;
+    border-radius: 3px 3px 0 0;
+    filter: drop-shadow(0 10px 14px rgba(28, 28, 32, .18));
+    transition: transform .25s;
+    mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / calc(2 * var(--pink)) 100%;
+  }
+  /* Grain and a soft sheen over every cloth, so the weave reads as fabric rather than a flat pattern. */
+  .cloth::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+      linear-gradient(118deg, rgba(255, 255, 255, .16), transparent 38%, transparent 62%, rgba(0, 0, 0, .28));
+    mix-blend-mode: overlay;
+    opacity: .55;
+  }
+  .chalkstripe {
+    background:
+      repeating-linear-gradient(90deg, rgba(225, 228, 240, 0) 0 24px, rgba(225, 228, 240, .26) 25.5px, rgba(225, 228, 240, 0) 27px),
+      repeating-linear-gradient(45deg, rgba(0, 0, 0, .14) 0 1px, transparent 1px 3px),
+      #1c2336;
+  }
+  .pinstripe {
+    background:
+      repeating-linear-gradient(90deg, transparent 0 13px, rgba(255, 255, 255, .2) 13px 14px),
+      repeating-linear-gradient(-45deg, rgba(0, 0, 0, .16) 0 1px, transparent 1px 3px),
+      #2b2c32;
+  }
+  .herringbone {
+    background:
+      linear-gradient(135deg, #5d5f64 25%, transparent 25%) -7px 0 / 14px 14px,
+      linear-gradient(225deg, #5d5f64 25%, transparent 25%) -7px 0 / 14px 14px,
+      linear-gradient(315deg, #5d5f64 25%, transparent 25%) 0 0 / 14px 14px,
+      linear-gradient(45deg, #5d5f64 25%, transparent 25%) 0 0 / 14px 14px,
+      #686a6f;
+  }
+  .glencheck {
+    background:
+      repeating-linear-gradient(90deg, transparent 0 63px, rgba(125, 31, 47, .6) 63px 64px),
+      repeating-linear-gradient(0deg, transparent 0 63px, rgba(125, 31, 47, .6) 63px 64px),
+      repeating-linear-gradient(90deg, transparent 0 20px, rgba(38, 38, 44, .22) 20px 32px),
+      repeating-linear-gradient(0deg, transparent 0 20px, rgba(38, 38, 44, .22) 20px 32px),
+      repeating-linear-gradient(90deg, rgba(38, 38, 44, .14) 0 1px, transparent 1px 4px),
+      #a3a19b;
+  }
+  .birdseye {
+    background:
+      radial-gradient(rgba(220, 224, 236, .22) .8px, transparent 1.3px) 0 0 / 5px 5px,
+      radial-gradient(rgba(0, 0, 0, .25) .8px, transparent 1.3px) 2.5px 2.5px / 5px 5px,
+      #2a3040;
+  }
+  .silk {
+    background:
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, .07) 0 2px, transparent 2px 4px),
+      radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, .18), transparent 60%),
+      #6a1d2b;
+  }
+  .windowpane {
+    background:
+      linear-gradient(90deg, rgba(72, 48, 24, .45) 1.5px, transparent 1.5px) 0 0 / 44px 44px,
+      linear-gradient(rgba(72, 48, 24, .45) 1.5px, transparent 1.5px) 0 0 / 44px 44px,
+      repeating-linear-gradient(45deg, rgba(0, 0, 0, .06) 0 1px, transparent 1px 3px),
+      #b0916a;
+  }
+  .tweed {
+    background:
+      radial-gradient(rgba(216, 180, 88, .38) .7px, transparent 1.2px) 0 0 / 11px 9px,
+      radial-gradient(rgba(176, 90, 60, .35) .7px, transparent 1.2px) 4px 5px / 7px 13px,
+      radial-gradient(rgba(230, 230, 220, .14) .6px, transparent 1.1px) 2px 1px / 5px 6px,
+      repeating-linear-gradient(45deg, rgba(0, 0, 0, .12) 0 1px, transparent 1px 3px),
+      #34453a;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cloth { transition: none; }
+  }
+  @media (max-width: 60rem) {
+    header { display: block; }
+    header p { margin-top: 1rem; }
+    .swatches { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>

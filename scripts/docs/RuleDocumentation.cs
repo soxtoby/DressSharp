@@ -28,8 +28,6 @@ sealed record RuleSubgroup(string? Name, ImmutableArray<RuleDocumentation> Rules
 
 static class CatalogReader
 {
-    internal static int Version => RuleCatalog.BuiltIn.Version;
-
     /// <summary>Groups are ordered by first appearance in catalog order, which is the order <c>dotnet dress init</c> writes them.</summary>
     internal static async Task<ImmutableArray<RuleGroup>> ReadAsync(CancellationToken cancellationToken)
     {

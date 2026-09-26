@@ -1,0 +1,25 @@
+<section class="landing-bleed start">
+  <div class="landing-wrap">
+    <p>Ready for your first fitting?</p>
+    <div class="commands">
+      <code>dotnet tool install --global DressSharp</code>
+      <code>dotnet dress interactive</code>
+    </div>
+    <a href="cli/">Get started →</a>
+  </div>
+</section>
+
+<style>
+  .start { padding: 4rem 0; color: var(--jacket-fg); background: var(--jacket); }
+  .landing-wrap { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 2.5rem; }
+  p { margin: 0; color: #fff; font: italic 400 2rem var(--serif); }
+  .commands { display: grid; gap: .5rem; }
+  code { padding: .55rem 1rem; color: var(--gold); background: var(--jacket-well); border-radius: 6px; font: .9rem var(--mono); }
+  code::before { content: "$ "; color: var(--jacket-muted); }
+  a { padding: .75rem 1.2rem; color: var(--jacket); background: var(--gold); border-radius: 8px; font-weight: 700; }
+  a:hover { color: var(--jacket); background: #e6c774; }
+
+  @media (max-width: 60rem) {
+    .landing-wrap { grid-template-columns: 1fr; justify-items: start; }
+  }
+</style>

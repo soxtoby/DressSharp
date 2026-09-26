@@ -22,6 +22,7 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
             Example = kind switch
                 {
                     NewLineKind.Catch or NewLineKind.Finally => "try { Work(); } catch (Exception) { Recover(); } finally { CleanUp(); }",
+                    NewLineKind.Else => "if (ready) { Work(); } else { Wait(); }",
                     NewLineKind.ObjectInitializerMembers => "var value = new Example { First = 1, Second = 2 };",
                     NewLineKind.AnonymousTypeMembers => "var value = new { First = 1, Second = 2 };",
                     NewLineKind.QueryClauses => "var result = from item in items where item.Active select item.Name;",

@@ -1,3 +1,168 @@
 :root {
   --sl-content-width: 56rem;
+
+  /* Brand colours and type, shared with the interactive app. */
+  --ink: #1c1c20;
+  --page: #f1efe9;
+  --frame: #c2bdb1;
+  --jacket: #2a2b31;
+  --jacket-fg: #f5f5f3;
+  --jacket-muted: #9a9ba3;
+  --jacket-well: #3a3b42;
+  --jacket-line: #55565e;
+  --gold: #d8b458;
+  --burgundy: #7d1f2f;
+  --prose: #4a4a52;
+  --serif: Georgia, "Cambria", "Times New Roman", serif;
+  --sans: "Bahnschrift", "Aptos", sans-serif;
+  --mono: "Cascadia Code", "SFMono-Regular", monospace;
+
+  --sl-font: var(--sans);
+  --sl-font-mono: var(--mono);
+}
+
+/*
+ * Starlight's palette in the brand's colours. Dark is the jacket lined in gold; light is the pattern paper with
+ * burgundy chalk, since gold is too faint to read on it. The kicker and stitch colours follow the same split.
+ */
+:root,
+::backdrop {
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #eceae4;
+  --sl-color-gray-2: #c9c9cf;
+  --sl-color-gray-3: #9a9ba3;
+  --sl-color-gray-4: #6c6d75;
+  --sl-color-gray-5: #45464e;
+  --sl-color-gray-6: #2f3036;
+  --sl-color-black: #232429;
+  --sl-color-accent-low: #3a3322;
+  --sl-color-accent: #d8b458;
+  --sl-color-accent-high: #f0dfae;
+  --sl-color-text-accent: var(--sl-color-accent);
+  --sl-color-bg-sidebar: var(--jacket);
+  --sl-color-bg-inline-code: var(--jacket-well);
+  --sl-color-hairline-light: #3a3b42;
+  --sl-color-hairline: #33343b;
+  --sl-color-hairline-shade: #1b1c20;
+  --dress-kicker: var(--gold);
+  --dress-stitch: rgba(216, 180, 88, .4);
+  --sl-color-backdrop-overlay: rgba(20, 20, 24, .7);
+}
+
+:root[data-theme="light"],
+[data-theme="light"] ::backdrop {
+  --sl-color-white: var(--ink);
+  --sl-color-gray-1: #26262b;
+  --sl-color-gray-2: #3b3b42;
+  --sl-color-gray-3: #5e5e66;
+  --sl-color-gray-4: #8b8983;
+  --sl-color-gray-5: var(--frame);
+  --sl-color-gray-6: #e4e0d6;
+  --sl-color-gray-7: #ebe8e0;
+  --sl-color-black: #f7f5f0;
+  --sl-color-accent-low: #f1e1de;
+  --sl-color-accent: var(--burgundy);
+  --sl-color-accent-high: #5a1622;
+  --sl-color-text-accent: var(--sl-color-accent);
+  --sl-color-bg-sidebar: var(--page);
+  --sl-color-bg-inline-code: #e8e3d8;
+  --sl-color-hairline-light: #ddd8cc;
+  --sl-color-hairline: #e4e0d6;
+  --sl-color-hairline-shade: #ddd8cc;
+  --dress-kicker: var(--burgundy);
+  --dress-stitch: #c9c1ae;
+  --sl-color-backdrop-overlay: rgba(42, 43, 49, .55);
+}
+
+::selection { background: rgba(216, 180, 88, .35); }
+
+/* The header wears the jacket in either theme, stitched to the page below it. */
+header.header {
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #eceae4;
+  --sl-color-gray-2: #c9c9cf;
+  --sl-color-gray-3: #9a9ba3;
+  --sl-color-gray-4: #6c6d75;
+  --sl-color-gray-5: #45464e;
+  --sl-color-gray-6: #33343b;
+  --sl-color-black: #2a2b31;
+  --sl-color-bg-nav: #2a2b31;
+  --sl-color-text: #c9c9cf;
+  --sl-color-text-accent: #d8b458;
+  --sl-color-accent-low: #3a3322;
+  --sl-color-accent: #d8b458;
+  --sl-color-accent-high: #f0dfae;
+  --sl-color-hairline-shade: #2a2b31;
+  color-scheme: dark;
+  border-bottom: 1px dashed rgba(216, 180, 88, .4);
+}
+.site-title { font-family: var(--serif); font-weight: 700; letter-spacing: -.01em; }
+
+/* Sidebars: group labels set like the landing page's kickers, the current page marked in chalk. */
+.sidebar-content .group-label .large,
+.right-sidebar h2 {
+  color: var(--dress-kicker);
+  font: 600 .72rem var(--mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.sidebar-content a[aria-current="page"] {
+  color: var(--sl-color-white);
+  background: var(--sl-color-accent-low);
+  border-radius: 0 4px 4px 0;
+}
+.sidebar-content li:has(> a[aria-current="page"]) { border-inline-start-color: var(--sl-color-accent); }
+
+/* Content: serif headings over sans text, with a stitch between the title and the page. */
+.content-panel + .content-panel { border-top: 1px dashed var(--dress-stitch); }
+.sl-markdown-content :is(h1, h2, h3, h4, h5) {
+  color: var(--sl-color-white);
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.sl-markdown-content h2 { font-size: calc(var(--sl-text-h2) * .9); }
+.sl-markdown-content h3 { font-size: calc(var(--sl-text-h3) * .9); }
+.sl-markdown-content a:not(:where(.not-content *)) { text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: .2em; }
+.sl-markdown-content a:not(:where(.not-content *)):hover { text-decoration-color: currentColor; }
+.sl-markdown-content :is(h2, h3) a:not(:where(.not-content *)) { text-decoration: none; }
+.sl-markdown-content :is(h2, h3) a:not(:where(.not-content *)):hover { color: var(--sl-color-white); }
+.sl-markdown-content :not(pre) > code:not(:where(.not-content *)) { padding: .1em .35em; border-radius: 4px; font-variant-ligatures: none; }
+.expressive-code { font-variant-ligatures: none; }
+
+.sl-markdown-content th {
+  color: var(--sl-color-gray-3);
+  font: 600 .72rem var(--mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.sl-markdown-content :is(th, td) { border-bottom-color: var(--sl-color-hairline-light); }
+
+/* Rule examples: a tab per value, labelled as the value is written. */
+starlight-tabs [role="tab"] { font: 500 .85rem var(--mono); }
+starlight-tabs [role="tab"]:hover { color: var(--sl-color-white); }
+
+.pagination-links a { border-color: var(--sl-color-hairline-light); border-radius: 6px; }
+.pagination-links a:hover { border-color: var(--sl-color-accent); }
+.pagination-links .link-title { font-family: var(--serif); font-weight: 700; }
+
+/*
+ * The landing page is the only page with a hero. Its sections carry their own colours in either theme and run
+ * edge to edge, so the panels around them lose their padding.
+ */
+[data-has-hero] body { overflow-x: clip; }
+[data-has-hero] main { padding-bottom: 0; }
+/* Starlight's page footer holds edit links and pagination, which the landing page has none of. */
+[data-has-hero] main > .content-panel > .sl-container > footer { display: none; }
+[data-has-hero] .content-panel { padding-block: 0; }
+[data-has-hero] .content-panel .sl-container > * + * { margin-top: 0; }
+
+.landing { font-family: var(--sans); }
+.landing a { text-decoration: none; }
+.landing code, .landing pre { font-variant-ligatures: none; }
+.landing-bleed { width: 100vw; margin-inline: calc(50% - 50vw); }
+.landing-wrap { width: min(100% - 3rem, 72rem); margin-inline: auto; }
+.landing-pinstripe {
+  color: var(--jacket-fg);
+  background: repeating-linear-gradient(90deg, transparent 0 23px, rgba(255, 255, 255, .035) 23px 24px), var(--jacket);
 }

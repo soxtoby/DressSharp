@@ -1,0 +1,25 @@
+---
+// Overrides Starlight's PageTitle to set a kicker above the title, as the landing page does: the rule pages are the
+// pattern book the landing page opens, and any other page is labelled with its sidebar group.
+import type { StarlightRouteData } from "@astrojs/starlight/route-data";
+
+const { entry, id, sidebar } = Astro.locals.starlightRoute;
+
+function groupOf(entries: StarlightRouteData["sidebar"]): string | undefined {
+  for (const item of entries) {
+    if (item.type === "group" && item.entries.some((child) => child.type === "link" ? child.isCurrent : groupOf([child])))
+      return item.label;
+  }
+}
+
+const kicker = id === "rules" || id.startsWith("rules/") ? "The pattern book" : groupOf(sidebar);
+---
+
+{kicker && <p class="kicker">{kicker}</p>}
+<h1 id="_top">{entry.data.title}</h1>
+
+<style>
+  .kicker { margin: 1rem 0 0; color: var(--dress-kicker); font: 600 .75rem var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+  h1 { margin-top: 1rem; color: var(--sl-color-white); font: 700 var(--sl-text-h1)/1.1 var(--serif); letter-spacing: -.015em; }
+  .kicker + h1 { margin-top: .35rem; }
+</style>

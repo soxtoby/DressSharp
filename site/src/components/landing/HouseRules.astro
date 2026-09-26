@@ -1,0 +1,51 @@
+---
+// What DressSharp promises, each as a tailoring headline over the plain claim.
+const rules = [
+  {
+    title: "Made to measure",
+    plain: "No house style",
+    body: "Every rule is yours to choose. A rule you leave unset changes nothing, and dotnet dress init writes every rule with its default into your EditorConfig, so the whole fit is in one file you can read.",
+  },
+  {
+    title: "Your pattern, in EditorConfig",
+    plain: "Speaks EditorConfig",
+    body: "The csharp_* and dotnet_* settings your team already uses work as they do in Visual Studio. Where they stop, DressSharp picks up: list wrapping, closing delimiters, comment alignment, blank lines, and more.",
+  },
+  {
+    title: "Alterations while you wait",
+    plain: "Formats as you work",
+    body: "Run it on every commit, or every time your coding agent writes a file. It only touches what changed, so it stays out of your way, and formatting never comes up in code review again.",
+  },
+];
+---
+
+<section class="landing-bleed landing-pinstripe house">
+  <div class="landing-wrap">
+    <h2>The house rules</h2>
+    <div class="grid">
+      {
+        rules.map((rule) => (
+          <article>
+            <small>{rule.plain}</small>
+            <h3>{rule.title}</h3>
+            <p>{rule.body}</p>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .house { padding: 5rem 0; }
+  h2 { margin: 0 0 2.5rem; color: #fff; font: 700 2.4rem var(--serif); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3rem; }
+  article { padding-top: 1.5rem; border-top: 2px dashed rgba(216, 180, 88, .45); }
+  small { color: var(--gold); font: 600 .72rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+  h3 { margin: .6rem 0 .7rem; color: #fff; font: 700 1.6rem/1.15 var(--serif); }
+  p { margin: 0; color: #b9b9c0; font-size: .98rem; line-height: 1.65; }
+
+  @media (max-width: 60rem) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
