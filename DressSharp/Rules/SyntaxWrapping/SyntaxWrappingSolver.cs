@@ -29,6 +29,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     readonly HashSet<int> _settledBreaks = [];
     readonly Dictionary<int, bool> _settledBoundaries = [];
     Dictionary<SyntaxNode, int>? _occurrencesByNode;
+    Dictionary<SyntaxToken, int>? _chainOperators;
     readonly Dictionary<int, string?> _lineIndents = [];
 
     internal SyntaxWrappingSolver(
@@ -217,6 +218,30 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         return null;
     }
 
+    /// <inheritdoc />
+    public bool? LinkStartsItsOwnLine(MemberAccessExpressionSyntax link)
+    {
+        if (_chainOperators is null)
+        {
+            _chainOperators = [];
+            foreach (var occurrence in _occurrences)
+            {
+                if (occurrence.Kind != SyntaxWrappingKind.MemberAccessChains)
+                    continue;
+                for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+                {
+                    var index = _boundaries[occurrence.BoundaryStart + offset].RightIndex;
+                    _chainOperators.TryAdd(_stream.Pieces[index].Token, index);
+                }
+            }
+        }
+
+        return _chainOperators.TryGetValue(link.OperatorToken, out var operatorIndex)
+            && _settledBoundaries.TryGetValue(operatorIndex, out var breaks)
+                ? breaks
+                : null;
+    }
+
     Dictionary<SyntaxNode, int> OccurrencesByNode()
     {
         var byNode = new Dictionary<SyntaxNode, int>(_occurrences.Length);
@@ -329,8 +354,10 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                             - CurrentGapWidth(boundary.RightIndex);
                     }
 
-                    multi = (long)VisualStartColumn(occurrence) + width
-                        > occurrence.Setting.MaximumLineLength;
+                    var start = VisualStartColumn(occurrence);
+                    multi = (long)start + width > occurrence.Setting.MaximumLineLength;
+                    if (multi && occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax)
+                        multi = ChainBreakGivesRoom(occurrence, occurrenceIndex, start);
                 }
             }
 
@@ -403,6 +430,70 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         }
 
         return new(width, hasLineComment);
+    }
+
+    /// <summary>
+    /// Whether breaking a chain that does not fit on one line is worth it.
+    /// </summary>
+    /// <remarks>
+    /// A chain too long up to its last member name needs its breaks. One that fits up to that name is pushed over
+    /// only by the arguments after it, and breaking moves those arguments to a line of their own: worth it when
+    /// they then fit, and otherwise only a move before they wrap anyway, which their own list does better alone.
+    /// A single call is a call rather than a chain, so its arguments wrap as any call's do.
+    /// </remarks>
+    bool ChainBreakGivesRoom(Occurrence occurrence, int occurrenceIndex, int start)
+    {
+        var name = occurrence.Node.GetLastToken();
+        var nameIndex = occurrence.LastToken;
+        while (nameIndex > occurrence.FirstToken && _stream.Pieces[nameIndex].Token != name)
+            nameIndex--;
+        var limit = occurrence.Setting.MaximumLineLength;
+        if (nameIndex == occurrence.LastToken || (long)start + JoinedWidth(occurrence, occurrence.FirstToken, nameIndex) > limit)
+            return true;
+        if (SyntaxWrappingDiscovery.ChainEnd(occurrence.Node)
+                .DescendantNodesAndSelf(SyntaxWrappingDiscovery.IsChainLink)
+                .OfType<InvocationExpressionSyntax>()
+                .Take(2)
+                .Count() < 2)
+        {
+            return false;
+        }
+
+        var lastBreak = -1;
+        for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+        {
+            if (_boundaries[occurrence.BoundaryStart + offset].BreakWhenMulti)
+                lastBreak = offset;
+        }
+
+        return lastBreak >= 0
+            && (long)VisualWidth(Indent(occurrenceIndex, 1), _settings.TabWidth)
+                    + JoinedWidth(occurrence, _boundaries[occurrence.BoundaryStart + lastBreak].RightIndex, occurrence.LastToken)
+                <= limit;
+    }
+
+    /// <summary>The width of a run of tokens on one line, with this occurrence's own boundaries joined.</summary>
+    int JoinedWidth(Occurrence occurrence, int from, int to)
+    {
+        var width = 0;
+        var offset = 0;
+        for (var index = from; index <= to; index++)
+        {
+            if (index != from)
+            {
+                while (offset < occurrence.BoundaryCount && _boundaries[occurrence.BoundaryStart + offset].RightIndex < index)
+                    offset++;
+                width += offset < occurrence.BoundaryCount
+                    && _boundaries[occurrence.BoundaryStart + offset] is { } boundary
+                    && boundary.RightIndex == index
+                        ? PlannedWidth(boundary, _trivia!, false, _lineEnding, _settings.TabWidth)
+                        : CurrentGapWidth(index);
+            }
+
+            width += VisualWidth(_stream.Pieces[index].Token.Text, _settings.TabWidth);
+        }
+
+        return width;
     }
 
     int CurrentGapWidth(int index) =>

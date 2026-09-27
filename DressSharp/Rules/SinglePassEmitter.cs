@@ -1299,6 +1299,8 @@ sealed class SinglePassEmitter
         {
             return null;
         }
+        if (_indentation.LambdaContinuation(token, content, tokenIndent, TokenIndentOf) is { } lambdaContinuation)
+            return lambdaContinuation;
         if (!_indentation.TryGet(content, out var emittedContentIndent))
             return null;
         if (!IsOriginalToken(token)

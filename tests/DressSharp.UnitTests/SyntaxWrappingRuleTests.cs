@@ -1388,6 +1388,141 @@ public class SyntaxWrappingRuleTests
     }
 
     [Fact]
+    public void Auto_member_access_measures_the_arguments_of_the_call_it_ends_with()
+    {
+        const string source = "var subtotal = order.Lines.Where(line => line.Quantity > 0).Sum(line => pricing.PriceFor(line.Sku, line.Quantity));";
+        const string expected = """
+            var subtotal = order.Lines
+                .Where(line => line.Quantity > 0)
+                .Sum(line => pricing.PriceFor(line.Sku, line.Quantity));
+            """;
+        var preferences = new[]
+            {
+                ("dress_member_access_chains_layout", "auto"),
+                ("dress_arguments_layout", "auto"),
+                ("max_line_length", "80")
+            };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_arguments_wrap_a_single_call_whose_arguments_do_not_fit()
+    {
+        const string source = """_ = Regex.IsMatch(input, "[?@:$]" + name + "suffix", RegexOptions.IgnoreCase);""";
+        const string expected = """
+            _ = Regex.IsMatch(
+                input,
+                "[?@:$]" + name + "suffix",
+                RegexOptions.IgnoreCase
+            );
+            """;
+        var preferences = new[]
+            {
+                ("dress_member_access_chains_layout", "auto"),
+                ("dress_arguments_layout", "auto"),
+                ("max_line_length", "60")
+            };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_member_access_breaks_before_a_call_on_a_call_whose_arguments_do_not_fit()
+    {
+        const string source = "_ = Execute(command, cancellationToken).ConfigureAwait(false);";
+        const string expected = """
+            _ = Execute(command, cancellationToken)
+                .ConfigureAwait(false);
+            """;
+        var preferences = new[]
+            {
+                ("dress_member_access_chains_layout", "auto"),
+                ("dress_arguments_layout", "auto"),
+                ("max_line_length", "55")
+            };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("always_multi")]
+    public void Member_access_keeps_leading_property_access_with_its_receiver(string layout)
+    {
+        const string source = "_ = this.order.Lines.Where(line => line.Quantity > 0).Select(line => line.Sku);";
+        const string expected = """
+            _ = this.order.Lines
+                .Where(line => line.Quantity > 0)
+                .Select(line => line.Sku);
+            """;
+        var preferences = new[]
+            {
+                ("dress_member_access_chains_layout", layout),
+                ("max_line_length", "60")
+            };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_member_access_breaks_a_chain_without_calls_anywhere()
+    {
+        const string source = "_ = order.Customer.BillingAddress.PostalCode;";
+        const string expected = """
+            _ = order
+                .Customer
+                .BillingAddress
+                .PostalCode;
+            """;
+        var preferences = new[]
+            {
+                ("dress_member_access_chains_layout", "auto"),
+                ("max_line_length", "30")
+            };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_arguments_measure_their_line_after_the_chain_holding_them_breaks()
+    {
+        const string source = "var subtotal = order.Lines.Where(line => line.Quantity > 0 && line.IsAvailable).Select(line => pricing.PriceFor(line.Sku)).Sum();";
+        const string expected = """
+            var subtotal = order.Lines
+                .Where(line => line.Quantity > 0 && line.IsAvailable)
+                .Select(line => pricing.PriceFor(line.Sku))
+                .Sum();
+            """;
+        var preferences = new[]
+            {
+                ("dress_member_access_chains_layout", "auto"),
+                ("dress_arguments_layout", "auto"),
+                ("max_line_length", "80")
+            };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
     public void Auto_uses_an_earlier_rewritten_members_effective_width()
     {
         const string source = "class C { int A() { return 1; } void B() { int value = 0; N(alpha, beta); } }";

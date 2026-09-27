@@ -583,6 +583,48 @@ public class IndentationOwnershipTests
         Format(result, preferences).ShouldBe(result);
     }
 
+    [Fact]
+    public void A_lambda_argument_keeps_its_continuations_when_wrapping_moves_it()
+    {
+        const string source = """
+            class C
+            {
+                void M()
+                {
+                    assertionChain
+                        .BecauseOf(because, becauseArgs)
+                        .WithExpectation("Expected type to be {0}{reason}, but it was something else entirely.", typeof(TExpectation).FullName, chain => chain
+                            .ForCondition(Subject is not null)
+                            .FailWith("but found a null element."));
+                }
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                void M()
+                {
+                    assertionChain
+                        .BecauseOf(because, becauseArgs)
+                        .WithExpectation(
+                            "Expected type to be {0}{reason}, but it was something else entirely.",
+                            typeof(TExpectation).FullName,
+                            chain => chain
+                                .ForCondition(Subject is not null)
+                                .FailWith("but found a null element."));
+                }
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults
+            .Select(item => (item.Key.ToName(), item.Key == RuleKey.MaxLineLength ? "120" : item.Default))
+            .ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
@@ -593,7 +635,7 @@ public class IndentationOwnershipTests
             {
                 void M()
                 {
-                    return _connection.Read<(int Id, string Text, DateTime CreationDate, DateTime LastChangeDate, int? Counter1, int? Counter2)>("select * from Posts where Id = @Id", i).First();
+                    return _connection.Read<(int Id, string Text, DateTime CreationDate, DateTime LastChangeDate, int? Counter1, int? Counter2)>("select * from Posts where Id = @Id and IsDeleted = 0", i).First();
                 }
             }
             """.ReplaceLineEndings(lineEnding);
@@ -604,7 +646,7 @@ public class IndentationOwnershipTests
                 {
                     return _connection
                         .Read<(int Id, string Text, DateTime CreationDate, DateTime LastChangeDate, int? Counter1, int? Counter2)>(
-                            "select * from Posts where Id = @Id",
+                            "select * from Posts where Id = @Id and IsDeleted = 0",
                             i
                         )
                         .First();

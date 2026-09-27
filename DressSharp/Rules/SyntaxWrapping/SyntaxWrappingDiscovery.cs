@@ -204,11 +204,26 @@ sealed class SyntaxWrappingDiscovery
         if (Enabled(SyntaxWrappingKind.MemberAccessChains) is not null
             && token.Parent is MemberAccessExpressionSyntax access
             && token == access.OperatorToken
-            && access.Parent is not MemberAccessExpressionSyntax
+            && !ContinuesChain(access)
             && !IsInsideArgument(access))
         {
             AddOccurrence(access, SyntaxWrappingKind.MemberAccessChains);
         }
+    }
+
+    /// <summary>
+    /// Whether an access is a link in a longer chain, which owns its operator.
+    /// </summary>
+    /// <remarks>
+    /// A chain's calls sit between its links, so <c>order.Lines.Where(...)</c> is held by the invocation that
+    /// <c>.Sum</c> then reaches. Were it a chain of its own, it would decide the same breaks again after the whole
+    /// chain had, from lines the whole chain had already broken, and undo them for everything measured after.
+    /// </remarks>
+    static bool ContinuesChain(SyntaxNode access)
+    {
+        var end = ChainEnd(access);
+        return end.Parent is MemberAccessExpressionSyntax outer && outer.Expression == end
+            || end.Parent is ConditionalAccessExpressionSyntax;
     }
 
     void DiscoverQuestion(SyntaxToken token)
@@ -216,8 +231,7 @@ sealed class SyntaxWrappingDiscovery
         if (Enabled(SyntaxWrappingKind.MemberAccessChains) is not null
             && token.Parent is ConditionalAccessExpressionSyntax access
             && token == access.OperatorToken
-            && access.Parent is not MemberAccessExpressionSyntax
-            && access.Parent is not ConditionalAccessExpressionSyntax
+            && !ContinuesChain(access)
             && !IsInsideArgument(access))
         {
             AddOccurrence(access, SyntaxWrappingKind.MemberAccessChains);
@@ -353,9 +367,15 @@ sealed class SyntaxWrappingDiscovery
         }
     }
 
+    /// <remarks>
+    /// Members reached before the chain's first call are the receiver, as in <c>order.Lines.Where(...)</c>, so they
+    /// stay with it; a chain that calls nothing is all receiver and breaks anywhere.
+    /// </remarks>
     void MemberAccess(SyntaxNode occurrence, int firstToken, int lastToken)
     {
         var pieces = _stream.Pieces;
+        var start = _boundaries.Count;
+        var firstCall = -1;
         for (var index = firstToken; index <= lastToken; index++)
         {
             var token = pieces[index].Token;
@@ -366,21 +386,52 @@ sealed class SyntaxWrappingDiscovery
                     && !token.GetPreviousToken().IsKind(SyntaxKind.QuestionToken))
                 || token.IsKind(SyntaxKind.MinusGreaterThanToken)))
             {
+                if (firstCall < 0 && CallsMember(token))
+                    firstCall = _boundaries.Count;
                 AddBoundary(index, GapStyle.CompactItem);
             }
         }
+
+        for (var index = start; index < firstCall; index++)
+            _boundaries[index] = _boundaries[index] with { BreakWhenMulti = false };
     }
 
+    /// <summary>Whether the member after a chain's access operator is called.</summary>
+    static bool CallsMember(SyntaxToken accessOperator)
+    {
+        var name = accessOperator.GetNextToken();
+        if (accessOperator.IsKind(SyntaxKind.QuestionToken))
+            name = name.GetNextToken();
+        var member = name.Parent?.Parent;
+        return member is MemberAccessExpressionSyntax or MemberBindingExpressionSyntax
+            && member.Parent is InvocationExpressionSyntax invocation
+            && invocation.Expression == member;
+    }
+
+    /// <remarks>
+    /// Only the links between a chain's operator and the chain itself make the operator the chain's. Anything else,
+    /// such as an argument, a parenthesized or awaited receiver, or a type argument, holds an operator that belongs
+    /// to a chain of its own or to none.
+    /// </remarks>
     static bool BelongsToOccurrence(SyntaxToken token, SyntaxNode occurrence)
     {
         for (var node = token.Parent; node is not null && !ReferenceEquals(node, occurrence); node = node.Parent)
         {
-            if (node is ArgumentSyntax or AttributeArgumentSyntax or LambdaExpressionSyntax or AnonymousMethodExpressionSyntax)
+            if (!IsChainLink(node))
                 return false;
         }
 
         return true;
     }
+
+    internal static bool IsChainLink(SyntaxNode node) =>
+        node is MemberAccessExpressionSyntax
+            or InvocationExpressionSyntax
+            or ElementAccessExpressionSyntax
+            or ConditionalAccessExpressionSyntax
+            or MemberBindingExpressionSyntax
+            or ElementBindingExpressionSyntax
+        || node.IsKind(SyntaxKind.SuppressNullableWarningExpression);
 
     static bool IsInsideArgument(SyntaxNode node) =>
         node.Ancestors().Any(parent => parent is ArgumentSyntax or AttributeArgumentSyntax);
@@ -426,8 +477,29 @@ sealed class SyntaxWrappingDiscovery
                 declaration.ConstraintClauses[^1].GetLastToken(),
             DelegateDeclarationSyntax { ConstraintClauses.Count: > 0 } declaration =>
                 declaration.ConstraintClauses[^1].GetLastToken(),
+            MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax => ChainEnd(node).GetLastToken(),
             _ => node.GetLastToken()
         };
+
+    /// <summary>
+    /// The call or indexer a chain ends with, whose arguments share the line of the chain's last member.
+    /// </summary>
+    /// <remarks>
+    /// The chain's own node stops at its last member name, but the arguments after that name are on the same line
+    /// until something breaks it. A chain that measured only up to the name would find room its line does not
+    /// have, and leave the break to the arguments.
+    /// </remarks>
+    internal static SyntaxNode ChainEnd(SyntaxNode chain)
+    {
+        while (chain.Parent is InvocationExpressionSyntax invocation && invocation.Expression == chain
+            || chain.Parent is ElementAccessExpressionSyntax access && access.Expression == chain
+            || chain.Parent is PostfixUnaryExpressionSyntax suppression
+                && suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+        {
+            chain = chain.Parent;
+        }
+        return chain;
+    }
 
     void Delimited<T>(SeparatedSyntaxList<T> items, SyntaxToken close, bool spacesInside = false) where T : SyntaxNode
     {

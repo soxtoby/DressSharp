@@ -20,6 +20,9 @@ namespace DressSharp.Rules;
 interface IWrappedItems
 {
     bool? StartsItsOwnLine(SyntaxNode list, SyntaxNode item);
+
+    /// <summary>Whether syntax wrapping starts a line at a link of a member access chain, such as <c>.Where</c>.</summary>
+    bool? LinkStartsItsOwnLine(MemberAccessExpressionSyntax link);
 }
 
 sealed class IndentationModel
@@ -80,9 +83,42 @@ sealed class IndentationModel
         var indent = _facts.LeadingIndent(token);
         if (_plan.IndentBlockContents is null)
             return indent;
+        if (LambdaContinuation(token, owner, indent, _facts.LeadingIndent) is { } lambdaIndent)
+            return lambdaIndent;
 
         var ownerIndent = _facts.LeadingIndent(owner.GetFirstToken(includeZeroWidth: true));
         return Rebase(ownerIndent, ForNode(owner), indent);
+    }
+
+    /// <summary>
+    /// Where a line continuing the body of a lambda argument that starts a line of its own is written, or null
+    /// when no such lambda holds <paramref name="token"/> within <paramref name="owner"/>.
+    /// </summary>
+    /// <remarks>
+    /// A lambda that wrapping moves onto a line of its own takes the lines continuing its body with it, each keeping
+    /// its distance from the line the lambda started on. Measured from the statement instead, they would stay where
+    /// they were and leave the lambda standing over them. A rewritten member has no source lines to keep distances
+    /// from; its rewrite already placed them.
+    /// </remarks>
+    internal string? LambdaContinuation(
+        SyntaxToken token,
+        SyntaxNode owner,
+        string sourceIndent,
+        Func<SyntaxToken, string?> sourceIndentOf)
+    {
+        for (var node = token.Parent; node is not null && node != owner; node = node.Parent)
+        {
+            if (node is AnonymousFunctionExpressionSyntax { Parent: ArgumentSyntax { Parent: BaseArgumentListSyntax list } argument } lambda
+                && lambda.GetFirstToken(includeZeroWidth: true) != token
+                && !_originalOwners.ContainsKey(lambda.AncestorsAndSelf().Last())
+                && StartsItsOwnLine(argument, list)
+                && sourceIndentOf(lambda.GetFirstToken(includeZeroWidth: true)) is { } lambdaSourceIndent)
+            {
+                return Rebase(lambdaSourceIndent, ForNode(lambda), sourceIndent);
+            }
+        }
+
+        return null;
     }
 
     internal static string? Rebase(string sourceOwnerIndent, string emittedOwnerIndent, string sourceLineIndent) =>
@@ -158,6 +194,8 @@ sealed class IndentationModel
             return indent;
         if (_originalOwners.TryGetValue(node, out var original))
             return ForNode(original);
+        if (CalledLink(node) is { } link && _wrapping?.LinkStartsItsOwnLine(link) == true)
+            return ForNode(link) + _plan.IndentUnit;
         return node.Parent switch
             {
                 ArgumentListSyntax arguments when node is ArgumentSyntax => ForNode(arguments) + PreservedContinuation(node, arguments),
@@ -181,6 +219,19 @@ sealed class IndentationModel
                 _ => ForNode(node.Parent)
             };
     }
+
+    /// <summary>
+    /// The chain link whose call or indexer <paramref name="node"/> is the argument list of, or null.
+    /// </summary>
+    /// <remarks>
+    /// A link wrapping starts a line at is where its arguments continue from, as the plan that placed it indents them.
+    /// </remarks>
+    static MemberAccessExpressionSyntax? CalledLink(SyntaxNode node) => node switch
+        {
+            ArgumentListSyntax { Parent: InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax link } } => link,
+            BracketedArgumentListSyntax { Parent: ElementAccessExpressionSyntax { Expression: MemberAccessExpressionSyntax link } } => link,
+            _ => null
+        };
 
     internal string Brace(SyntaxNode owner)
     {
