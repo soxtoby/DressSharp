@@ -1,11 +1,30 @@
 ---
 title: Compatibility and versioning
+description: Supported platforms and C# versions, and what a DressSharp version number promises.
 ---
 
-DressSharp targets .NET 10 (`net10.0`). It supports operating systems and architectures supported by that runtime, subject to successful MSBuild project evaluation. CI covers Windows, Linux, and macOS x64 and Arm64 where hosted runners are available.
+## Platforms
 
-The `DressSharp` package is a wrapper that selects a precompiled platform package: `DressSharp.win-x64`, `DressSharp.linux-x64`, `DressSharp.osx-x64`, or `DressSharp.osx-arm64`. A release publishes all five packages at the same version. Installing a platform-specific tool requires the .NET 10 SDK or later; other platforms supported by the runtime are not packaged.
+DressSharp needs the .NET 10 SDK or later. The `DressSharp` package installs a precompiled build for your platform:
 
-DressSharp bundles and pins Roslyn rather than loading the invoking SDK's or project's compiler assemblies. Stable DressSharp releases use stable Roslyn packages. Released and preview C# versions understood by that bundled Roslyn are accepted when selected by the resolved parse context.
+| Platform | Package |
+| --- | --- |
+| Windows x64 | `DressSharp.win-x64` |
+| Linux x64 | `DressSharp.linux-x64` |
+| macOS x64 | `DressSharp.osx-x64` |
+| macOS Arm64 | `DressSharp.osx-arm64` |
 
-The `DressSharp` package follows SemVer. Breaking CLI or configuration changes require a major release. Formatting output may change in a minor release and must be called out in release notes. Pinning the package version pins the formatter and its output contract.
+Always install `DressSharp` itself, which picks the right one. Every release publishes all five packages at the same version. Other platforms aren't packaged.
+
+## C# versions
+
+DressSharp ships with its own copy of the Roslyn C# parser, so it doesn't depend on the compiler in your SDK or project. It accepts every released C# version that copy understands, and preview versions when a project selects them. Stable DressSharp releases ship a stable Roslyn.
+
+## Versioning
+
+DressSharp follows semantic versioning:
+
+- **Major releases** may change commands, options or EditorConfig settings in ways that break existing setups.
+- **Minor releases** may format some code differently. The release notes call out every such change.
+
+Pinning a version in your tool manifest pins the formatting too: the same code and rules always give the same output.

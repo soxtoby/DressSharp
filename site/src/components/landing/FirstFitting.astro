@@ -3,11 +3,14 @@
 // the Default max_line_length. The build writes all three into landing.json, so the cut here is always the real one.
 import { Code } from "astro:components";
 import landing from "../../generated/landing.json";
+import { jacket } from "../../styles/code-theme.mjs";
 
 const { before, after, maxLineLength } = landing;
 const lines = (code: string) => code.split("\n");
 const longest = (code: string) => Math.max(...lines(code).map((line) => line.length));
 const rulerColumns = Math.ceil(Math.max(longest(before), longest(after), maxLineLength) / 10) * 10;
+// The site's own code theme, so the example is coloured as every other code block is; the cloth shows through it.
+const theme = { ...jacket, colors: { ...jacket.colors, "editor.background": "transparent" } };
 ---
 
 <div class="landing-bleed band">
@@ -35,8 +38,8 @@ const rulerColumns = Math.ceil(Math.max(longest(before), longest(after), maxLine
         }
       </div>
       <div class="cloth">
-        <div class="pane before"><Code code={before} lang="cs" theme="css-variables" /></div>
-        <div class="pane after" aria-hidden="true"><Code code={after} lang="cs" theme="css-variables" /></div>
+        <div class="pane before"><Code code={before} lang="cs" theme={theme} /></div>
+        <div class="pane after" aria-hidden="true"><Code code={after} lang="cs" theme={theme} /></div>
         <div class="chalk" aria-hidden="true"></div>
       </div>
     </div>
@@ -72,17 +75,6 @@ const rulerColumns = Math.ceil(Math.max(longest(before), longest(after), maxLine
 
 <style>
   .band {
-    --astro-code-foreground: #e9e7e1;
-    --astro-code-background: transparent;
-    --astro-code-token-keyword: #d8b458;
-    --astro-code-token-string: #9fd3c7;
-    --astro-code-token-string-expression: #9fd3c7;
-    --astro-code-token-constant: #e8a0aa;
-    --astro-code-token-function: #f5f5f3;
-    --astro-code-token-parameter: #c9c9cf;
-    --astro-code-token-comment: #8a8b93;
-    --astro-code-token-punctuation: #9a9ba3;
-    --astro-code-token-link: #d8b458;
     background:
       linear-gradient(to bottom, transparent 0 6rem, var(--page) 6rem),
       repeating-linear-gradient(90deg, transparent 0 23px, rgba(255, 255, 255, .035) 23px 24px),

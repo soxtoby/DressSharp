@@ -27,7 +27,7 @@ sealed class ContentWriter(string root)
 
                 public decimal Total(Order order, bool includeShipping) {
                     if(order.Lines.Count==0) return 0m;
-                    var subtotal = order.Lines.Where(line => line.Quantity > 0).Sum(line => pricing.PriceFor(line.Sku, line.Quantity, order.Customer.Tier, order.Currency));
+                    var subtotal = order.Lines.Where(line => line.Quantity > 0).Sum(line => pricing.PriceFor(line.Sku, line.Quantity, order.Customer.Tier, order.CurrencyCode));
                     var shipping = includeShipping ? pricing.Shipping(order.Destination, order.Weight, order.Customer.Tier) : 0m;
                     log.Info($"Order {order.Id}: {subtotal} + {shipping}");
                     return subtotal+shipping;
@@ -160,17 +160,19 @@ sealed class ContentWriter(string root)
 
     static string Example(RuleDocumentation rule)
     {
-        var input = rule.Metadata.Example;
         var isFileRule = rule.Metadata.GroupName == "File";
         var example = new StringBuilder();
-        example.Append(Fence("cs", "title=\"Input\"", input)).Append("\n\n<Tabs>\n");
+        // Options with their own examples each show their own input in the diff, so there is no shared input to show first.
+        if (rule.Metadata.OptionExamples.IsEmpty)
+            example.Append(Fence("cs", "title=\"Input\"", rule.Metadata.Example)).Append("\n\n");
+        example.Append("<Tabs>\n");
         foreach (var outcome in rule.Outcomes.OrderBy(outcome => outcome.IsDefault ? 0 : 1))
         {
             var label = outcome.IsDefault ? $"{outcome.Value} (Default)" : outcome.Value;
             example.Append($"<TabItem label={Attribute(label)}>\n\n");
             // Line endings are representation, reported below the output, so a change to them alone is not a code change.
-            var unchanged = Split(outcome.Result.Text).SequenceEqual(Split(input));
-            example.Append(unchanged ? "Code unchanged." : Fence("diff", "lang=\"cs\"", Diff(input, outcome.Result.Text))).Append("\n\n");
+            var unchanged = Split(outcome.Result.Text).SequenceEqual(Split(outcome.Source));
+            example.Append(unchanged ? "Code unchanged." : Fence("diff", "lang=\"cs\"", Diff(outcome.Source, outcome.Result.Text))).Append("\n\n");
             if (isFileRule)
             {
                 example.Append(

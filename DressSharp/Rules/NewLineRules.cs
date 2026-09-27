@@ -27,23 +27,73 @@ sealed class NewLineRule(RuleKey ruleKey, string caption, string? subgroupName, 
                     NewLineKind.AnonymousTypeMembers => "var value = new { First = 1, Second = 2 };",
                     NewLineKind.QueryClauses => "var result = from item in items where item.Active select item.Name;",
                     _ => """
-                    class Example
-                    {
-                        void Run()
-                        {
-                            if (true)
-                            {
+                    class Example {
+                        int Count {
+                            get {
+                                return 0;
                             }
-                            else
-                            {
+                        }
+
+                        int this[int index] {
+                            get => index;
+                        }
+
+                        event Action Changed {
+                            add => Work();
+                            remove => Work();
+                        }
+
+                        void Run() {
+                            if (Count > 0) {
+                                Work();
                             }
+
+                            void Local() {
+                                Work();
+                            }
+
+                            Action lambda = () => {
+                                Work();
+                            };
+                            Action method = delegate {
+                                Work();
+                            };
+                            var point = new {
+                                X = 1
+                            };
+                            int[] numbers = new[] {
+                                1
+                            };
                         }
                     }
                     """
                 },
+            ExamplePreferences = kind == NewLineKind.OpenBrace ? OpenBraceCompanions : ImmutableDictionary<RuleKey, string>.Empty,
+            OptionExamples = kind == NewLineKind.OpenBrace ? OpenBraceExamples : ImmutableDictionary<string, string>.Empty,
             OwnedSyntax = "owned token boundaries",
             Invariant = "Only boundary whitespace changes"
         };
+
+    // A brace this rule moves to its own line takes its column from brace indentation, so the examples show the Default one.
+    static readonly ImmutableDictionary<RuleKey, string> OpenBraceCompanions =
+        ImmutableDictionary<RuleKey, string>.Empty.Add(RuleKey.CSharpIndentBraces, "false");
+
+    // Each holds only the brace its option moves, and members sit in a type so they parse as members.
+    static readonly ImmutableDictionary<string, string> OpenBraceExamples = new Dictionary<string, string>
+        {
+            ["accessors"] = "class Example {\n    int Count {\n        get {\n            return 0;\n        }\n    }\n}",
+            ["anonymous_methods"] = "Action action = delegate {\n    Work();\n};",
+            ["anonymous_types"] = "var point = new {\n    X = 1\n};",
+            ["control_blocks"] = "if (ready) {\n    Work();\n}",
+            ["events"] = "class Example {\n    event Action Changed {\n        add => Work();\n        remove => Work();\n    }\n}",
+            ["indexers"] = "class Example {\n    int this[int index] {\n        get => index;\n    }\n}",
+            ["lambdas"] = "Action action = () => {\n    Work();\n};",
+            ["local_functions"] = "void Local() {\n    Work();\n}",
+            ["methods"] = "class Example {\n    void Run() {\n        Work();\n    }\n}",
+            ["object_collection_array_initializers"] = "int[] numbers = new[] {\n    1,\n    2\n};",
+            ["properties"] = "class Example {\n    int Count {\n        get => 0;\n    }\n}",
+            ["types"] = "class Example {\n    int count;\n}",
+        }.ToImmutableDictionary();
 
     internal NewLineKind Kind => kind;
     internal bool RequiresInitializerMemberBoundary => kind is NewLineKind.ObjectInitializerMembers or NewLineKind.AnonymousTypeMembers;

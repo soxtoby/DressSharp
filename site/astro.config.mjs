@@ -18,16 +18,19 @@ export default defineConfig({
       favicon: "/favicon.svg",
       social: repository ? [{ icon: "github", label: "GitHub", href: `https://github.com/${repository}` }] : [],
       sidebar: [
+        { label: "Guides", items: ["getting-started", "choosing-rules", "formatting-automatically"] },
+        { label: "Rules", items: [{ autogenerate: { directory: "rules" } }] },
         {
-          label: "Guides",
+          label: "Reference",
           items: ["cli", "compatibility", { label: "NuGet package", link: "https://www.nuget.org/packages/DressSharp" }],
         },
-        { label: "Rules", items: [{ autogenerate: { directory: "rules" } }] },
       ],
       customCss: ["./src/styles/custom.css"],
       components: {
         Hero: "./src/components/landing/Hero.astro",
         PageTitle: "./src/components/PageTitle.astro",
+        SiteTitle: "./src/components/SiteTitle.astro",
+        ThemeSelect: "./src/components/ThemeSelect.astro",
       },
       expressiveCode: {
         themes: [jacket, paper],

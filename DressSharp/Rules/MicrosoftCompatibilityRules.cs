@@ -131,7 +131,8 @@ sealed class ParenthesisSpacingRule() : TokenSpacingRule(
     null,
     RuleValues.MultipleChoice(["control_flow_statements", "expressions", "type_casts"], "false"),
     "false",
-    "parenthesized syntax")
+    "parenthesized syntax",
+    "if (ready) total = (int)(count * 2);")
 {
     internal override ImmutableArray<SyntaxKind> TriggerKinds { get; } = [SyntaxKind.OpenParenToken, SyntaxKind.CloseParenToken];
 

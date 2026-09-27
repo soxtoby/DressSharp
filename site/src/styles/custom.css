@@ -97,6 +97,8 @@ header.header {
   border-bottom: 1px dashed rgba(216, 180, 88, .4);
 }
 .site-title { font-family: var(--serif); font-weight: 700; letter-spacing: -.01em; }
+/* Pages without a sidebar have no theme toggle, so nothing follows the rule that divides the social icons from it. */
+:root:not([data-has-sidebar]) .header .social-icons::after { display: none; }
 
 /* Sidebars: group labels set like the landing page's kickers, the current page marked in chalk. */
 .sidebar-content .group-label .large,
@@ -115,14 +117,14 @@ header.header {
 
 /* Content: serif headings over sans text, with a stitch between the title and the page. */
 .content-panel + .content-panel { border-top: 1px dashed var(--dress-stitch); }
-.sl-markdown-content :is(h1, h2, h3, h4, h5) {
+.sl-markdown-content :is(h1, h2, h3, h4, h5):not(:where(.not-content *)) {
   color: var(--sl-color-white);
   font-family: var(--serif);
   font-weight: 700;
   letter-spacing: -.01em;
 }
-.sl-markdown-content h2 { font-size: calc(var(--sl-text-h2) * .9); }
-.sl-markdown-content h3 { font-size: calc(var(--sl-text-h3) * .9); }
+.sl-markdown-content h2:not(:where(.not-content *)) { font-size: calc(var(--sl-text-h2) * .9); }
+.sl-markdown-content h3:not(:where(.not-content *)) { font-size: calc(var(--sl-text-h3) * .9); }
 .sl-markdown-content a:not(:where(.not-content *)) { text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: .2em; }
 .sl-markdown-content a:not(:where(.not-content *)):hover { text-decoration-color: currentColor; }
 .sl-markdown-content :is(h2, h3) a:not(:where(.not-content *)) { text-decoration: none; }
@@ -130,13 +132,13 @@ header.header {
 .sl-markdown-content :not(pre) > code:not(:where(.not-content *)) { padding: .1em .35em; border-radius: 4px; font-variant-ligatures: none; }
 .expressive-code { font-variant-ligatures: none; }
 
-.sl-markdown-content th {
+.sl-markdown-content th:not(:where(.not-content *)) {
   color: var(--sl-color-gray-3);
   font: 600 .72rem var(--mono);
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-.sl-markdown-content :is(th, td) { border-bottom-color: var(--sl-color-hairline-light); }
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) { border-bottom-color: var(--sl-color-hairline-light); }
 
 /* Rule examples: a tab per value, labelled as the value is written. */
 starlight-tabs [role="tab"] { font: 500 .85rem var(--mono); }

@@ -107,6 +107,11 @@ sealed record RuleMetadata
     public required string DefaultValue { get; init; }
     public required string Example { get; init; }
     public ImmutableDictionary<RuleKey, string> ExamplePreferences { get; init; } = ImmutableDictionary<RuleKey, string>.Empty;
+    /// <summary>
+    /// A short example per option of a multiple-choice rule, for documentation that shows each option alone.
+    /// <see cref="Example"/> still holds every option, so any selection of them can be tried against it.
+    /// </summary>
+    public ImmutableDictionary<string, string> OptionExamples { get; init; } = ImmutableDictionary<string, string>.Empty;
     public required string OwnedSyntax { get; init; }
     public required string Invariant { get; init; }
 

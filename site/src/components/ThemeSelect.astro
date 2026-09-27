@@ -1,0 +1,119 @@
+---
+// Overrides Starlight's ThemeSelect, whose native select names no purpose until opened and lists its options in the
+// operating system's colours. A row of three icons says what it is at a glance and needs no menu, which matters in the
+// mobile sidebar where a menu would open off the bottom of the screen. It keeps Starlight's stored preference, so a
+// choice made before this override still applies.
+//
+// The landing page has no sidebar and is drawn in fixed colours, so a theme there would change nothing.
+const { hasSidebar } = Astro.locals.starlightRoute;
+
+const themes = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "auto", label: "Match system" },
+];
+---
+
+{
+  hasSidebar && (
+    <dress-theme-select role="group" aria-label="Colour theme">
+      {themes.map((theme) => (
+        <button type="button" data-theme-value={theme.value} aria-pressed="false" title={theme.label}>
+          <span class="sr-only">{theme.label}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            {theme.value === "light" && (
+              <>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+              </>
+            )}
+            {theme.value === "dark" && <path d="M20.5 14.1A8.5 8.5 0 1 1 9.9 3.5a6.8 6.8 0 0 0 10.6 10.6z" />}
+            {theme.value === "auto" && (
+              <>
+                <circle cx="12" cy="12" r="8.5" />
+                <path class="fill" d="M12 3.5a8.5 8.5 0 0 1 0 17z" />
+              </>
+            )}
+          </svg>
+        </button>
+      ))}
+    </dress-theme-select>
+  )
+}
+
+{/* Inlined so the current choice is marked before the page paints. */}
+<script is:inline>
+  (() => {
+    const theme = (typeof localStorage !== "undefined" && localStorage.getItem("starlight-theme")) || "auto";
+    for (const button of document.querySelectorAll("dress-theme-select button"))
+      button.setAttribute("aria-pressed", String(button.dataset.themeValue === theme));
+  })();
+</script>
+
+<script>
+  type Theme = "auto" | "dark" | "light";
+
+  // Starlight's own key, which its inline theme provider reads before the page paints.
+  const storageKey = "starlight-theme";
+
+  const parseTheme = (theme: unknown): Theme => (theme === "dark" || theme === "light" ? theme : "auto");
+  const loadTheme = (): Theme => parseTheme(typeof localStorage !== "undefined" && localStorage.getItem(storageKey));
+  const systemTheme = () => (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+
+  function applyTheme(theme: Theme) {
+    document.documentElement.dataset.theme = theme === "auto" ? systemTheme() : theme;
+    if (typeof localStorage !== "undefined") localStorage.setItem(storageKey, theme === "auto" ? "" : theme);
+    // The header and the mobile sidebar each hold one.
+    for (const button of document.querySelectorAll<HTMLButtonElement>("dress-theme-select button"))
+      button.setAttribute("aria-pressed", String(button.dataset.themeValue === theme));
+  }
+
+  matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+    if (loadTheme() === "auto") applyTheme("auto");
+  });
+
+  customElements.define(
+    "dress-theme-select",
+    class extends HTMLElement {
+      connectedCallback() {
+        this.addEventListener("click", (event) => {
+          const button = (event.target as Element).closest<HTMLButtonElement>("button[data-theme-value]");
+          if (button) applyTheme(parseTheme(button.dataset.themeValue));
+        });
+      }
+    },
+  );
+</script>
+
+<style>
+  dress-theme-select {
+    display: flex;
+    flex: none;
+    padding: 3px;
+    background: var(--sl-color-gray-6);
+    border-radius: 999px;
+  }
+  button {
+    display: grid;
+    place-items: center;
+    padding: .35rem .55rem;
+    color: var(--sl-color-gray-3);
+    background: none;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  button:hover { color: var(--sl-color-white); }
+  button[aria-pressed="true"] { color: var(--sl-color-black); background: var(--sl-color-accent); }
+  button:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  svg .fill { fill: currentColor; stroke: none; }
+</style>

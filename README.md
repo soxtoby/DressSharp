@@ -51,7 +51,7 @@ dotnet tool run dotnet-dress -- --version
 
 The package installs one command: `dotnet dress`.
 
-See [CLI and configuration](site/src/content/docs/cli.md) and the [compatibility policy](site/src/content/docs/compatibility.md).
+See [Getting started](site/src/content/docs/getting-started.md), the [command line reference](site/src/content/docs/cli.md) and the [compatibility policy](site/src/content/docs/compatibility.md).
 
 ## Documentation site
 

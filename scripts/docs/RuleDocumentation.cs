@@ -6,8 +6,8 @@ using DressSharp.Rules;
 
 namespace DressSharp.Docs;
 
-/// <summary>One rendered outcome of a rule's example under one preference value.</summary>
-sealed record ExampleOutcome(string Value, string Label, PreviewResult Result, bool IsDefault);
+/// <summary>One rendered outcome of a rule's example, or of one option's own example, under one preference value.</summary>
+sealed record ExampleOutcome(string Value, string Label, string Source, PreviewResult Result, bool IsDefault);
 
 /// <summary>Everything the site shows for one preference, taken from the built-in catalog and the real formatter.</summary>
 sealed record RuleDocumentation(
@@ -66,10 +66,12 @@ static class CatalogReader
                 .ToArray();
             if (Environment.GetEnvironmentVariable("DRESSSHARP_DOCS_TRACE") is not null)
                 Console.Error.WriteLine($"{metadata.RuleKey.ToName()} = {value}");
-            var result = await InteractivePreview.Format(metadata.Example, preferences, cancellationToken);
+            var source = metadata.OptionExamples.GetValueOrDefault(value, metadata.Example);
+            var result = await InteractivePreview.Format(source, preferences, cancellationToken);
             if (result.SkippedOccurrences > 0)
                 throw new InvalidOperationException($"Example for {metadata.RuleKey.ToName()} = {value} skipped {result.SkippedOccurrences} occurrence(s).");
-            outcomes.Add(new ExampleOutcome(value, Label(metadata, value), result, value.Equals(metadata.DefaultValue, StringComparison.OrdinalIgnoreCase)));
+            outcomes.Add(
+                new ExampleOutcome(value, Label(metadata, value), source, result, value.Equals(metadata.DefaultValue, StringComparison.OrdinalIgnoreCase)));
         }
 
         if (metadata.Values.Kind == RuleValueKind.Integer)
@@ -82,10 +84,15 @@ static class CatalogReader
             [.. metadata.ExamplePreferences.Select(pair => (pair.Key.ToName(), pair.Value))]);
     }
 
-    /// <summary>Every value the catalog accepts, or for integers a spread that includes the Default and the special values.</summary>
+    /// <summary>
+    /// Every value the catalog accepts, or for integers a spread that includes the Default and the special values. Options
+    /// with their own examples are shown one at a time, where a special value such as <c>all</c> has no example to show.
+    /// </summary>
     static IEnumerable<string> CandidateValues(RuleMetadata metadata)
     {
         var values = metadata.Values;
+        if (!metadata.OptionExamples.IsEmpty)
+            return values.Options.Select(option => option.Value);
         var specials = values.SpecialValues.IsDefault ? [] : values.SpecialValues;
         return values.Kind switch
             {

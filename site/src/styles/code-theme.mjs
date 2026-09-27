@@ -15,8 +15,18 @@ export const jacket = {
     { scope: ["keyword", "storage", "keyword.other.definition.ini"], settings: { foreground: "#d8b458" } },
     { scope: ["keyword.operator", "punctuation"], settings: { foreground: "#9a9ba3" } },
     { scope: ["entity.name.type", "entity.name.section", "support.type", "support.class"], settings: { foreground: "#f0dfae" } },
-    { scope: ["entity.name.function", "support.function"], settings: { foreground: "#f5f5f3" } },
-    { scope: ["variable.parameter", "variable.other"], settings: { foreground: "#e9e7e1" } },
+    { scope: ["entity.name.type.namespace"], settings: { foreground: "#e9e7e1" } },
+    { scope: ["entity.name.function", "support.function"], settings: { foreground: "#a9c8ea" } },
+    // A local or parameter is one colour where it is declared and where it is used; a member it reaches is another.
+    {
+      scope: ["variable.parameter", "entity.name.variable.parameter", "entity.name.variable.local", "variable.other.readwrite", "variable.other.object"],
+      settings: { foreground: "#e9e7e1" },
+    },
+    {
+      scope: ["variable.other.object.property", "variable.other.property", "entity.name.variable.field", "entity.name.variable.property"],
+      settings: { foreground: "#cbb8e6" },
+    },
+    { scope: ["variable.language"], settings: { foreground: "#d8b458" } },
     { scope: ["string", "punctuation.definition.string"], settings: { foreground: "#9fd3c7" } },
     { scope: ["constant", "constant.character.escape"], settings: { foreground: "#e8a0aa" } },
     { scope: ["punctuation.definition.interpolation", "punctuation.section.interpolation"], settings: { foreground: "#d8b458" } },
@@ -61,8 +71,18 @@ export const paper = {
     { scope: ["keyword", "storage", "keyword.other.definition.ini"], settings: { foreground: "#7d1f2f" } },
     { scope: ["keyword.operator", "punctuation"], settings: { foreground: "#5e5e66" } },
     { scope: ["entity.name.type", "entity.name.section", "support.type", "support.class"], settings: { foreground: "#80590f" } },
-    { scope: ["entity.name.function", "support.function"], settings: { foreground: "#1c1c20" } },
-    { scope: ["variable.parameter", "variable.other"], settings: { foreground: "#2a2b31" } },
+    { scope: ["entity.name.type.namespace"], settings: { foreground: "#2a2b31" } },
+    { scope: ["entity.name.function", "support.function"], settings: { foreground: "#2b5283" } },
+    // A local or parameter is one colour where it is declared and where it is used; a member it reaches is another.
+    {
+      scope: ["variable.parameter", "entity.name.variable.parameter", "entity.name.variable.local", "variable.other.readwrite", "variable.other.object"],
+      settings: { foreground: "#2a2b31" },
+    },
+    {
+      scope: ["variable.other.object.property", "variable.other.property", "entity.name.variable.field", "entity.name.variable.property"],
+      settings: { foreground: "#6b3d8f" },
+    },
+    { scope: ["variable.language"], settings: { foreground: "#7d1f2f" } },
     { scope: ["string", "punctuation.definition.string"], settings: { foreground: "#1d6b5f" } },
     { scope: ["constant", "constant.character.escape"], settings: { foreground: "#a8374f" } },
     { scope: ["punctuation.definition.interpolation", "punctuation.section.interpolation"], settings: { foreground: "#7d1f2f" } },
