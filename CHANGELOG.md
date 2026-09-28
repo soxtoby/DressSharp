@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.1.0
+
 ### Added
 - `dotnet dress format` and `dotnet dress check` format C# files according to explicit EditorConfig preferences, using syntax only.
 - `--staged` and `--changed` select only the files Git reports as changed, so a pre-commit or editor hook formats what was touched.
