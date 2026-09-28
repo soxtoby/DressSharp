@@ -8,7 +8,7 @@ namespace DressSharp.Rules;
 
 sealed class RuleCatalog
 {
-    const int CurrentVersion = 4;
+    const int CurrentVersion = 1;
 
     RuleCatalog()
     {

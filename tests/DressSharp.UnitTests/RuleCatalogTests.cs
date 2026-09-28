@@ -9,7 +9,7 @@ namespace DressSharp.UnitTests;
 public class RuleCatalogTests
 {
     [Fact]
-    public void Catalog_version_is_explicit() => RuleCatalog.BuiltIn.Version.ShouldBe(4);
+    public void Catalog_version_is_explicit() => RuleCatalog.BuiltIn.Version.ShouldBe(1);
 
     [Fact]
     public void Expanded_caption_defaults_to_caption_unless_specified()

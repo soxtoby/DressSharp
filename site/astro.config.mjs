@@ -10,6 +10,9 @@ export default defineConfig({
   site: process.env.DOCS_SITE,
   base: process.env.DOCS_BASE,
   outDir: "../dist/site",
+  // The site's images are screenshots of flat interface colour and text. Lossy WebP smears the text and
+  // hatching visibly, while lossless is sharp and, at full size, smaller than the default quality.
+  image: { service: { config: { webp: { lossless: true } } } },
   integrations: [
     starlight({
       title: "DressSharp",
