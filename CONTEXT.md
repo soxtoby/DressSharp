@@ -106,3 +106,9 @@ An explicit `charset`, `end_of_line`, or `insert_final_newline` setting that may
 
 **Performance target**:
 A tracked, non-blocking expectation measured on the product owner's documented machine. It guides optimization but is neither portable nor a release criterion.
+
+**Release preparation**:
+A local, reviewable move of the Unreleased changelog entries under a new version heading, with the package version to match, which also advances this repository's pinned DressSharp to the latest release. It does not commit, tag, push, or publish.
+
+**Release**:
+A tagged, immutable version whose project version, changelog heading, Git tag, NuGet packages, and GitHub release share one `v`-prefixed identity, except that NuGet's package version omits the prefix.

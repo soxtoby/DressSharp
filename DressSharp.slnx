@@ -13,6 +13,9 @@
     <File Path="scripts/build.cs" />
     <File Path="scripts/install-local.cs" />
     <File Path="scripts/materialize-corpus.cs" />
+    <File Path="scripts/pack.cs" />
+    <File Path="scripts/prepare-release.cs" />
+    <File Path="scripts/release.cs" />
     <File Path="scripts/run.cs" />
     <File Path="scripts/test.cs" />
   </Folder>

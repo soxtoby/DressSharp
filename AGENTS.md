@@ -33,3 +33,12 @@ Put experiments, traces, logs, and screenshots in `scratch/`. `dist/` holds only
 ## Measuring
 
 Before claiming a speedup, run `benchmarks/protocol-v1.md`. Report CPU time beside wall time, since a change can win one while losing the other, and report a change that removes work by construction as that, with the numbers as evidence rather than the claim.
+
+## Changelog
+
+A change a user would notice gets an entry under `## Unreleased` in `CHANGELOG.md`, under one of these headings, which `./do prepare-release` reads to choose the next version:
+
+- `### Breaking`: a command, option, or preference changed in a way that breaks an existing setup. Major.
+- `### Added`: a new command, option, or preference. Minor.
+- `### Changed`: a deliberate change to existing behaviour, including how some input formats. Minor.
+- `### Fixed`: a bug fix, including a formatting bug. Patch.

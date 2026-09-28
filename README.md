@@ -51,6 +51,10 @@ dotnet tool run dotnet-dress -- --version
 
 The package installs one command: `dotnet dress`.
 
+## Releasing
+
+`./do prepare-release` moves the Unreleased notes in `CHANGELOG.md` under the next version, chosen from their headings, and sets the package version to match. Review and commit the result, then tag it `v<version>` and push the tag. The `Release` workflow packs every platform package, publishes them to NuGet with trusted publishing, and creates the GitHub release from the changelog notes.
+
 See [Getting started](site/src/content/docs/getting-started.md), the [command line reference](site/src/content/docs/cli.md) and the [compatibility policy](site/src/content/docs/compatibility.md).
 
 ## Documentation site
