@@ -32,7 +32,7 @@ dotnet dress init
 
 This adds every rule DressSharp supports to `.editorconfig`, each set to its default. It creates the file if you have none. Settings already in the file stay as they are, so the `csharp_*` and `dotnet_*` preferences your team already uses keep working.
 
-The defaults are opinionated: together they make a complete, consistent style. But they're only a starting point. Open the file and you'll see your whole code style in one place, where any rule can be changed, or set to `unset` so DressSharp leaves that part of your code alone. The easiest way to change them is to try them on:
+Together the defaults make a complete, consistent style, but they're only a starting point. Open the file and you'll see your whole code style in one place, where any rule can be changed, or set to `unset` so DressSharp leaves that part of your code alone. The easiest way to change them is to try them on:
 
 ```sh
 dotnet dress interactive

@@ -1,79 +1,57 @@
 # DressSharp
 
-DressSharp is a syntax-only, explicitly configured C# formatter distributed as one .NET tool package.
+DressSharp is an unopinionated C# formatter. It formats your code to the rules you choose in EditorConfig, and nothing else: every rule is yours to set, and any rule you leave unset leaves that part of your code alone. With no preferences set, it leaves every file as it found it.
+
+**[Read the documentation](https://soxtoby.github.io/DressSharp/)**
 
 ## Install
 
-```powershell
-dotnet tool install --global DressSharp
-dotnet dress --version
-```
+DressSharp is a .NET tool and needs the .NET 10 SDK. Install it into your repository so everyone on the team, and your CI, runs the same version:
 
-For a repository-pinned install:
-
-```powershell
+```sh
 dotnet new tool-manifest
 dotnet tool install DressSharp
 ```
 
-## Hooks
+Skip the first command if your repository already has a `.config/dotnet-tools.json`. Commit that file. Anyone who clones the repository then runs `dotnet tool restore` once to get the tool.
 
-`--staged` and `--changed` select only the files Git reports as changed, so a hook formats what was touched instead of the repository. A pre-commit hook is one line; `format --staged` stages what it rewrites:
-
-```sh
-dotnet dress format --staged
-```
-
-For a hook that runs after an editor or agent writes, format everything changed since the last commit:
+To use DressSharp everywhere on your machine instead, install it globally:
 
 ```sh
-dotnet dress format --changed
+dotnet tool install --global DressSharp
 ```
 
-Both require a repository-pinned or global install of the current version. This repository's `.claude/settings.json` and `.codex/hooks.json` run the second form from Claude Code and Codex after `dotnet tool restore`.
+## Get started
 
-## Development
+Add every rule DressSharp supports to `.editorconfig`, each set to its default:
 
-Build, test, and format DressSharp from the current checkout:
-
-```powershell
-./do test
-./do format-self
+```sh
+dotnet dress init
 ```
 
-To test the packed local tool:
+Try the rules on against your own code, with a live preview in the browser:
 
-```powershell
-dotnet tool restore
-./do install-local
-dotnet tool run dotnet-dress -- --version
+```sh
+dotnet dress interactive
 ```
 
-The package installs one command: `dotnet dress`.
+See which files don't match your rules, without changing anything:
 
-## Releasing
+```sh
+dotnet dress check
+```
 
-`./do prepare-release` moves the Unreleased notes in `CHANGELOG.md` under the next version, chosen from their headings, and sets the package version to match. Review and commit the result, then tag it `v<version>` and push the tag. The `Release` workflow packs every platform package, publishes them to NuGet with trusted publishing, and creates the GitHub release from the changelog notes.
+Then format every C# file in the current directory and below:
 
-See [Getting started](site/src/content/docs/getting-started.md), the [command line reference](site/src/content/docs/cli.md) and the [compatibility policy](site/src/content/docs/compatibility.md).
+```sh
+dotnet dress
+```
 
-## Documentation site
+## Learn more
 
-`./do build-docs` builds the static site into `dist/site` with [Astro Starlight](https://starlight.astro.build/) under Bun. The site in `site/` holds the hand-written pages; `scripts/build-docs.cs` adds a reference for every preference in the built-in rule catalog before each build. Each rule's example is formatted by the real formatter under every accepted value, so the reference cannot drift from the code. After one `./do build-docs`, `bun run site:dev` serves the site with live reload. The `Docs` workflow publishes the same output to GitHub Pages on every push to `master`; enable Pages with the "GitHub Actions" source once in the repository settings.
-
-## Repository layout
-
-| Path | Holds |
-| --- | --- |
-| `DressSharp/` | The formatter and `dotnet dress` tool |
-| `DressSharp.Interactive/` | The browser app `dotnet dress interactive` embeds, with its Playwright checks in `e2e/` |
-| `site/` | The Starlight documentation site |
-| `tests/` | The .NET test projects |
-| `scripts/` | `./do` tasks; `docs/` and `corpus/` hold the files the tasks include |
-| `assets/` | Logo and favicons |
-| `docs/` | Design notes and architecture decision records |
-| `benchmarks/` | The benchmark protocol, result schema, and pinned corpus definition; the materialized corpus and results are gitignored |
-| `dist/` | Build outputs, gitignored; every directory is rebuilt by a `./do` task |
-| `scratch/` | Experiments, traces, logs, and screenshots, gitignored |
-
-The root `package.json` is a Bun workspace over `DressSharp.Interactive` and `site`, so `bun install` and `bun run` work from the root as `./do` does.
+- [Getting started](https://soxtoby.github.io/DressSharp/getting-started/): install, choose your rules, and format for the first time.
+- [Choosing your rules](https://soxtoby.github.io/DressSharp/choosing-rules/): find the settings that match how your team writes C#.
+- [Formatting automatically](https://soxtoby.github.io/DressSharp/formatting-automatically/): format on every commit, check in CI, and tidy up after coding agents.
+- [Rules](https://soxtoby.github.io/DressSharp/rules/): every setting, with examples of what each value does.
+- [Command line](https://soxtoby.github.io/DressSharp/cli/): every command and option, and their exit codes.
+- [Compatibility and versioning](https://soxtoby.github.io/DressSharp/compatibility/): supported platforms and C# versions, and how to keep formatting stable.
