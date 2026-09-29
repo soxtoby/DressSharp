@@ -9,7 +9,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
     readonly string _discoveryRoot = Path.GetFullPath(discoveryRoot);
     readonly IMSBuildEvaluator _evaluator = evaluator ?? new MSBuildEvaluationCache(new DotNetMSBuildEvaluator());
 
-    public async ValueTask<IReadOnlyDictionary<string, ParseContextResolution>> Resolve(
+    public async ValueTask<ResolvedParseContexts> Resolve(
         IReadOnlyList<string> paths,
         string? configuration,
         CancellationToken cancellationToken)
@@ -40,7 +40,33 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
             else
                 results[path] = ResolveOwned(path, contexts[path]);
         }
-        return results;
+        return new(results, SkippedProjectWarnings(selected, contexts));
+    }
+
+    /// <summary>
+    /// One message per project that could not be read, naming how many of the selected files it keeps
+    /// from being formatted. A project that owns none of them has nothing to say.
+    /// </summary>
+    static List<string> SkippedProjectWarnings(
+        IReadOnlyList<string> selected,
+        IReadOnlyDictionary<string, List<ProjectContext>> contexts)
+    {
+        var failures = new Dictionary<string, (string Diagnostic, HashSet<string> Paths)>(PathComparer);
+        foreach (var path in selected)
+        {
+            foreach (var context in contexts[path])
+            {
+                if (context.Diagnostic is null)
+                    continue;
+                if (!failures.TryGetValue(context.Project, out var failure))
+                    failures[context.Project] = failure = (context.Diagnostic, new HashSet<string>(PathComparer));
+                failure.Paths.Add(path);
+            }
+        }
+
+        return failures.OrderBy(pair => pair.Key, PathComparer)
+            .Select(pair => $"skipping {pair.Value.Paths.Count} {(pair.Value.Paths.Count == 1 ? "file" : "files")} in {pair.Key}: {pair.Value.Diagnostic}")
+            .ToList();
     }
 
     HashSet<string> AncestorProjects(IEnumerable<string> paths)
@@ -67,46 +93,74 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
         CancellationToken cancellationToken) =>
         Task.WhenAll(projects.Order(PathComparer).Select(project => AddProjectContextsAsync(project, configuration, contexts, cancellationToken).AsTask()));
 
+    /// <remarks>
+    /// The symbols a file compiles with are added by an SDK target that only the build of one
+    /// framework has, so a project is first asked what it declares, and then, for each framework it
+    /// names, what that framework's build compiles with. A project that names no framework is not
+    /// built by the SDK, and compiles with what it declares.
+    /// </remarks>
     async ValueTask AddProjectContextsAsync(
         string project,
         string configuration,
         IReadOnlyDictionary<string, List<ProjectContext>> contexts,
         CancellationToken cancellationToken)
     {
-        var outer = await _evaluator.EvaluateAsync(project, configuration, null, cancellationToken);
-        if (!outer.Succeeded)
+        var declared = await _evaluator.EvaluateAsync(project, configuration, null, MSBuildEvaluationKind.Declaration, cancellationToken);
+        if (!declared.Succeeded)
         {
-            foreach (var path in contexts.Keys.Where(path => IsUnder(path, Path.GetDirectoryName(project)!)))
-                AddContext(contexts[path], ProjectContext.Failed(project, outer.Diagnostic));
+            FailProject(project, declared.Diagnostic, contexts);
             return;
         }
 
-        var frameworks = Split(outer.Properties.GetValueOrDefault("TargetFrameworks"));
+        var frameworks = Split(declared.Properties.GetValueOrDefault("TargetFrameworks"));
         if (frameworks.Count == 0)
-            frameworks = [outer.Properties.GetValueOrDefault("TargetFramework") ?? ""];
-        foreach (var framework in frameworks.Where(value => !string.IsNullOrWhiteSpace(value)))
+            frameworks = Split(declared.Properties.GetValueOrDefault("TargetFramework"));
+        if (frameworks.Count == 0)
         {
-            var evaluation = frameworks.Count == 1 && outer.Properties.GetValueOrDefault("TargetFramework") == framework
-                ? outer
-                : await _evaluator.EvaluateAsync(project, configuration, framework, cancellationToken);
-            if (!evaluation.Succeeded)
-            {
-                foreach (var path in contexts.Keys.Where(path => IsUnder(path, Path.GetDirectoryName(project)!)))
-                    AddContext(contexts[path], ProjectContext.Failed(project, evaluation.Diagnostic));
-                continue;
-            }
-            try
-            {
-                var options = CreateOptions(evaluation.Properties);
-                foreach (var item in evaluation.CompileItems.Where(contexts.ContainsKey))
-                    AddContext(contexts[item], new(project, framework, options, null));
-            }
-            catch (UnsupportedLanguageVersionException exception)
-            {
-                foreach (var item in evaluation.CompileItems.Where(contexts.ContainsKey))
-                    AddContext(contexts[item], ProjectContext.Failed(project, exception.Message));
-            }
+            AddContexts(project, "", declared, contexts);
+            return;
         }
+
+        foreach (var framework in frameworks)
+        {
+            var compiled = await _evaluator.EvaluateAsync(project, configuration, framework, MSBuildEvaluationKind.Compilation, cancellationToken);
+            if (!compiled.Succeeded)
+            {
+                FailProject(project, compiled.Diagnostic, contexts);
+                return;
+            }
+            AddContexts(project, framework, compiled, contexts);
+        }
+    }
+
+    static void AddContexts(
+        string project,
+        string framework,
+        MSBuildEvaluation evaluation,
+        IReadOnlyDictionary<string, List<ProjectContext>> contexts)
+    {
+        try
+        {
+            var options = CreateOptions(evaluation.Properties);
+            foreach (var item in evaluation.CompileItems.Where(contexts.ContainsKey))
+                AddContext(contexts[item], new(project, framework, options, null));
+        }
+        catch (UnsupportedLanguageVersionException exception)
+        {
+            foreach (var item in evaluation.CompileItems.Where(contexts.ContainsKey))
+                AddContext(contexts[item], ProjectContext.Failed(project, exception.Message));
+        }
+    }
+
+    /// <summary>
+    /// Records that a project could not be read. Which files it owns is unknown, so every selected file
+    /// beneath its directory is taken to be one of them.
+    /// </summary>
+    static void FailProject(string project, string diagnostic, IReadOnlyDictionary<string, List<ProjectContext>> contexts)
+    {
+        var failed = ProjectContext.Failed(project, $"project evaluation failed. {diagnostic}");
+        foreach (var path in contexts.Keys.Where(path => IsUnder(path, Path.GetDirectoryName(project)!)))
+            AddContext(contexts[path], failed);
     }
 
     static void AddContext(List<ProjectContext> contexts, ProjectContext context)
@@ -117,7 +171,7 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
 
     async ValueTask<ParseContextResolution> ResolveFileAppAsync(string path, string configuration, CancellationToken cancellationToken)
     {
-        var evaluation = await _evaluator.EvaluateAsync(path, configuration, null, cancellationToken);
+        var evaluation = await _evaluator.EvaluateAsync(path, configuration, null, MSBuildEvaluationKind.Compilation, cancellationToken);
         if (!evaluation.Succeeded)
             return new(Fallback, [$"{path}: implicit file-app evaluation failed; using latest-stable fallback. {evaluation.Diagnostic}"]);
         try
@@ -132,9 +186,8 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
 
     static ParseContextResolution ResolveOwned(string path, IReadOnlyList<ProjectContext> contexts)
     {
-        var failure = contexts.FirstOrDefault(context => context.Diagnostic is not null);
-        if (failure is not null)
-            return new(null, [$"{path}: project evaluation failed for {failure.Project}. {failure.Diagnostic}"]);
+        if (contexts.Any(context => context.Diagnostic is not null))
+            return new(null, [], Skipped: true);
         var selectedContexts = contexts.GroupBy(context => context.Project, PathComparer)
             .Select(group => group.Aggregate((left, right) => IsLower(right.Framework, left.Framework) ? right : left))
             .ToArray();

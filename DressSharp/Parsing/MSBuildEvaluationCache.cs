@@ -38,16 +38,17 @@ sealed class MSBuildEvaluationCache(IMSBuildEvaluator inner) : IMSBuildEvaluator
         string target,
         string configuration,
         string? targetFramework,
+        MSBuildEvaluationKind kind,
         CancellationToken cancellationToken)
     {
         if (!Enabled)
-            return await inner.EvaluateAsync(target, configuration, targetFramework, cancellationToken);
+            return await inner.EvaluateAsync(target, configuration, targetFramework, kind, cancellationToken);
 
-        var path = EntryPath(target, configuration, targetFramework);
+        var path = EntryPath(target, configuration, targetFramework, kind);
         if (Read(path) is { } cached)
             return cached;
 
-        var evaluation = await inner.EvaluateAsync(target, configuration, targetFramework, cancellationToken);
+        var evaluation = await inner.EvaluateAsync(target, configuration, targetFramework, kind, cancellationToken);
 
         // A failed evaluation usually means something the user is about to fix, so it is not worth
         // remembering, and remembering it would hide the fix until an input file happened to change.
@@ -98,14 +99,14 @@ sealed class MSBuildEvaluationCache(IMSBuildEvaluator inner) : IMSBuildEvaluator
         }
     }
 
-    static string? EntryPath(string target, string configuration, string? targetFramework)
+    static string? EntryPath(string target, string configuration, string? targetFramework, MSBuildEvaluationKind kind)
     {
         try
         {
             var root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             return string.IsNullOrEmpty(root)
                 ? null
-                : Path.Combine(root, "DressSharp", "msbuild", $"{Fingerprint(target, configuration, targetFramework)}.json");
+                : Path.Combine(root, "DressSharp", "msbuild", $"{Fingerprint(target, configuration, targetFramework, kind)}.json");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -113,13 +114,14 @@ sealed class MSBuildEvaluationCache(IMSBuildEvaluator inner) : IMSBuildEvaluator
         }
     }
 
-    static string Fingerprint(string target, string configuration, string? targetFramework)
+    static string Fingerprint(string target, string configuration, string? targetFramework, MSBuildEvaluationKind kind)
     {
         var builder = new StringBuilder();
         builder.Append(typeof(MSBuildEvaluationCache).Assembly.GetName().Version)
             .Append(Separator).Append(target)
             .Append(Separator).Append(configuration)
-            .Append(Separator).Append(targetFramework);
+            .Append(Separator).Append(targetFramework)
+            .Append(Separator).Append(kind);
 
         foreach (var input in Inputs(target))
         {

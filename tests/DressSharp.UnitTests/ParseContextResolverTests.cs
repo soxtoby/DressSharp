@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using EasyAssertions;
+using Kind = DressSharp.Parsing.MSBuildEvaluationKind;
 
 namespace DressSharp.UnitTests;
 
@@ -17,9 +18,9 @@ public sealed class ParseContextResolverTests : IDisposable
         var project = File("App.csproj");
         var evaluator = new FakeEvaluator
             {
-                [project, null] = Success(("TargetFrameworks", "net9.0;net8.0")),
-                [project, "net9.0"] = Success(file, ("TargetFramework", "net9.0"), ("LangVersion", "13"), ("DefineConstants", "NET9;DEBUG")),
-                [project, "net8.0"] = Success(file, ("TargetFramework", "net8.0"), ("LangVersion", "12"), ("DefineConstants", "NET8;DEBUG")),
+                [project, null, Kind.Declaration] = Success(("TargetFrameworks", "net9.0;net8.0"), ("TargetFramework", "")),
+                [project, "net9.0", Kind.Compilation] = Success(file, ("TargetFramework", "net9.0"), ("LangVersion", "13"), ("DefineConstants", "NET9;DEBUG")),
+                [project, "net8.0", Kind.Compilation] = Success(file, ("TargetFramework", "net8.0"), ("LangVersion", "12"), ("DefineConstants", "NET8;DEBUG")),
             };
 
         var result = await Resolve(evaluator, file, "Release");
@@ -30,6 +31,46 @@ public sealed class ParseContextResolverTests : IDisposable
     }
 
     [Fact]
+    public async Task Single_target_project_compiles_the_framework_it_declares()
+    {
+        var file = File("Program.cs");
+        var project = File("App.csproj");
+        var evaluator = new FakeEvaluator
+            {
+                [project, null, Kind.Declaration] = Success(file, ("TargetFramework", "net10.0"), ("DefineConstants", "DEBUG")),
+                [project, "net10.0", Kind.Compilation] = Success(
+                    file,
+                    ("TargetFramework", "net10.0"),
+                    ("LangVersion", "latest"),
+                    ("DefineConstants", "DEBUG;NET10_0")),
+            };
+
+        var result = await Resolve(evaluator, file);
+
+        result.CanFormat.ShouldBe(true);
+        result.Options!.PreprocessorSymbolNames.ShouldContain("NET10_0");
+        evaluator.Requests.ShouldMatch([Request(project, null, Kind.Declaration), Request(project, "net10.0", Kind.Compilation)]);
+    }
+
+    [Fact]
+    public async Task Project_without_a_framework_compiles_with_what_it_declares()
+    {
+        var file = File("Program.cs");
+        var project = File("Legacy.csproj");
+        var evaluator = new FakeEvaluator
+            {
+                [project, null, Kind.Declaration] = Success(file, ("LangVersion", "7.3"), ("DefineConstants", "DEBUG;TRACE")),
+            };
+
+        var result = await Resolve(evaluator, file);
+
+        result.CanFormat.ShouldBe(true);
+        result.Options!.LanguageVersion.ShouldBe(LanguageVersion.CSharp7_3);
+        result.Options.PreprocessorSymbolNames.ShouldContain("TRACE");
+        evaluator.Requests.ShouldMatch([Request(project, null, Kind.Declaration)]);
+    }
+
+    [Fact]
     public async Task Differing_shared_file_contexts_are_skipped()
     {
         var file = File("Shared.cs");
@@ -37,13 +78,16 @@ public sealed class ParseContextResolverTests : IDisposable
         var second = File("Second.csproj");
         var evaluator = new FakeEvaluator
             {
-                [first, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "FIRST")),
-                [second, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "SECOND")),
+                [first, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
+                [first, "net10.0", Kind.Compilation] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "FIRST")),
+                [second, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
+                [second, "net10.0", Kind.Compilation] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "SECOND")),
             };
 
         var result = await Resolve(evaluator, file);
 
         result.CanFormat.ShouldBe(false);
+        result.Skipped.ShouldBe(false);
         result.Diagnostics.Single().ShouldContain("differing parse contexts");
     }
 
@@ -69,14 +113,16 @@ public sealed class ParseContextResolverTests : IDisposable
         File("other/Other.csproj");
         var evaluator = new FakeEvaluator
             {
-                [project, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest")),
-                [outer, null] = Success(("TargetFramework", "net10.0"), ("LangVersion", "latest")),
+                [project, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
+                [project, "net10.0", Kind.Compilation] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest")),
+                [outer, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
+                [outer, "net10.0", Kind.Compilation] = Success(("TargetFramework", "net10.0"), ("LangVersion", "latest")),
             };
 
         var result = await Resolve(evaluator, file);
 
         result.CanFormat.ShouldBe(true);
-        evaluator.Targets.ShouldMatch([outer, project]);
+        evaluator.Requests.Select(request => request.Target).Distinct().ShouldMatch([outer, project]);
     }
 
     [Fact]
@@ -86,7 +132,8 @@ public sealed class ParseContextResolverTests : IDisposable
         var project = File("src/App/App.csproj");
         var evaluator = new FakeEvaluator
             {
-                [project, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "LINKED")),
+                [project, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
+                [project, "net10.0", Kind.Compilation] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "LINKED")),
             };
 
         var result = await Resolve(evaluator, file);
@@ -96,23 +143,69 @@ public sealed class ParseContextResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task Failed_owned_project_is_skipped()
+    public async Task Failed_project_is_reported_once_and_its_files_are_skipped()
+    {
+        var first = File("Program.cs");
+        var second = File("Nested/Other.cs");
+        var project = File("App.csproj");
+        var evaluator = new FakeEvaluator { [project, null, Kind.Declaration] = Failure("broken import") };
+
+        var resolved = await new ParseContextResolver(root, evaluator).Resolve([first, second], null, TestContext.Current.CancellationToken);
+
+        foreach (var path in new[] { first, second })
+        {
+            resolved.Files[path].CanFormat.ShouldBe(false);
+            resolved.Files[path].Skipped.ShouldBe(true);
+            resolved.Files[path].Diagnostics.ShouldBeEmpty();
+        }
+        resolved.Warnings.Single().ShouldBe($"skipping 2 files in {project}: project evaluation failed. broken import");
+    }
+
+    [Fact]
+    public async Task Failed_framework_skips_the_project_without_compiling_the_rest()
     {
         var file = File("Program.cs");
         var project = File("App.csproj");
-        var evaluator = new FakeEvaluator { [project, null] = Failure("broken import") };
+        var evaluator = new FakeEvaluator
+            {
+                [project, null, Kind.Declaration] = Success(("TargetFrameworks", "net9.0;net8.0")),
+                [project, "net9.0", Kind.Compilation] = Failure("missing workload"),
+                [project, "net8.0", Kind.Compilation] = Success(file, ("TargetFramework", "net8.0"), ("LangVersion", "12")),
+            };
 
-        var result = await Resolve(evaluator, file);
+        var resolved = await new ParseContextResolver(root, evaluator).Resolve([file], null, TestContext.Current.CancellationToken);
 
-        result.CanFormat.ShouldBe(false);
-        result.Diagnostics.Single().ShouldContain("broken import");
+        resolved.Files[file].Skipped.ShouldBe(true);
+        resolved.Warnings.Single().ShouldBe($"skipping 1 file in {project}: project evaluation failed. missing workload");
+        evaluator.Requests.ShouldMatch([Request(project, null, Kind.Declaration), Request(project, "net9.0", Kind.Compilation)]);
+    }
+
+    [Fact]
+    public async Task Failed_project_that_owns_no_selected_file_is_not_reported()
+    {
+        var file = File("src/App/Program.cs");
+        var project = File("src/App/App.csproj");
+        var other = File("other/Other.csproj");
+        var evaluator = new FakeEvaluator
+            {
+                [project, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
+                [project, "net10.0", Kind.Compilation] = Success(("TargetFramework", "net10.0"), ("LangVersion", "latest")),
+                [other, null, Kind.Declaration] = Failure("broken import"),
+                [file, null, Kind.Compilation] = Success(("TargetFramework", "net10.0"), ("LangVersion", "latest")),
+            };
+
+        var resolved = await new ParseContextResolver(root, evaluator).Resolve([file], null, TestContext.Current.CancellationToken);
+
+        resolved.Warnings.ShouldBeEmpty();
+        resolved.Files[file].CanFormat.ShouldBe(true);
+        evaluator.Requests.Select(request => request.Target).ShouldContain(other);
     }
 
     [Fact]
     public async Task Failed_file_app_uses_reported_latest_stable_fallback()
     {
         var file = File("Program.cs");
-        var evaluator = new FakeEvaluator { [file, null] = Failure("SDK unavailable") };
+        var evaluator = new FakeEvaluator { [file, null, Kind.Compilation] = Failure("SDK unavailable") };
 
         var result = await Resolve(evaluator, file);
 
@@ -124,19 +217,21 @@ public sealed class ParseContextResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task Unsupported_owned_language_version_skips_file()
+    public async Task Unsupported_owned_language_version_skips_the_project()
     {
         var file = File("Program.cs");
         var project = File("App.csproj");
         var evaluator = new FakeEvaluator
             {
-                [project, null] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "999")),
+                [project, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
+                [project, "net10.0", Kind.Compilation] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "999")),
             };
 
-        var result = await Resolve(evaluator, file);
+        var resolved = await new ParseContextResolver(root, evaluator).Resolve([file], null, TestContext.Current.CancellationToken);
 
-        result.CanFormat.ShouldBe(false);
-        result.Diagnostics.Single().ShouldContain("Language version");
+        resolved.Files[file].CanFormat.ShouldBe(false);
+        resolved.Files[file].Skipped.ShouldBe(true);
+        resolved.Warnings.Single().ShouldStartWith($"skipping 1 file in {project}: Language version");
     }
 
     [Fact]
@@ -150,17 +245,35 @@ public sealed class ParseContextResolverTests : IDisposable
 
         var results = await new ParseContextResolver(projectRoot).Resolve([file], null, TestContext.Current.CancellationToken);
 
-        results[file].CanFormat.ShouldBe(true, string.Join(Environment.NewLine, results[file].Diagnostics));
-        var options = results[file].Options.ShouldBeA<CSharpParseOptions>().And;
+        results.Files[file].CanFormat.ShouldBe(true, string.Join(Environment.NewLine, results.Files[file].Diagnostics));
+        var options = results.Files[file].Options.ShouldBeA<CSharpParseOptions>().And;
         options.PreprocessorSymbolNames.ShouldContain("NET10_0");
         options.PreprocessorSymbolNames.ShouldContain("DEBUG");
         options.Kind.ShouldBe(SourceCodeKind.Regular);
     }
 
+    [Fact]
+    public async Task Dotnet_evaluation_reads_each_framework_of_a_multi_targeting_project()
+    {
+        var file = File("Program.cs");
+        var project = File("App.csproj");
+        System.IO.File.WriteAllText(
+            project,
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFrameworks>net10.0;net9.0</TargetFrameworks></PropertyGroup></Project>");
+
+        var results = await new ParseContextResolver(root, new DotNetMSBuildEvaluator()).Resolve([file], null, TestContext.Current.CancellationToken);
+
+        results.Warnings.ShouldBeEmpty();
+        results.Files[file].CanFormat.ShouldBe(true);
+        var options = results.Files[file].Options.ShouldBeA<CSharpParseOptions>().And;
+        options.PreprocessorSymbolNames.ShouldContain("NET9_0");
+        options.PreprocessorSymbolNames.ShouldNotContain("NET10_0");
+    }
+
     async Task<DressSharp.Architecture.ParseContextResolution> Resolve(FakeEvaluator evaluator, string file, string? configuration = null)
     {
         var results = await new ParseContextResolver(root, evaluator).Resolve([file], configuration, TestContext.Current.CancellationToken);
-        return results[file];
+        return results.Files[file];
     }
 
     string File(string name)
@@ -179,6 +292,8 @@ public sealed class ParseContextResolverTests : IDisposable
 
     static MSBuildEvaluation Failure(string diagnostic) => new(false, new Dictionary<string, string>(), [], diagnostic);
 
+    static (string Target, string? Framework, Kind Kind) Request(string target, string? framework, Kind kind) => (target, framework, kind);
+
     public void Dispose()
     {
         if (Directory.Exists(root))
@@ -188,23 +303,30 @@ public sealed class ParseContextResolverTests : IDisposable
 
     sealed class FakeEvaluator : IMSBuildEvaluator
     {
-        readonly Dictionary<(string Target, string? Framework), MSBuildEvaluation> evaluations = new();
+        readonly Dictionary<(string Target, string? Framework, Kind Kind), MSBuildEvaluation> evaluations = new();
 
         internal List<string> Configurations { get; } = [];
 
-        internal List<string> Targets { get; } = [];
+        internal List<(string Target, string? Framework, Kind Kind)> Requests { get; } = [];
 
-        internal MSBuildEvaluation this[string target, string? framework]
+        internal MSBuildEvaluation this[string target, string? framework, Kind kind]
         {
-            set => evaluations[(target, framework)] = value;
+            set => evaluations[(target, framework, kind)] = value;
         }
 
-        public ValueTask<MSBuildEvaluation> EvaluateAsync(string target, string configuration, string? targetFramework, CancellationToken cancellationToken)
+        public ValueTask<MSBuildEvaluation> EvaluateAsync(
+            string target,
+            string configuration,
+            string? targetFramework,
+            Kind kind,
+            CancellationToken cancellationToken)
         {
-            Configurations.Add(configuration);
-            lock (Targets)
-                Targets.Add(target);
-            return ValueTask.FromResult(evaluations[(target, targetFramework)]);
+            lock (Requests)
+            {
+                Configurations.Add(configuration);
+                Requests.Add((target, targetFramework, kind));
+            }
+            return ValueTask.FromResult(evaluations[(target, targetFramework, kind)]);
         }
     }
 
@@ -220,6 +342,7 @@ public sealed class ParseContextResolverTests : IDisposable
             string target,
             string configuration,
             string? targetFramework,
+            Kind kind,
             CancellationToken cancellationToken
         ) {
             var concurrency = Interlocked.Increment(ref _active);

@@ -195,6 +195,34 @@ public sealed class FormatExecutionTests : IDisposable
     }
 
     [Fact]
+    public async Task Unreadable_project_is_reported_once_and_its_files_are_skipped()
+    {
+        const string source = "class C { void M(int a,int b) { } }";
+        var broken = Path.Combine(_directory, "Broken", "Broken.csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(broken)!);
+        await File.WriteAllTextAsync(broken, "<Project Sdk=\"Microsoft.NET.Sdk\"><Import Project=\"Missing.props\" /></Project>", Token);
+        var readable = Source(source);
+        var first = Source(source, Path.Combine("Broken", "First.cs"));
+        var second = Source(source, Path.Combine("Broken", "Second.cs"));
+
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var exitCode = await new FormatExecutor(_directory, output, error).Run(
+            new(CommandKind.Format, [], false, null),
+            [new(readable, "Program.cs"), new(first, "Broken/First.cs"), new(second, "Broken/Second.cs")],
+            Token);
+
+        exitCode.ShouldBe(0);
+        output.ToString().ShouldMatch($"^Formatted 1 of 1 file in [0-9]+\\.[0-9]{{2}} s\\.{Environment.NewLine}$");
+        var warnings = error.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        warnings.Single().ShouldStartWith($"warning: skipping 2 files in {broken}: project evaluation failed. ");
+        warnings.Single().ShouldContain("MSB4019");
+        (await File.ReadAllTextAsync(readable, Token)).ShouldNotBe(source);
+        (await File.ReadAllTextAsync(first, Token)).ShouldBe(source);
+        (await File.ReadAllTextAsync(second, Token)).ShouldBe(source);
+    }
+
+    [Fact]
     public async Task No_preferences_explain_how_to_initialize_editorconfig()
     {
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "root = true\n", Token);

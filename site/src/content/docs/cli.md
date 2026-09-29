@@ -35,7 +35,7 @@ description: Every dotnet dress command and option, which files it selects, and 
 
 Without `--include`, DressSharp selects every `.cs` file in the current directory and below. Inside a Git repository it skips anything Git ignores, the same way `git status` does. Generated files, `.csx` scripts, and symbolic links are always skipped.
 
-DressSharp reads each file's project to learn its C# language version and preprocessor symbols, so code in `#if` blocks is handled the way the compiler sees it. A project set to a C# version DressSharp doesn't understand stops the run before anything is written.
+DressSharp reads each file's project to learn its C# language version and preprocessor symbols, so code in `#if` blocks is handled the way the compiler sees it. A project that targets several frameworks is read once per framework. When a project can't be read, or is set to a C# version DressSharp doesn't understand, DressSharp says so once on standard error, leaves that project's files as they are, and carries on with the rest.
 
 ## How files are written
 

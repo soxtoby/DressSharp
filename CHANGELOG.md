@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+- A project that can't be read is reported once, and its files are skipped, instead of failing the run with one error per file.
+
+### Fixed
+- Projects that target several frameworks failed to evaluate with `error MSB4057: The target "AddImplicitDefineConstants" does not exist in the project`. Each framework is now read on its own, and a project that names no framework is read as it is declared.
+
 ## v0.1.0
 
 ### Added

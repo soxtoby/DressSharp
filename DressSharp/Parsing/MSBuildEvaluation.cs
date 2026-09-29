@@ -3,12 +3,30 @@ using System.Text.Json;
 
 namespace DressSharp.Parsing;
 
+/// <summary>What an evaluation asks MSBuild for.</summary>
+enum MSBuildEvaluationKind
+{
+    /// <summary>
+    /// The properties and items as the project declares them, with no target run. Every project
+    /// answers: the outer build of one that targets several frameworks, which has no framework of
+    /// its own, and a project outside the SDK, which names none.
+    /// </summary>
+    Declaration,
+
+    /// <summary>
+    /// The properties and items as the compiler sees them, after the SDK's target has added the
+    /// framework's implicit preprocessor symbols. Only the build of one framework has that target.
+    /// </summary>
+    Compilation,
+}
+
 interface IMSBuildEvaluator
 {
     ValueTask<MSBuildEvaluation> EvaluateAsync(
         string target,
         string configuration,
         string? targetFramework,
+        MSBuildEvaluationKind kind,
         CancellationToken cancellationToken);
 }
 
@@ -28,22 +46,34 @@ sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
         string target,
         string configuration,
         string? targetFramework,
+        MSBuildEvaluationKind kind,
         CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo("dotnet")
             {
                 WorkingDirectory = Path.GetDirectoryName(target)!,
             };
-        startInfo.ArgumentList.Add("build");
-        startInfo.ArgumentList.Add(target);
-        startInfo.ArgumentList.Add("--nologo");
-        startInfo.ArgumentList.Add("--no-restore");
-        startInfo.ArgumentList.Add("--target:AddImplicitDefineConstants");
-        startInfo.ArgumentList.Add($"--property:Configuration={configuration}");
+        if (kind == MSBuildEvaluationKind.Compilation)
+        {
+            // Only `build` accepts a file-based app, which it wraps in a project of its own.
+            startInfo.ArgumentList.Add("build");
+            startInfo.ArgumentList.Add(target);
+            startInfo.ArgumentList.Add("--nologo");
+            startInfo.ArgumentList.Add("--no-restore");
+            startInfo.ArgumentList.Add("--target:AddImplicitDefineConstants");
+        }
+        else
+        {
+            // With no target named, MSBuild evaluates the project and builds nothing.
+            startInfo.ArgumentList.Add("msbuild");
+            startInfo.ArgumentList.Add(target);
+            startInfo.ArgumentList.Add("-nologo");
+        }
+        startInfo.ArgumentList.Add($"-property:Configuration={configuration}");
         if (targetFramework is not null)
-            startInfo.ArgumentList.Add($"--property:TargetFramework={targetFramework}");
-        startInfo.ArgumentList.Add($"--getProperty:{string.Join(',', PropertyNames)}");
-        startInfo.ArgumentList.Add("--getItem:Compile");
+            startInfo.ArgumentList.Add($"-property:TargetFramework={targetFramework}");
+        startInfo.ArgumentList.Add($"-getProperty:{string.Join(',', PropertyNames)}");
+        startInfo.ArgumentList.Add("-getItem:Compile");
 
         var result = await ProcessRunner.TryRunAsync(startInfo, cancellationToken)
             ?? throw new InvalidOperationException("Could not start dotnet.");

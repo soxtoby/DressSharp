@@ -33,7 +33,11 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         timing.Wall = Stopwatch.GetElapsedTime(commandStart);
         await BenchmarkDiagnostics.WriteAsync(timing, cancellationToken);
         if (!failed)
-            await ReportFormatSummary(request, prepared.Count(result => result?.Changed == true), selected.Count, timing.Wall);
+        {
+            // A skipped file was reported with its project, and is not among the files this run took on.
+            var skipped = preparation.Contexts.Values.Count(context => context.Skipped);
+            await ReportFormatSummary(request, prepared.Count(result => result?.Changed == true), selected.Count - skipped, timing.Wall);
+        }
         return ExitCode(request, prepared, failed);
     }
 
@@ -74,8 +78,10 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         stageStart = Stopwatch.GetTimestamp();
         var contexts = await new ParseContextResolver(_invocationDirectory).Resolve(paths, request.BuildConfiguration, cancellationToken);
         timing.MsBuild = Stopwatch.GetElapsedTime(stageStart);
+        foreach (var warning in contexts.Warnings)
+            await _error.WriteLineAsync($"warning: {warning}");
 
-        return new(contexts, CreateFormatters(selected, configurations, timing));
+        return new(contexts.Files, CreateFormatters(selected, configurations, timing));
     }
 
     static DocumentFormatter[] CreateFormatters(
@@ -194,7 +200,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         }
 
         if (!context.CanFormat)
-            return false;
+            return context.Skipped;
 
         var result = prepared!;
         if (result.Failure is not null)
