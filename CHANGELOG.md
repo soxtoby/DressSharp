@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.0
+
 ### Changed
 - A project that can't be read is reported once, and its files are skipped, instead of failing the run with one error per file.
 - A file compiled under several frameworks or projects is formatted under each, so every `#if` region is formatted. Such files used to fail, or be formatted under the lowest framework only.
