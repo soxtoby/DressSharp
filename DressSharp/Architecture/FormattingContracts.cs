@@ -5,15 +5,21 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DressSharp.Architecture;
 
-/// <param name="Options">How to parse the file, or null when it is not formatted.</param>
+/// <param name="Contexts">
+/// Every distinct way the file is parsed, one per framework of each project that compiles it, in
+/// project and framework order. Empty when the file is not formatted.
+/// </param>
 /// <param name="Diagnostics">What kept the file from being formatted, or is worth saying about how it will be.</param>
 /// <param name="Skipped">
 /// Whether the file is left alone because a project it may belong to could not be read. The project is
 /// reported once, for all of its files, so the file carries no diagnostic and does not fail the run.
 /// </param>
-sealed record ParseContextResolution(CSharpParseOptions? Options, IReadOnlyList<string> Diagnostics, bool Skipped = false)
+sealed record ParseContextResolution(IReadOnlyList<CSharpParseOptions> Contexts, IReadOnlyList<string> Diagnostics, bool Skipped = false)
 {
-    internal bool CanFormat => Options is not null;
+    internal bool CanFormat => Contexts.Count > 0;
+
+    /// <summary>The first context, for a caller that needs only one.</summary>
+    internal CSharpParseOptions? Options => Contexts.Count > 0 ? Contexts[0] : null;
 }
 
 /// <param name="Files">The resolution of each selected file, by full path.</param>

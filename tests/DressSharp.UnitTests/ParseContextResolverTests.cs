@@ -12,7 +12,7 @@ public sealed class ParseContextResolverTests : IDisposable
     readonly string root = Path.Combine(Path.GetTempPath(), $"DressSharp-{Guid.NewGuid():N}");
 
     [Fact]
-    public async Task Lowest_target_context_wins_and_configuration_is_forwarded()
+    public async Task Every_framework_is_a_context_in_framework_order_and_configuration_is_forwarded()
     {
         var file = File("Program.cs");
         var project = File("App.csproj");
@@ -25,8 +25,10 @@ public sealed class ParseContextResolverTests : IDisposable
 
         var result = await Resolve(evaluator, file, "Release");
 
-        result.Options!.LanguageVersion.ShouldBe(LanguageVersion.CSharp12);
-        result.Options.PreprocessorSymbolNames.ShouldContain("NET8");
+        result.Contexts.Select(context => context.LanguageVersion).ShouldMatch([LanguageVersion.CSharp12, LanguageVersion.CSharp13]);
+        result.Contexts[0].PreprocessorSymbolNames.ShouldContain("NET8");
+        result.Contexts[1].PreprocessorSymbolNames.ShouldContain("NET9");
+        result.Diagnostics.Single().ShouldContain("parsed 2 ways");
         evaluator.Configurations.AllItemsSatisfy(value => value.ShouldBe("Release"));
     }
 
@@ -71,24 +73,27 @@ public sealed class ParseContextResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task Differing_shared_file_contexts_are_skipped()
+    public async Task Shared_file_keeps_each_distinct_context_in_project_order()
     {
         var file = File("Shared.cs");
         var first = File("First.csproj");
         var second = File("Second.csproj");
+        var third = File("Third.csproj");
         var evaluator = new FakeEvaluator
             {
                 [first, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
                 [first, "net10.0", Kind.Compilation] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "FIRST")),
                 [second, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
                 [second, "net10.0", Kind.Compilation] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "SECOND")),
+                [third, null, Kind.Declaration] = Success(("TargetFramework", "net10.0")),
+                [third, "net10.0", Kind.Compilation] = Success(file, ("TargetFramework", "net10.0"), ("LangVersion", "latest"), ("DefineConstants", "FIRST")),
             };
 
         var result = await Resolve(evaluator, file);
 
-        result.CanFormat.ShouldBe(false);
-        result.Skipped.ShouldBe(false);
-        result.Diagnostics.Single().ShouldContain("differing parse contexts");
+        result.CanFormat.ShouldBe(true);
+        result.Contexts.Select(context => context.PreprocessorSymbolNames.Single()).ShouldMatch(["FIRST", "SECOND"]);
+        result.Diagnostics.Single().ShouldBe($"{file}: parsed 2 ways by the projects that compile it.");
     }
 
     [Fact]
@@ -264,10 +269,10 @@ public sealed class ParseContextResolverTests : IDisposable
         var results = await new ParseContextResolver(root, new DotNetMSBuildEvaluator()).Resolve([file], null, TestContext.Current.CancellationToken);
 
         results.Warnings.ShouldBeEmpty();
-        results.Files[file].CanFormat.ShouldBe(true);
-        var options = results.Files[file].Options.ShouldBeA<CSharpParseOptions>().And;
-        options.PreprocessorSymbolNames.ShouldContain("NET9_0");
-        options.PreprocessorSymbolNames.ShouldNotContain("NET10_0");
+        results.Files[file].Contexts.Count.ShouldBe(2);
+        results.Files[file].Contexts[0].PreprocessorSymbolNames.ShouldContain("NET10_0");
+        results.Files[file].Contexts[1].PreprocessorSymbolNames.ShouldContain("NET9_0");
+        results.Files[file].Contexts[1].PreprocessorSymbolNames.ShouldNotContain("NET10_0");
     }
 
     async Task<DressSharp.Architecture.ParseContextResolution> Resolve(FakeEvaluator evaluator, string file, string? configuration = null)

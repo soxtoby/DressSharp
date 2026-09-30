@@ -45,6 +45,44 @@ public class DocumentFormatterTests
             TestContext.Current.CancellationToken);
     }
 
+    [Fact]
+    public async Task Each_context_formats_the_region_it_enables()
+    {
+        var formatter = new DocumentFormatter(new(new Dictionary<RuleKey, string> { [RuleKey.CSharpSpaceAfterComma] = "true" }), new BenchmarkTiming());
+        const string source = "#if A\nclass A { void M(int a,int b) { } }\n#else\nclass B { void M(int a,int b) { } }\n#endif\n";
+        const string expected = "#if A\nclass A { void M(int a, int b) { } }\n#else\nclass B { void M(int a, int b) { } }\n#endif\n";
+        var contexts = new[] { CSharpParseOptions.Default.WithPreprocessorSymbols("A"), CSharpParseOptions.Default };
+
+        var result = await formatter.Format(SourceDocument.FromText("test.cs", source), contexts, TestContext.Current.CancellationToken);
+
+        result.ContextsDisagree.ShouldBe(false);
+        SourceDocument.Decode(result.Content, result.Encoding).ShouldBe(expected);
+        var repeated = await formatter.Format(SourceDocument.FromText("test.cs", expected), contexts, TestContext.Current.CancellationToken);
+        SourceDocument.Decode(repeated.Content, repeated.Encoding).ShouldBe(expected);
+    }
+
+    [Fact]
+    public async Task Contexts_settle_a_member_that_spans_a_directive()
+    {
+        var preferences = new Dictionary<RuleKey, string>
+            {
+                [RuleKey.IndentStyle] = "space",
+                [RuleKey.IndentSize] = "4",
+                [RuleKey.CSharpIndentBlockContents] = "true",
+                [RuleKey.CSharpNewLineBeforeOpenBrace] = "all",
+            };
+        var formatter = new DocumentFormatter(new(preferences), new BenchmarkTiming());
+        // Each context sees a different method header over the same body, and moves only its own brace.
+        const string source = "class C\n{\n#if A\n    void M() {\n#else\n    void N() {\n#endif\n    int x = 1; }\n}\n";
+        const string expected = "class C\n{\n#if A\n    void M()\n    {\n#else\n    void N()\n    {\n#endif\n    int x = 1; }\n}\n";
+        var contexts = new[] { CSharpParseOptions.Default.WithPreprocessorSymbols("A"), CSharpParseOptions.Default };
+
+        var result = await formatter.Format(SourceDocument.FromText("test.cs", source), contexts, TestContext.Current.CancellationToken);
+
+        result.ContextsDisagree.ShouldBe(false);
+        SourceDocument.Decode(result.Content, result.Encoding).ShouldBe(expected);
+    }
+
     [Theory]
     [InlineData("class C { void M() { var x = new Options { Callback = () => { if (a) Work(); }, Name = \"n\" }; } }")]
     [InlineData("class C { object M(int[] xs) { var q = from x in xs where x > 0 select x; return q; } }")]

@@ -34,11 +34,49 @@ sealed class DocumentFormatter
         _representation = Representation(configuration);
     }
 
-    internal async ValueTask<FormattedDocument> Format(SourceDocument document, CSharpParseOptions options, CancellationToken cancellationToken)
+    internal ValueTask<FormattedDocument> Format(SourceDocument document, CSharpParseOptions options, CancellationToken cancellationToken) =>
+        Format(document, [options], cancellationToken);
+
+    /// <summary>
+    /// Formats a file under each way it is parsed, so that a region one context disables is formatted
+    /// by another that enables it.
+    /// </summary>
+    /// <remarks>
+    /// Each context leaves what it cannot see, so the contexts are applied in turn, and the earlier
+    /// ones are then applied again to confirm they leave the later ones' work alone. Contexts that
+    /// disagree would move the same lines back and forth on every run, so the file is returned as it
+    /// was, marked so. A file without directives reads the same under every set of symbols, so only
+    /// contexts that parse different C# are applied to it.
+    /// </remarks>
+    internal async ValueTask<FormattedDocument> Format(SourceDocument document, IReadOnlyList<CSharpParseOptions> contexts, CancellationToken cancellationToken)
     {
-        var root = await Parse(document, options, cancellationToken);
-        var transformed = Transform(root, document.Text, options, cancellationToken);
-        return new(Encode(document, transformed.Text), transformed.SkippedOccurrences, _representation.Encoding ?? document.SourceEncoding);
+        var text = document.Text;
+        var root = await Parse(document.Path, text, contexts[0], cancellationToken);
+        var transformed = Transform(root, text, contexts[0], cancellationToken);
+        var skipped = transformed.SkippedOccurrences;
+        text = transformed.Text;
+        var applied = root.ContainsDirectives
+            ? contexts
+            : contexts.DistinctBy(context => (context.LanguageVersion, context.Kind, context.DocumentationMode)).ToArray();
+        for (var index = 1; index < applied.Count; index++)
+        {
+            transformed = await FormatText(document.Path, text, applied[index], cancellationToken);
+            skipped = Math.Min(skipped, transformed.SkippedOccurrences);
+            text = transformed.Text;
+        }
+        for (var index = 0; index < applied.Count - 1; index++)
+        {
+            transformed = await FormatText(document.Path, text, applied[index], cancellationToken);
+            if (transformed.Text != text)
+                return new(document.OriginalBytes, skipped, document.SourceEncoding, ContextsDisagree: true);
+        }
+        return new(Encode(document, text), skipped, _representation.Encoding ?? document.SourceEncoding);
+    }
+
+    async ValueTask<TransformedDocument> FormatText(string path, string text, CSharpParseOptions options, CancellationToken cancellationToken)
+    {
+        var root = await Parse(path, text, options, cancellationToken);
+        return Transform(root, text, options, cancellationToken);
     }
 
     internal string FormatSyntax(
@@ -49,12 +87,13 @@ sealed class DocumentFormatter
         Transform(root, source, options, cancellationToken).Text;
 
     async ValueTask<SyntaxNode> Parse(
-        SourceDocument document,
+        string path,
+        string text,
         CSharpParseOptions options,
         CancellationToken cancellationToken)
     {
         var parseStart = Stopwatch.GetTimestamp();
-        var tree = CSharpSyntaxTree.ParseText(document.Text, options, document.Path, cancellationToken: cancellationToken);
+        var tree = CSharpSyntaxTree.ParseText(text, options, path, cancellationToken: cancellationToken);
         var root = await tree.GetRootAsync(cancellationToken);
         _timing.AddParse(Stopwatch.GetElapsedTime(parseStart));
         return root;
@@ -203,4 +242,8 @@ sealed record TransformedDocument(string Text, int SkippedOccurrences);
 
 sealed record EmittedDocument(string Text, int SkippedOccurrences);
 
-sealed record FormattedDocument(ReadOnlyMemory<byte> Content, int SkippedOccurrences, SourceEncoding Encoding);
+/// <param name="ContextsDisagree">
+/// Whether the ways the file is parsed could not settle on one layout, in which case the content is
+/// the file as it was.
+/// </param>
+sealed record FormattedDocument(ReadOnlyMemory<byte> Content, int SkippedOccurrences, SourceEncoding Encoding, bool ContextsDisagree = false);

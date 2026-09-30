@@ -30,7 +30,11 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
             await EvaluateAsync(remaining, configuration ?? "Debug", contexts, cancellationToken);
         }
         foreach (var projectContexts in contexts.Values)
-            projectContexts.Sort((left, right) => PathComparer.Compare(left.Project, right.Project));
+        {
+            projectContexts.Sort((left, right) => PathComparer.Compare(left.Project, right.Project) is var byProject && byProject != 0
+                ? byProject
+                : string.CompareOrdinal(left.Framework, right.Framework));
+        }
 
         var results = new Dictionary<string, ParseContextResolution>(PathComparer);
         foreach (var path in selected)
@@ -173,27 +177,27 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
     {
         var evaluation = await _evaluator.EvaluateAsync(path, configuration, null, MSBuildEvaluationKind.Compilation, cancellationToken);
         if (!evaluation.Succeeded)
-            return new(Fallback, [$"{path}: implicit file-app evaluation failed; using latest-stable fallback. {evaluation.Diagnostic}"]);
+            return new([Fallback], [$"{path}: implicit file-app evaluation failed; using latest-stable fallback. {evaluation.Diagnostic}"]);
         try
         {
-            return new(CreateOptions(evaluation.Properties), []);
+            return new([CreateOptions(evaluation.Properties)], []);
         }
         catch (UnsupportedLanguageVersionException exception)
         {
-            return new(null, [$"{path}: {exception.Message}"]);
+            return new([], [$"{path}: {exception.Message}"]);
         }
     }
 
+    /// <remarks>
+    /// A file compiled by several projects, or by several frameworks of one, is parsed each way it
+    /// is compiled, so that every region a directive enables somewhere is formatted somewhere.
+    /// </remarks>
     static ParseContextResolution ResolveOwned(string path, IReadOnlyList<ProjectContext> contexts)
     {
         if (contexts.Any(context => context.Diagnostic is not null))
-            return new(null, [], Skipped: true);
-        var selectedContexts = contexts.GroupBy(context => context.Project, PathComparer)
-            .Select(group => group.Aggregate((left, right) => IsLower(right.Framework, left.Framework) ? right : left))
-            .ToArray();
-        if (selectedContexts.Select(context => context.Options!).Distinct(ParseOptionsComparer.Instance).Skip(1).Any())
-            return new(null, [$"{path}: owning projects provide differing parse contexts."]);
-        return new(selectedContexts[0].Options, []);
+            return new([], [], Skipped: true);
+        var options = contexts.Select(context => context.Options!).Distinct(ParseOptionsComparer.Instance).ToArray();
+        return new(options, options.Length > 1 ? [$"{path}: parsed {options.Length} ways by the projects that compile it."] : []);
     }
 
     static CSharpParseOptions CreateOptions(IReadOnlyDictionary<string, string> properties)
@@ -209,27 +213,6 @@ sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evalu
                 ? DocumentationMode.Diagnose
                 : DocumentationMode.Parse;
         return new(languageVersion, documentationMode: documentationMode, preprocessorSymbols: Split(properties.GetValueOrDefault("DefineConstants")));
-    }
-
-    static bool IsLower(string candidate, string current)
-    {
-        var candidateVersion = FrameworkVersion(candidate);
-        var currentVersion = FrameworkVersion(current);
-        return candidateVersion.Family == currentVersion.Family && candidateVersion.Version < currentVersion.Version;
-    }
-
-    static (string Family, Version Version) FrameworkVersion(string framework)
-    {
-        var separator = framework.IndexOf('-');
-        var portable = separator < 0 ? framework : framework[..separator];
-        var firstDigit = portable.IndexOfAny("0123456789".ToCharArray());
-        if (firstDigit < 0)
-            return (portable, new Version());
-        var family = portable[..firstDigit];
-        var versionText = portable[firstDigit..];
-        if (!versionText.Contains('.'))
-            versionText = string.Join('.', versionText.ToCharArray());
-        return (family, Version.TryParse(versionText, out var version) ? version : new Version());
     }
 
     static List<string> Split(string? value) =>

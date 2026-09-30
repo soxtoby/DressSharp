@@ -34,8 +34,10 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         await BenchmarkDiagnostics.WriteAsync(timing, cancellationToken);
         if (!failed)
         {
-            // A skipped file was reported with its project, and is not among the files this run took on.
-            var skipped = preparation.Contexts.Values.Count(context => context.Skipped);
+            // A skipped file was reported with its project, or on its own when its contexts disagreed,
+            // and is not among the files this run took on.
+            var skipped = preparation.Contexts.Values.Count(context => context.Skipped)
+                + prepared.Count(result => result?.ContextsDisagree == true);
             await ReportFormatSummary(request, prepared.Count(result => result?.Changed == true), selected.Count - skipped, timing.Wall);
         }
         return ExitCode(request, prepared, failed);
@@ -150,7 +152,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
             var readStart = Stopwatch.GetTimestamp();
             var document = await SourceDocument.ReadAsync(file.FullPath, cancellationToken);
             timing.AddRead(Stopwatch.GetElapsedTime(readStart));
-            var formatted = await formatter.Format(document, context.Options!, cancellationToken);
+            var formatted = await formatter.Format(document, context.Contexts, cancellationToken);
             return new(document, formatted);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -208,6 +210,11 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
             await _error.WriteLineAsync($"{file.DisplayPath}: {result.Failure.Message}");
             return false;
         }
+        if (result.ContextsDisagree)
+        {
+            await _error.WriteLineAsync($"warning: {file.DisplayPath}: the projects that compile it disagree about its layout, so it is left as it is.");
+            return true;
+        }
 
         if (request.Verbose && result.SkippedOccurrences > 0)
             await _error.WriteLineAsync($"{file.DisplayPath}: skipped {result.SkippedOccurrences} malformed occurrence(s).");
@@ -260,6 +267,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
             Document = document;
             Content = formatted.Content;
             SkippedOccurrences = formatted.SkippedOccurrences;
+            ContextsDisagree = formatted.ContextsDisagree;
         }
 
         internal PreparedFile(Exception failure) => Failure = failure;
@@ -268,6 +276,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         internal ReadOnlyMemory<byte> Content { get; }
         internal Exception? Failure { get; }
         internal int SkippedOccurrences { get; }
+        internal bool ContextsDisagree { get; }
         internal bool Changed => Failure is null && !Content.Span.SequenceEqual(Document!.OriginalBytes.Span);
     }
 }

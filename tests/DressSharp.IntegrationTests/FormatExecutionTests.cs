@@ -223,6 +223,30 @@ public sealed class FormatExecutionTests : IDisposable
     }
 
     [Fact]
+    public async Task Shared_file_is_formatted_under_each_project_that_compiles_it()
+    {
+        // The root project compiles everything beneath it, including the nested project's file, which
+        // that project compiles again with a symbol of its own.
+        var nested = Path.Combine(_directory, "Nested", "Nested.csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(nested)!);
+        await File.WriteAllTextAsync(
+            nested,
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><DefineConstants>NESTED</DefineConstants></PropertyGroup></Project>",
+            Token);
+        var path = Source(
+            "#if NESTED\nclass A { void M(int a,int b) { } }\n#else\nclass B { void M(int a,int b) { } }\n#endif\n",
+            Path.Combine("Nested", "Shared.cs"));
+
+        var (exitCode, output, error) = await Run(CommandKind.Format, path, verbose: true);
+
+        exitCode.ShouldBe(0);
+        output.ShouldStartWith($"Shared.cs{Environment.NewLine}Formatted 1 of 1 file in ");
+        ExactAssert.Text($"{path}: parsed 2 ways by the projects that compile it.{Environment.NewLine}", error);
+        (await File.ReadAllTextAsync(path, Token))
+            .ShouldBe("#if NESTED\nclass A { void M(int a, int b) { } }\n#else\nclass B { void M(int a, int b) { } }\n#endif\n");
+    }
+
+    [Fact]
     public async Task No_preferences_explain_how_to_initialize_editorconfig()
     {
         await File.WriteAllTextAsync(Path.Combine(_directory, ".editorconfig"), "root = true\n", Token);
