@@ -53,9 +53,11 @@ sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
             {
                 WorkingDirectory = Path.GetDirectoryName(target)!,
             };
-        if (kind == MSBuildEvaluationKind.Compilation)
+        if (kind == MSBuildEvaluationKind.Compilation && IsFileApp(target))
         {
-            // Only `build` accepts a file-based app, which it wraps in a project of its own.
+            // Only `build` accepts a file-based app, which it wraps in a project of its own. It is
+            // kept to that case: `build` also starts the SDK's background workload-manifest update,
+            // whose NuGet credential plugin can outlive the process while holding its pipes open.
             startInfo.ArgumentList.Add("build");
             startInfo.ArgumentList.Add(target);
             startInfo.ArgumentList.Add("--nologo");
@@ -64,10 +66,12 @@ sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
         }
         else
         {
-            // With no target named, MSBuild evaluates the project and builds nothing.
             startInfo.ArgumentList.Add("msbuild");
             startInfo.ArgumentList.Add(target);
             startInfo.ArgumentList.Add("-nologo");
+            // With no target named, MSBuild evaluates the project and builds nothing.
+            if (kind == MSBuildEvaluationKind.Compilation)
+                startInfo.ArgumentList.Add("-target:AddImplicitDefineConstants");
         }
         startInfo.ArgumentList.Add($"-property:Configuration={configuration}");
         if (targetFramework is not null)
@@ -97,6 +101,9 @@ sealed class DotNetMSBuildEvaluator : IMSBuildEvaluator
             return new(false, new Dictionary<string, string>(), [], $"MSBuild returned an unreadable evaluation: {exception.Message}");
         }
     }
+
+    static bool IsFileApp(string target) =>
+        Path.GetExtension(target).Equals(".cs", StringComparison.OrdinalIgnoreCase);
 
     static string FirstDiagnostic(string error, string output)
     {
