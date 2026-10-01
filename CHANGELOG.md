@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.1
+
 ### Fixed
 - Formatting could stall for 30 seconds per project, or hang, in a repository whose NuGet feed uses a credential provider.
 
