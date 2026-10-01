@@ -19,6 +19,7 @@ sealed class SyntaxWrappingRule(
             Description = $"Controls {kind}. Only whitespace owned by syntax wrapping changes."
                 + (kind is SyntaxWrappingKind.Arguments or SyntaxWrappingKind.Parameters or SyntaxWrappingKind.CollectionExpressions ? " Auto puts each item in a multiline list on its own line and keeps fitting single-line lists compact."
                     : kind == SyntaxWrappingKind.ConditionalExpressions ? " Wrapped branches indent one level beyond the deepest formatted line of a multiline condition."
+                    : kind == SyntaxWrappingKind.MemberAccessChains ? " A wrapped chain keeps its first call with a receiver no wider than the continuation indent, since breaking there would gain no room."
                     : ""),
             Values = RuleValues.From(InitializerKindFor(kind) is not null
                 ? ["compact", "auto", "expanded"]

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- A member access chain that wraps keeps its first call on the receiver's line when the receiver is no wider than the continuation indent, such as `_sut` or `this` at the start of a statement, since breaking before that call would gain no room.
+
 ## v0.2.1
 
 ### Fixed

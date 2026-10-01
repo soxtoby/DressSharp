@@ -434,13 +434,13 @@ public class SyntaxWrappingRuleTests
             ("dress_parameters_layout", "auto"),
             ("max_line_length", "31"))
             .ShouldBe(Format(
-            """
+                """
                 class C
                 {
                     void M(int alpha, int beta) {}
                 }
                 """,
-            ("dress_parameters_layout", "always_single")));
+                ("dress_parameters_layout", "always_single")));
 
         Format(
             """
@@ -452,13 +452,13 @@ public class SyntaxWrappingRuleTests
             ("dress_parameters_layout", "auto"),
             ("max_line_length", "30"))
             .ShouldBe(Format(
-            """
+                """
                 class C
                 {
                     void M(int alpha, int beta) {}
                 }
                 """,
-            ("dress_parameters_layout", "always_multi")));
+                ("dress_parameters_layout", "always_multi")));
     }
 
     [Fact]
@@ -469,8 +469,8 @@ public class SyntaxWrappingRuleTests
             ("dress_parameters_layout", "auto"),
             ("max_line_length", "off"))
             .ShouldBe(Format(
-            "class C { void M(int alpha, int beta) {} }",
-            ("dress_parameters_layout", "always_single")));
+                "class C { void M(int alpha, int beta) {} }",
+                ("dress_parameters_layout", "always_single")));
     }
 
     [Fact]
@@ -1452,6 +1452,51 @@ public class SyntaxWrappingRuleTests
 
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("_sut", true)]
+    [InlineData("this", true)]
+    [InlineData("_sut2", false)]
+    public void Auto_member_access_keeps_the_first_call_with_a_receiver_no_wider_than_the_indent(string receiver, bool keeps)
+    {
+        var source = $"{receiver}.PropertyName(typeof(ConcreteImplementation), nameof(ConcreteImplementation.InterfaceProperty)).ShouldBe(\"renamed_interface_property\");";
+        var expected = keeps
+            ? $"""
+              {receiver}.PropertyName(typeof(ConcreteImplementation), nameof(ConcreteImplementation.InterfaceProperty))
+                  .ShouldBe("renamed_interface_property");
+              """
+            : $"""
+              {receiver}
+                  .PropertyName(typeof(ConcreteImplementation), nameof(ConcreteImplementation.InterfaceProperty))
+                  .ShouldBe("renamed_interface_property");
+              """;
+        var preferences = new[]
+            {
+                ("dress_member_access_chains_layout", "auto"),
+                ("dress_arguments_layout", "auto"),
+                ("max_line_length", "120")
+            };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Auto_member_access_leaves_a_chain_whose_only_break_would_gain_no_room()
+    {
+        const string source = """_sut.Run().ShouldBe("a value that pushes the line over the limit");""";
+        var preferences = new[]
+            {
+                ("dress_member_access_chains_layout", "auto"),
+                ("max_line_length", "50")
+            };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(source);
     }
 
     [Theory]

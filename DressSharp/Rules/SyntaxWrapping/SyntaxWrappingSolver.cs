@@ -329,12 +329,15 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax or BaseArgumentListSyntax or BaseListSyntax or BinaryExpressionSyntax
                     && MeasureMultilineBoundaries(occurrence) is { } breaks)
                 {
-                    multi = breaks.Any(value => value);
                     if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax)
                     {
+                        var held = HeldChainBreak(occurrence, occurrenceIndex, VisualStartColumn(occurrence));
+                        if (held >= 0)
+                            breaks[held] = false;
                         for (var offset = 0; offset < breaks.Length; offset++)
                             _chainBoundaryBreaks[occurrence.BoundaryStart + offset] = breaks[offset];
                     }
+                    multi = breaks.Any(value => value);
                 }
                 else
                 {
@@ -357,7 +360,12 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                     var start = VisualStartColumn(occurrence);
                     multi = (long)start + width > occurrence.Setting.MaximumLineLength;
                     if (multi && occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax)
-                        multi = ChainBreakGivesRoom(occurrence, occurrenceIndex, start);
+                    {
+                        var held = HeldChainBreak(occurrence, occurrenceIndex, start);
+                        multi = ChainBreakGivesRoom(occurrence, occurrenceIndex, start, held);
+                        if (multi && held >= 0)
+                            _chainBoundaryBreaks[occurrence.BoundaryStart + held] = false;
+                    }
                 }
             }
 
@@ -439,10 +447,21 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     /// A chain too long up to its last member name needs its breaks. One that fits up to that name is pushed over
     /// only by the arguments after it, and breaking moves those arguments to a line of their own: worth it when
     /// they then fit, and otherwise only a move before they wrap anyway, which their own list does better alone.
-    /// A single call is a call rather than a chain, so its arguments wrap as any call's do.
+    /// A single call is a call rather than a chain, so its arguments wrap as any call's do. A chain whose only
+    /// break is held has nothing left to break.
     /// </remarks>
-    bool ChainBreakGivesRoom(Occurrence occurrence, int occurrenceIndex, int start)
+    bool ChainBreakGivesRoom(Occurrence occurrence, int occurrenceIndex, int start, int heldBoundary)
     {
+        var lastBreak = -1;
+        for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
+        {
+            if (offset != heldBoundary && _boundaries[occurrence.BoundaryStart + offset].BreakWhenMulti)
+                lastBreak = offset;
+        }
+
+        if (lastBreak < 0)
+            return false;
+
         var name = occurrence.Node.GetLastToken();
         var nameIndex = occurrence.LastToken;
         while (nameIndex > occurrence.FirstToken && _stream.Pieces[nameIndex].Token != name)
@@ -459,17 +478,34 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             return false;
         }
 
-        var lastBreak = -1;
+        return (long)VisualWidth(Indent(occurrenceIndex, 1), _settings.TabWidth)
+                + JoinedWidth(occurrence, _boundaries[occurrence.BoundaryStart + lastBreak].RightIndex, occurrence.LastToken)
+            <= limit;
+    }
+
+    /// <summary>
+    /// The offset of a chain's first breakable boundary when breaking there gains no room, otherwise -1.
+    /// </summary>
+    /// <remarks>
+    /// A break moves the member after it to the continuation column. A receiver that ends at or before that
+    /// column, as <c>_sut</c> or <c>this</c> does at the start of a statement, already has its first call start
+    /// no further right than a continuation line would, so the break spends a line and gains nothing. The chain
+    /// then breaks from its second call on, with the first call still attached to its receiver.
+    /// </remarks>
+    int HeldChainBreak(Occurrence occurrence, int occurrenceIndex, int start)
+    {
         for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
         {
-            if (_boundaries[occurrence.BoundaryStart + offset].BreakWhenMulti)
-                lastBreak = offset;
+            var boundary = _boundaries[occurrence.BoundaryStart + offset];
+            if (!boundary.BreakWhenMulti)
+                continue;
+            var joinedColumn = (long)start
+                + JoinedWidth(occurrence, occurrence.FirstToken, boundary.RightIndex)
+                - VisualWidth(_stream.Pieces[boundary.RightIndex].Token.Text, _settings.TabWidth);
+            return joinedColumn <= VisualWidth(Indent(occurrenceIndex, 1), _settings.TabWidth) ? offset : -1;
         }
 
-        return lastBreak >= 0
-            && (long)VisualWidth(Indent(occurrenceIndex, 1), _settings.TabWidth)
-                    + JoinedWidth(occurrence, _boundaries[occurrence.BoundaryStart + lastBreak].RightIndex, occurrence.LastToken)
-                <= limit;
+        return -1;
     }
 
     /// <summary>The width of a run of tokens on one line, with this occurrence's own boundaries joined.</summary>
