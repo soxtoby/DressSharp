@@ -5,6 +5,9 @@
 ### Changed
 - A member access chain that wraps keeps its first call on the receiver's line when the receiver is no wider than the continuation indent, such as `_sut` or `this` at the start of a statement, since breaking before that call would gain no room.
 
+### Fixed
+- Expanding a single-line accessor whose body is a block, such as `get { return 1; } set { Store(value); }`, left the next accessor on the closing brace's line as `} set`. Each accessor now starts its own line once a body in the list expands; accessors without a block body still share a line.
+
 ## v0.2.1
 
 ### Fixed

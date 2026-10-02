@@ -1141,6 +1141,18 @@ sealed class SinglePassEmitter
             return 1;
         }
 
+        // Accessors share a line until one of them spans lines. Expanding a body puts its braces
+        // on lines of their own, and the accessor after it starts the next line rather than
+        // following the closing brace.
+        if (_plan.ExpandSingleLineBlocks
+            && FirstAccessorAt(right) is { Parent: AccessorListSyntax accessors } accessor
+            && PreviousAccessorIn(accessors, accessor) is { } previousAccessor
+            && SharesLine(previousAccessor, accessor)
+            && ExpandsAnAccessorBody(accessors))
+        {
+            return 1;
+        }
+
         if (_plan.SeparateSingleLineStatements
             && FirstStatementAt(right) is { Parent: { } statementParent and (BlockSyntax or SwitchSectionSyntax) } statement
             && PreviousStatementIn(statementParent, statement) is { } previous
@@ -1187,6 +1199,42 @@ sealed class SinglePassEmitter
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The accessor <paramref name="token"/> begins: its keyword, or a modifier or attribute
+    /// before it.
+    /// </summary>
+    AccessorDeclarationSyntax? FirstAccessorAt(SyntaxToken token)
+    {
+        var accessor = token.Parent switch
+            {
+                AccessorDeclarationSyntax declaration => declaration,
+                AttributeListSyntax { Parent: AccessorDeclarationSyntax declaration } => declaration,
+                _ => null
+            };
+        return accessor is not null && BeginsAt(accessor, token) ? accessor : null;
+    }
+
+    static AccessorDeclarationSyntax? PreviousAccessorIn(AccessorListSyntax accessors, AccessorDeclarationSyntax accessor)
+    {
+        var index = accessors.Accessors.IndexOf(accessor);
+        return index > 0 ? accessors.Accessors[index - 1] : null;
+    }
+
+    /// <summary>
+    /// Whether expanding single-line blocks moves a brace of a body in this list. An accessor
+    /// without a body, or with an expression body, spans no lines by itself.
+    /// </summary>
+    bool ExpandsAnAccessorBody(AccessorListSyntax accessors)
+    {
+        foreach (var accessor in accessors.Accessors)
+        {
+            if (accessor.Body is { } body && IsSafeSingleLine(body))
+                return true;
+        }
+
+        return false;
     }
 
     static bool SharesLine(SyntaxNode left, SyntaxNode right) =>

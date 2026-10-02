@@ -1,3 +1,5 @@
+using DressSharp.Architecture;
+using DressSharp.Configuration;
 using Xunit;
 using EasyAssertions;
 using static DressSharp.UnitTests.EmitterTestHarness;
@@ -547,7 +549,8 @@ public class MicrosoftCompatibilityRuleTests
             get => field; set => field = value;
             }
             int Mixed {
-            get; set {
+            get;
+            set {
             field = value;
             }
             }
@@ -620,6 +623,106 @@ public class MicrosoftCompatibilityRuleTests
             ("csharp_preserve_single_line_blocks", "true"),
             ("dress_preserve_trivial_single_line_blocks", "true"))
             .ShouldBe(source);
+    }
+
+    [Fact]
+    public void Expanding_an_accessor_body_gives_each_accessor_its_own_line()
+    {
+        var first = Format(
+            """
+            class C
+            {
+            int Bodies { get { return 1; } set { Store(value); } }
+            int Mixed { get => 1; set { Store(value); } }
+            int Arrows { get => 1; set => Store(value); }
+            }
+            """,
+            ("csharp_preserve_single_line_blocks", "false"));
+        first.ShouldBe("""
+            class C
+            {
+            int Bodies {
+            get {
+            return 1;
+            }
+            set {
+            Store(value);
+            }
+            }
+            int Mixed {
+            get => 1;
+            set {
+            Store(value);
+            }
+            }
+            int Arrows {
+            get => 1; set => Store(value);
+            }
+            }
+            """);
+        Format(first, ("csharp_preserve_single_line_blocks", "false")).ShouldBe(first);
+    }
+
+    [Fact]
+    public void Expanding_an_accessor_body_separates_accessors_sharing_a_line_of_a_multi_line_list()
+    {
+        var first = Format(
+            """
+            class C
+            {
+            int P
+            {
+            get { return 1; } private set { Store(value); }
+            }
+            }
+            """,
+            ("csharp_preserve_single_line_blocks", "false"));
+        first.ShouldBe("""
+            class C
+            {
+            int P
+            {
+            get {
+            return 1;
+            }
+            private set {
+            Store(value);
+            }
+            }
+            }
+            """);
+        Format(first, ("csharp_preserve_single_line_blocks", "false")).ShouldBe(first);
+    }
+
+    [Fact]
+    public void Default_preferences_put_each_bodied_accessor_on_its_own_line()
+    {
+        var preferences = PreferenceCatalog.Defaults
+            .Select(preference => (preference.Key.ToName(), preference.Default))
+            .ToArray();
+        var first = Format("""
+            class C
+            {
+                private string Value { get { throw new InvalidOperationException(); } set { throw new InvalidOperationException(); } }
+            }
+            """, preferences);
+        first.ShouldBe("""
+            class C
+            {
+                private string Value
+                {
+                    get
+                    {
+                        throw new InvalidOperationException();
+                    }
+                    set
+                    {
+                        throw new InvalidOperationException();
+                    }
+                }
+            }
+            """);
+        Format(first, preferences).ShouldBe(first);
     }
 
     [Fact]
