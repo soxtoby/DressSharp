@@ -8,12 +8,12 @@ namespace DressSharp.Parsing;
 /// Remembers MSBuild evaluations between runs, keyed by the files that can change the answer.
 /// </summary>
 /// <remarks>
-/// Evaluating a project means starting a <c>dotnet</c> process and waiting roughly a second, which
-/// on a repository of any size costs more than reading, parsing and formatting every file put
-/// together. The inputs almost never change between runs, so the evaluation is recorded against a
-/// fingerprint of them and reused until one of them is touched.
+/// Evaluating a project means loading MSBuild and reading the SDK's targets, which for a single
+/// file costs more than reading, parsing and formatting it, and across a repository adds up to as
+/// long as formatting every file. The inputs almost never change between runs, so the evaluation
+/// is recorded against a fingerprint of them and reused until one of them is touched.
 /// </remarks>
-sealed class MSBuildEvaluationCache(IMSBuildEvaluator inner) : IMSBuildEvaluator
+sealed class MSBuildEvaluationCache(IMSBuildEvaluator inner) : IMSBuildEvaluator, IDisposable
 {
     const string DisableEnvironmentVariable = "DRESSSHARP_NO_MSBUILD_CACHE";
     const char Separator = '|';
@@ -33,6 +33,8 @@ sealed class MSBuildEvaluationCache(IMSBuildEvaluator inner) : IMSBuildEvaluator
         ];
 
     static bool Enabled => string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(DisableEnvironmentVariable));
+
+    public void Dispose() => (inner as IDisposable)?.Dispose();
 
     public async ValueTask<MSBuildEvaluation> EvaluateAsync(
         string target,

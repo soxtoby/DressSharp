@@ -7,9 +7,27 @@ namespace DressSharp.Parsing;
 sealed class ParseContextResolver(string discoveryRoot, IMSBuildEvaluator? evaluator = null)
 {
     readonly string _discoveryRoot = Path.GetFullPath(discoveryRoot);
-    readonly IMSBuildEvaluator _evaluator = evaluator ?? new MSBuildEvaluationCache(new DotNetMSBuildEvaluator());
+    readonly IMSBuildEvaluator _evaluator = evaluator ?? new MSBuildEvaluationCache(new InProcessMSBuildEvaluator(new DotNetMSBuildEvaluator()));
+    readonly bool _ownsEvaluator = evaluator is null;
 
+    /// <remarks>A resolver answers once; the evaluator it made for itself is released when it has.</remarks>
     public async ValueTask<ResolvedParseContexts> Resolve(
+        IReadOnlyList<string> paths,
+        string? configuration,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ResolveCore(paths, configuration, cancellationToken);
+        }
+        finally
+        {
+            if (_ownsEvaluator)
+                (_evaluator as IDisposable)?.Dispose();
+        }
+    }
+
+    async ValueTask<ResolvedParseContexts> ResolveCore(
         IReadOnlyList<string> paths,
         string? configuration,
         CancellationToken cancellationToken)

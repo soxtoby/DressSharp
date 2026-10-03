@@ -37,6 +37,7 @@ Before claiming a speedup, run `benchmarks/protocol-v1.md`. Report CPU time besi
 ## Changelog
 
 A change a user would notice gets an entry under `## Unreleased` in `CHANGELOG.md`, under one of these headings, which `./do prepare-release` reads to choose the next version:
+Keep entries short and user-focused.
 
 - `### Breaking`: a command, option, or preference changed in a way that breaks an existing setup. Major.
 - `### Added`: a new command, option, or preference. Minor.

@@ -33,6 +33,11 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="editorconfig" />
+    <!-- Projects are evaluated by the MSBuild of whichever SDK the user runs, found at run time, so
+         the package is compiled against and never shipped: a copy in the tool's folder would be
+         loaded in place of the SDK's and could not read its projects. -->
+    <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Locator" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
     <PackageReference Include="System.CommandLine" />
