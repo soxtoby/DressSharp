@@ -216,18 +216,14 @@ public class EmbeddedStatementRuleTests
     }
 
     [Theory]
-    [InlineData("compact", false)]
-    [InlineData("balanced", false)]
-    [InlineData("always", true)]
-    public void Empty_bodies_use_the_mode_canonical_form(string mode, bool expectedBlock)
+    [InlineData("compact")]
+    [InlineData("balanced")]
+    [InlineData("always")]
+    public void Empty_blocks_are_preserved(string mode)
     {
-        var body = Root(Format(
-            "class C { void M() { if (ready) { } } }",
-            ("dress_embedded_statement_braces", mode)))
-            .DescendantNodes().OfType<IfStatementSyntax>().Single().Statement;
+        const string source = "class C { void M() { using (resource) { } } }";
 
-        (body is BlockSyntax).ShouldBe(expectedBlock);
-        (body is EmptyStatementSyntax).ShouldBe(!expectedBlock);
+        Format(source, ("dress_embedded_statement_braces", mode)).ShouldBe(source);
     }
 
     [Fact]

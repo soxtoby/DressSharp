@@ -405,18 +405,10 @@ static class EmbeddedStatementBraces
     {
         if (!removable
             || statement is not BlockSyntax block
-            || block.Statements.Count > 1
+            || block.Statements.Count != 1
             || !SyntaxRuleSafety.CanRewriteWithoutCounting(block, context))
         {
             return statement;
-        }
-
-        if (block.Statements.Count == 0)
-        {
-            return SyntaxFactory.EmptyStatement(
-                SyntaxFactory.Token(SyntaxKind.SemicolonToken))
-                .WithLeadingTrivia(block.GetLeadingTrivia())
-                .WithTrailingTrivia(block.GetTrailingTrivia());
         }
 
         return block.Statements[0]
