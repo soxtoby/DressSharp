@@ -8,6 +8,7 @@
 
 ### Fixed
 - Expanding a single-line accessor whose body is a block, such as `get { return 1; } set { Store(value); }`, left the next accessor on the closing brace's line as `} set`. Each accessor now starts its own line once a body in the list expands; accessors without a block body still share a line.
+- Attributes on preceding lines no longer cause braces in otherwise single-line declarations to move to the next line.
 
 ## v0.2.1
 

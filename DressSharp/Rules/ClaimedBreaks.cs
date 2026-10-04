@@ -218,8 +218,18 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
 
     static bool IsSingleLine(SyntaxNode node)
     {
-        var span = node.GetLocation().GetLineSpan();
-        return span.StartLinePosition.Line == span.EndLinePosition.Line;
+        var first = FirstTokenIgnoringAttributes(node).GetLocation().GetLineSpan();
+        var last = node.GetLastToken().GetLocation().GetLineSpan();
+        return first.StartLinePosition.Line == last.EndLinePosition.Line;
+    }
+
+    static SyntaxToken FirstTokenIgnoringAttributes(SyntaxNode node)
+    {
+        var token = node.GetFirstToken();
+        while (token.Parent is AttributeListSyntax attributes && attributes.Parent == node)
+            token = attributes.GetLastToken().GetNextToken();
+
+        return token;
     }
 
     /// <summary>
@@ -251,7 +261,7 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
 
     bool StaysOnOneLine(SyntaxNode node)
     {
-        if (!_stream!.TryFind(node.GetFirstToken(), out var start)
+        if (!_stream!.TryFind(FirstTokenIgnoringAttributes(node), out var start)
             || !_stream.TryFind(node.GetLastToken(), out var end))
         {
             return true;

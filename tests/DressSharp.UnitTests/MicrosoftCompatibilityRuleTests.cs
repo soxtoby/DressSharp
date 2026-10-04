@@ -140,6 +140,26 @@ public class MicrosoftCompatibilityRuleTests
                 """);
     }
 
+    [Fact]
+    public void Attributes_do_not_make_a_declaration_multiline_for_block_preservation()
+    {
+        const string source = """
+            [Singleton]
+            class Singleton : INotRegistered { }
+            """;
+
+        var first = Format(
+            source,
+            ("csharp_new_line_before_open_brace", "all"),
+            ("csharp_preserve_single_line_blocks", "true"));
+
+        first.ShouldBe(source);
+        Format(
+            first,
+            ("csharp_new_line_before_open_brace", "all"),
+            ("csharp_preserve_single_line_blocks", "true")).ShouldBe(first);
+    }
+
     [Theory]
     [
         InlineData("csharp_new_line_before_else",
