@@ -120,7 +120,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                     Node: BinaryExpressionSyntax binary
                 }
                 && binary.Ancestors().OfType<BinaryExpressionSyntax>().None()
-                        ? ExistingBinaryOperandIndent(occurrence)
+                        ? ExistingBinaryOperandIndent(occurrenceIndex)
                         : null;
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
@@ -623,10 +623,20 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         return false;
     }
 
-    string? ExistingBinaryOperandIndent(Occurrence occurrence) =>
-        _trivia!.HasLineBreak(occurrence.FirstToken)
-            ? _indentation.ExistingContinuation(_stream.Pieces[occurrence.FirstToken].Token)
-            : null;
+    string? ExistingBinaryOperandIndent(int occurrenceIndex)
+    {
+        var occurrence = _occurrences[occurrenceIndex];
+        var startsLine = _settledBoundaries.TryGetValue(occurrence.FirstToken, out var placed)
+            ? placed
+            : _trivia!.HasLineBreak(occurrence.FirstToken);
+        if (!startsLine)
+            return null;
+
+        // An argument or switch arm moves with its owner; its operators follow the same planned anchor.
+        return occurrence.Node.Parent is ArgumentSyntax or SwitchExpressionArmSyntax
+            ? PlannedBase(occurrenceIndex)
+            : _indentation.ExistingContinuation(_stream.Pieces[occurrence.FirstToken].Token);
+    }
 
     bool CanUseDecisionLadder(Occurrence occurrence, IReadOnlyDictionary<int, string> childGaps)
     {
@@ -980,12 +990,24 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             && content.SpanStart == token.SpanStart
                 ? _indentation.ForNode(content)
                 : null;
+        if (indent is null
+            && token.Parent?.FirstAncestorOrSelf<StatementSyntax>() is { } statement
+            && statement.SpanStart == token.SpanStart
+            && EmbeddedStatements.StartsBody(statement, out _))
+        {
+            indent = _indentation.ForNode(statement);
+        }
         _lineIndents[index] = indent;
         return indent;
     }
 
     int AdvancePrefixGap(int rightIndex, int column)
     {
+        var left = _stream.Pieces[rightIndex - 1].Token;
+        var right = _stream.Pieces[rightIndex].Token;
+        if (_claims.Before(left, right, leftOpenedItsLine: false) == true)
+            return VisualWidth(PlannedLineIndent(rightIndex) ?? _indentation.ForNode(right.Parent), _settings.TabWidth);
+
         if (_plannedLineBreaks.TryGetValue(rightIndex, out var plannedBreak))
             return AdvanceColumn(plannedBreak, column, _settings.TabWidth);
 
@@ -997,8 +1019,6 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         if (_trivia.HasMeaningfulGap(rightIndex) || _trivia.HasLineBreak(rightIndex))
             return AdvanceColumn(leading, AdvanceColumn(trailing, column));
 
-        var left = _stream.Pieces[rightIndex - 1].Token;
-        var right = _stream.Pieces[rightIndex].Token;
         return _emitterPlan.DesiredSpace(left, right) switch
             {
                 true => column + 1,

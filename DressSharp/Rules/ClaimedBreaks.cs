@@ -57,6 +57,16 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
     /// </param>
     internal bool? Before(SyntaxToken left, SyntaxToken token, bool leftOpenedItsLine)
     {
+        if (left.IsKind(SyntaxKind.OpenBraceToken)
+                && left.Parent is BlockSyntax leftBlock
+                && leftBlock.HasAnnotation(GeneratedSyntax.Block)
+            || token.IsKind(SyntaxKind.CloseBraceToken)
+                && token.Parent is BlockSyntax rightBlock
+                && rightBlock.HasAnnotation(GeneratedSyntax.Block))
+        {
+            return true;
+        }
+
         // Where an embedded statement is placed is decided before any brace it might open is
         // looked at, and before the rules that would otherwise own that brace.
         if (EmbeddedStatementBreak(token) is { } placed)

@@ -221,18 +221,6 @@ sealed class SinglePassEmitter
         return _lineIndent;
     }
 
-    static bool OpensOrClosesGeneratedBlock(
-        EffectiveTokenStream.Piece leftPiece,
-        EffectiveTokenStream.Piece rightPiece) =>
-        !leftPiece.IsOriginal
-            && leftPiece.Token.IsKind(SyntaxKind.OpenBraceToken)
-            && leftPiece.Token.Parent is BlockSyntax leftBlock
-            && leftBlock.HasAnnotation(GeneratedSyntax.Block)
-        || !rightPiece.IsOriginal
-            && rightPiece.Token.IsKind(SyntaxKind.CloseBraceToken)
-            && rightPiece.Token.Parent is BlockSyntax rightBlock
-            && rightBlock.HasAnnotation(GeneratedSyntax.Block);
-
     /// <summary>
     /// Whether the planned layout puts a line break anywhere inside <paramref name="node"/>.
     /// </summary>
@@ -310,9 +298,6 @@ sealed class SinglePassEmitter
         {
             return false;
         }
-
-        if (OpensOrClosesGeneratedBlock(leftPiece, rightPiece))
-            return true;
 
         if (ClaimsBreak(left, right) is { } claimed)
             return claimed;
@@ -395,12 +380,6 @@ sealed class SinglePassEmitter
             {
                 Append(" ");
             }
-            return;
-        }
-
-        if (OpensOrClosesGeneratedBlock(leftPiece, rightPiece))
-        {
-            StartLine(right);
             return;
         }
 

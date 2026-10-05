@@ -199,9 +199,12 @@ sealed class IndentationModel
         return node.Parent switch
             {
                 ArgumentListSyntax arguments when node is ArgumentSyntax => ForNode(arguments) + PreservedContinuation(node, arguments),
-                ArrowExpressionClauseSyntax clause when node is ConditionalExpressionSyntax or InvocationExpressionSyntax or AssignmentExpressionSyntax
+                ArrowExpressionClauseSyntax clause when node is ConditionalExpressionSyntax or InvocationExpressionSyntax or AssignmentExpressionSyntax or SwitchExpressionSyntax
                     && node == clause.Expression =>
                     ForNode(clause.Parent) + Unit(StartsAfterArrow(clause)),
+                SwitchExpressionArmSyntax arm when node == arm.Expression =>
+                    ForNode(arm) + Unit(_facts.StartLine(arm.Expression.GetFirstToken(includeZeroWidth: true))
+                    > _facts.StartLine(arm.EqualsGreaterThanToken)),
                 ConditionalExpressionSyntax conditional when node == conditional.WhenTrue || node == conditional.WhenFalse =>
                     ForNode(conditional) + _plan.IndentUnit,
                 BlockSyntax block => Contents(block),
