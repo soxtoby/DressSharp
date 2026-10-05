@@ -1852,6 +1852,33 @@ public class SyntaxWrappingRuleTests
         Format(lineComment, ("dress_parameters_layout", "always_single")).ShouldBe(Format(lineComment));
     }
 
+    [Theory]
+    [InlineData("auto", "\n")]
+    [InlineData("always_multi", "\n")]
+    [InlineData("auto", "\r\n")]
+    [InlineData("always_multi", "\r\n")]
+    public void Collection_item_wrapping_keeps_trailing_comments_on_their_items(string mode, string lineEnding)
+    {
+        var source = "var foo = [\n    a, // a\n    c,\n    // c\n    c\n];".ReplaceLineEndings(lineEnding);
+        (string Key, string Value)[] preferences =
+            [("dress_collection_expressions_layout", mode), ("csharp_indent_block_contents", "true")];
+
+        var first = Format(source, preferences);
+        first.ShouldBe(source);
+        Format(first, preferences).ShouldBe(first);
+    }
+
+    [Theory]
+    [InlineData("dress_arguments_layout", "always_multi", "Call(a, // a\n    b);", "Call(\n    a, // a\n    b\n);")]
+    [InlineData("dress_parameters_layout", "always_multi", "void M(int a, // a\n    int b) {}", "void M(\n    int a, // a\n    int b\n) {}")]
+    [InlineData("dress_array_initializer_layout", "expanded", "int[] foo = new[] { a, // a\n    b };", "int[] foo = new[]\n{\n    a, // a\n    b\n};")]
+    public void Other_item_wrapping_keeps_trailing_comments_on_their_items(string key, string mode, string source, string expected)
+    {
+        var first = Format(source, (key, mode));
+        first.ShouldBe(expected);
+        Format(first, (key, mode)).ShouldBe(expected);
+    }
+
     [Fact]
     public void Configured_line_endings_and_tab_indentation_are_preserved()
     {

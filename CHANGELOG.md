@@ -7,6 +7,7 @@
 - A member access chain that wraps keeps its first call on the receiver's line when the receiver is no wider than the continuation indent, such as `_sut` or `this` at the start of a statement, since breaking before that call would gain no room.
 
 ### Fixed
+- Item wrapping keeps trailing line comments with their original collection items, arguments, and parameters.
 - Empty blocks used as brace-optional statement bodies remain blocks instead of becoming empty statements.
 - Expanding a single-line accessor whose body is a block, such as `get { return 1; } set { Store(value); }`, left the next accessor on the closing brace's line as `} set`. Each accessor now starts its own line once a body in the list expands; accessors without a block body still share a line.
 - Attributes on preceding lines no longer cause braces in otherwise single-line declarations to move to the next line.

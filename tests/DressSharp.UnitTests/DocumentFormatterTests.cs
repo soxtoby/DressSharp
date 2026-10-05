@@ -12,6 +12,22 @@ namespace DressSharp.UnitTests;
 public class DocumentFormatterTests
 {
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Leading_collection_comment_keeps_another_items_trailing_comment(string lineEnding)
+    {
+        var preferences = PreferenceCatalog.Defaults
+            .Select(preference => (preference.Key.ToName(), preference.Default))
+            .ToArray();
+        var source = "var foo = [\n  a, // a\n  c,\n  //c\n  c\n];".ReplaceLineEndings(lineEnding);
+        var expected = "var foo = [\n        a, // a\n        c,\n        // c\n        c\n    ];".ReplaceLineEndings(lineEnding);
+        var first = EmitterTestHarness.Format(source, preferences);
+
+        first.ShouldBe(expected);
+        EmitterTestHarness.Format(first, preferences).ShouldBe(expected);
+    }
+
+    [Theory]
     [InlineData("\n", false)]
     [InlineData("\n", true)]
     [InlineData("\r\n", false)]

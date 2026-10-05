@@ -309,9 +309,21 @@ static class SyntaxWrappingRendering
         var significant = WithoutWhitespace(original);
         if (significant.Count == 0)
             return whitespace;
-        return significant[^1].IsKind(SyntaxKind.SingleLineCommentTrivia)
-            ? whitespace.AddRange(significant).AddRange(whitespace)
-            : whitespace.AddRange(significant).Add(SyntaxFactory.Space);
+        if (significant[^1].IsKind(SyntaxKind.SingleLineCommentTrivia))
+        {
+            // A trailing line comment belongs to the preceding item. The planned break goes
+            // after it; putting that break before it makes it lead the following item instead.
+            var startsOwnLine = false;
+            for (var index = 0; index < original.Count
+                && (original[index].IsKind(SyntaxKind.WhitespaceTrivia) || original[index].IsKind(SyntaxKind.EndOfLineTrivia)); index++)
+            {
+                startsOwnLine |= original[index].IsKind(SyntaxKind.EndOfLineTrivia);
+            }
+            return (startsOwnLine ? whitespace : SyntaxFactory.TriviaList(SyntaxFactory.Space))
+                .AddRange(significant)
+                .AddRange(whitespace);
+        }
+        return whitespace.AddRange(significant).Add(SyntaxFactory.Space);
     }
 
     static SyntaxTriviaList WithoutWhitespace(SyntaxTriviaList trivia) => SyntaxFactory.TriviaList(

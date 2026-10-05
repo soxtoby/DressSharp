@@ -494,8 +494,13 @@ sealed class SinglePassEmitter
             Append(openingIndent);
             return;
         }
-        if (lastBreak >= 0 && InitializerIndentFor(right) is not null)
+        if (lastBreak >= 0 && InitializerIndentFor(right) is { } initializerIndent)
         {
+            if (_plan.AlignComments && _triviaLayout.HasMeaningfulGap(_index))
+            {
+                gap = AlignedGap(gap, initializerIndent) ?? gap;
+                lastBreak = gap.LastIndexOfAny(LineBreaks);
+            }
             var indentStart = gap.Length;
             while (indentStart > lastBreak + 1 && gap[indentStart - 1] is ' ' or '\t')
                 indentStart--;
@@ -740,9 +745,11 @@ sealed class SinglePassEmitter
     /// which keeps its shape by moving as far as the line that opened it moved. A block whose lines
     /// do not all start where that line starts has no shape to keep, and stays where it is.
     /// </remarks>
-    string? AlignedGap(int start, string indent)
+    string? AlignedGap(int start, string indent) =>
+        AlignedGap(_output.ToString(start, _output.Length - start), indent);
+
+    static string? AlignedGap(string text, string indent)
     {
-        var text = _output.ToString(start, _output.Length - start);
         if (BlockComments(text) is not { } blocks)
             return null;
 

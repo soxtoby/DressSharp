@@ -26,12 +26,10 @@ public class SourcePreservationTests
             ("csharp_indent_block_contents", "true"),
             ("dress_parameters_layout", "auto"))
             .ShouldBe(
-            """
+                """
                 record R(
-                    string First,
-                    // first
-                    string Second,
-                    // second
+                    string First, // first
+                    string Second, // second
                     string Third);
                 """);
     }
@@ -54,7 +52,7 @@ public class SourcePreservationTests
             ("csharp_indent_block_contents", "true"),
             ("dress_method_body", "expression"))
             .ShouldBe(
-            """
+                """
                 class C
                 {
                     public void M() => Work();
