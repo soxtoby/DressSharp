@@ -665,4 +665,154 @@ public class IndentationOwnershipTests
         result.ShouldBe(expected);
         Format(result, preferences).ShouldBe(result);
     }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Binary_continuations_in_a_lambda_indent_from_the_chain_link_that_holds_it(string lineEnding)
+    {
+        var source = """
+            class C
+            {
+                void M()
+                {
+                    var children = value.Children
+                        .Select(c => CreateSearchNode(c, predicate, matchesPredicate))
+                        .Where(c => matchesPredicate
+                            || parentMatchesPredicate
+                            || c.MatchesPredicate)
+                        .ToArray();
+                }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(source);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Lines_inside_a_call_on_a_chain_link_wrapping_leaves_alone_indent_from_the_link(string lineEnding)
+    {
+        var source = """
+            class C
+            {
+                void M()
+                {
+                    Call(value.Children
+                        .Where(c => matchesPredicate
+                        || parentMatchesPredicate)
+                        .ToArray());
+                    target
+                        .Executes(() =>
+                            {
+                                Information(
+                                "Branch spec {branchspec} is a pull request. Adding build number {buildnumber}",
+                                BranchSpec,
+                                BuildNumber);
+                                Publish();
+                            });
+                }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var expected = """
+            class C
+            {
+                void M()
+                {
+                    Call(value.Children
+                        .Where(c => matchesPredicate
+                            || parentMatchesPredicate)
+                        .ToArray());
+                    target
+                        .Executes(() =>
+                            {
+                                Information(
+                                    "Branch spec {branchspec} is a pull request. Adding build number {buildnumber}",
+                                    BranchSpec,
+                                    BuildNumber);
+                                Publish();
+                            });
+                }
+            }
+            """.ReplaceLineEndings(lineEnding);
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Precedence_indentation_indents_a_parenthesized_group_from_the_line_it_opens_on()
+    {
+        const string source = """
+            if (!toSymbols
+                && (!phraseTable.TryGetTimeSpanPhrase(TimeUnit.Second, out var phrase)
+                || phrase.Multiple is null))
+            {
+                return (property.DeclaringType.IsSameOrInherits(otherProperty.DeclaringType)
+                    || otherProperty.DeclaringType.IsSameOrInherits(property.DeclaringType))
+                    && property.Expectation.Name == otherProperty.Expectation.Name;
+            }
+            """;
+        const string expected = """
+            if (!toSymbols
+                && (!phraseTable.TryGetTimeSpanPhrase(TimeUnit.Second, out var phrase)
+                    || phrase.Multiple is null))
+            {
+                return (property.DeclaringType.IsSameOrInherits(otherProperty.DeclaringType)
+                        || otherProperty.DeclaringType.IsSameOrInherits(property.DeclaringType))
+                    && property.Expectation.Name == otherProperty.Expectation.Name;
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Precedence_indentation_starts_a_new_group_inside_a_lambda()
+    {
+        const string source = "var found = ready\n    && items.Any(item => item.First\n    || item.Second);";
+        const string expected = "var found = ready\n    && items.Any(item => item.First\n        || item.Second);";
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Operators_align_with_a_binary_argument_that_wrapping_moves_to_its_own_line()
+    {
+        const string source = """
+            assertion
+                .ForCondition(@event.Parameters.Length > 0)
+                .FailWith("Expected event from sender {0}, " +
+                    $"but event {eventRecording.EventName} does not have any parameters", expectedSender);
+            """;
+        const string expected = """
+            assertion
+                .ForCondition(@event.Parameters.Length > 0)
+                .FailWith(
+                    "Expected event from sender {0}, "
+                    + $"but event {eventRecording.EventName} does not have any parameters",
+                    expectedSender);
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
 }

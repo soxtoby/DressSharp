@@ -8,6 +8,8 @@
 
 ### Fixed
 - Wrapping and optional braces use planned line breaks and indentation, so formatting reaches a fixpoint when arguments, switch arms, or lambda bodies move.
+- Wrapped operators in a lambda passed to a chained call, such as `.Where(c => a` followed by `|| b`, no longer lose their indent when the chain's line breaks were already in place. Arguments of calls in such lambdas, and of calls in a chain inside an argument, indent from the chained call's line rather than the statement's.
+- With `dress_binary_expression_indentation = precedence`, operators inside parentheses, a lambda, or a call indent from the line their group opens on, as with `flat`, rather than lining up with the operators outside.
 - Item wrapping keeps trailing line comments with their original collection items, arguments, and parameters.
 - Empty blocks used as brace-optional statement bodies remain blocks instead of becoming empty statements.
 - Expanding a single-line accessor whose body is a block, such as `get { return 1; } set { Store(value); }`, left the next accessor on the closing brace's line as `} set`. Each accessor now starts its own line once a body in the list expands; accessors without a block body still share a line.

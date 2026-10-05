@@ -116,11 +116,9 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             var precedenceOperandIndent = occurrence is
                 {
                     Kind: SyntaxWrappingKind.BinaryExpressions,
-                    Setting: { Mode: WrappingMode.Auto or WrappingMode.Preserve, IndentationStyle: "precedence" },
-                    Node: BinaryExpressionSyntax binary
+                    Setting: { Mode: WrappingMode.Auto or WrappingMode.Preserve, IndentationStyle: "precedence" }
                 }
-                && binary.Ancestors().OfType<BinaryExpressionSyntax>().None()
-                        ? ExistingBinaryOperandIndent(occurrenceIndex)
+                        ? OwnLineOperandIndent(indentIndex)
                         : null;
             for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
             {
@@ -148,10 +146,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 {
                     var precedenceDepth = BinaryPrecedenceDepth(
                         _stream.Pieces[boundary.OperatorIndex].Token.Parent as BinaryExpressionSyntax);
-                    boundaryIndent = precedenceOperandIndent is null
-                        ? _indentation.Continuation(occurrence.Node, 1 + precedenceDepth, "")
-                        : precedenceOperandIndent
-                            + string.Concat(Enumerable.Repeat(_emitterPlan.IndentUnit, precedenceDepth));
+                    boundaryIndent = (precedenceOperandIndent ?? Indent(indentIndex, 1))
+                        + string.Concat(Enumerable.Repeat(_emitterPlan.IndentUnit, precedenceDepth));
                 }
                 if (occurrence is { Multi: true, Setting.NestedStyle: { } style })
                 {
@@ -623,19 +619,25 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         return false;
     }
 
-    string? ExistingBinaryOperandIndent(int occurrenceIndex)
+    /// <summary>
+    /// Where the first operand of a binary expression that starts its own line is written, or null when it shares
+    /// a line with what comes before it.
+    /// </summary>
+    /// <remarks>
+    /// A list that gives the expression a line of its own, or joins it to the line before, has already said so,
+    /// and the expression's planned base is that line. The source answers only for a line wrapping leaves alone.
+    /// </remarks>
+    string? OwnLineOperandIndent(int occurrenceIndex)
     {
-        var occurrence = _occurrences[occurrenceIndex];
-        var startsLine = _settledBoundaries.TryGetValue(occurrence.FirstToken, out var placed)
-            ? placed
-            : _trivia!.HasLineBreak(occurrence.FirstToken);
-        if (!startsLine)
-            return null;
+        var first = _occurrences[occurrenceIndex].FirstToken;
+        if (_settledBoundaries.TryGetValue(first, out var placed))
+            return placed ? PlannedBase(occurrenceIndex) : null;
 
-        // An argument or switch arm moves with its owner; its operators follow the same planned anchor.
-        return occurrence.Node.Parent is ArgumentSyntax or SwitchExpressionArmSyntax
-            ? PlannedBase(occurrenceIndex)
-            : _indentation.ExistingContinuation(_stream.Pieces[occurrence.FirstToken].Token);
+        return _trivia!.HasLineBreak(first)
+            ? _occurrences[occurrenceIndex].Node.Parent is ArgumentSyntax or SwitchExpressionArmSyntax
+                ? PlannedBase(occurrenceIndex)
+                : _indentation.ExistingContinuation(_stream.Pieces[first].Token)
+            : null;
     }
 
     bool CanUseDecisionLadder(Occurrence occurrence, IReadOnlyDictionary<int, string> childGaps)
@@ -1168,24 +1170,22 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     }
 
     /// <summary>
-    /// How many parenthesized groups stand between <paramref name="node"/> and
-    /// <paramref name="ancestor"/>.
+    /// Whether only binary operators stand between <paramref name="node"/> and <paramref name="ancestor"/>.
     /// </summary>
     /// <remarks>
     /// An indentation style says how far a step in precedence goes, and "flat" says nowhere.
-    /// Parentheses are not a step in precedence: they open a construct, and a construct indents
-    /// what it holds whatever the style says about precedence.
+    /// Parentheses, a lambda, a call's arguments or a switch arm are not a step in precedence: they
+    /// open a construct, and a construct indents what it holds whatever the style says about precedence.
     /// </remarks>
-    static int ParenthesisDepth(SyntaxNode? node, SyntaxNode ancestor)
+    static bool IsOperandOf(SyntaxNode node, SyntaxNode ancestor)
     {
-        var depth = 0;
-        for (var parent = node; parent is not null && parent != ancestor; parent = parent.Parent)
+        for (var parent = node.Parent; parent != ancestor; parent = parent.Parent)
         {
-            if (parent is ParenthesizedExpressionSyntax)
-                depth++;
+            if (parent is not BinaryExpressionSyntax)
+                return false;
         }
 
-        return depth;
+        return true;
     }
 
     /// <summary>
@@ -1195,13 +1195,13 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     /// A step in precedence splits one expression into an occurrence per operator, each starting on
     /// the line the step before it broke to. Indenting from that line would add a level per step,
     /// which is what an indentation style of "flat" says not to do, so every step in one group
-    /// answers from where the group itself began. Parentheses end a group: they open a construct.
+    /// answers from where the group itself began. Any other construct ends a group.
     /// </remarks>
     int PrecedenceGroupRoot(int occurrenceIndex)
     {
         while (_occurrences[occurrenceIndex] is { Parent: >= 0 } occurrence
             && _occurrences[occurrence.Parent] is { Kind: SyntaxWrappingKind.BinaryExpressions } parent
-            && ParenthesisDepth(occurrence.Node, parent.Node) == 0)
+            && IsOperandOf(occurrence.Node, parent.Node))
         {
             occurrenceIndex = occurrence.Parent;
         }
@@ -1216,7 +1216,11 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             return depth;
 
         var precedence = BinaryPrecedence(binary.Kind());
-        foreach (var parentBinary in binary.Ancestors().OfType<BinaryExpressionSyntax>())
+        // Parentheses, lambdas and calls open constructs of their own, and the planned base already
+        // indents what they hold; precedence counts only the steps within one expression.
+        for (var parentBinary = binary.Parent as BinaryExpressionSyntax;
+            parentBinary is not null;
+            parentBinary = parentBinary.Parent as BinaryExpressionSyntax)
         {
             var parentPrecedence = BinaryPrecedence(parentBinary.Kind());
             if (precedence > parentPrecedence)

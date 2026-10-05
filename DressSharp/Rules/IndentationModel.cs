@@ -194,7 +194,7 @@ sealed class IndentationModel
             return indent;
         if (_originalOwners.TryGetValue(node, out var original))
             return ForNode(original);
-        if (CalledLink(node) is { } link && _wrapping?.LinkStartsItsOwnLine(link) == true)
+        if (CalledLink(node) is { } link && LinkStartsItsOwnLine(link))
             return ForNode(link) + _plan.IndentUnit;
         return node.Parent switch
             {
@@ -282,6 +282,17 @@ sealed class IndentationModel
         _wrapping?.StartsItsOwnLine(owner, node)
         ?? _facts.StartLine(node.GetFirstToken(includeZeroWidth: true))
             != _facts.StartLine(owner.GetFirstToken(includeZeroWidth: true));
+
+    /// <summary>
+    /// Whether a chain link starts a line of its own.
+    /// </summary>
+    /// <remarks>
+    /// Wrapping answers for a chain it lays out. A chain it leaves alone, such as one already broken or one inside
+    /// an argument, keeps the breaks the file arrived with.
+    /// </remarks>
+    bool LinkStartsItsOwnLine(MemberAccessExpressionSyntax link) =>
+        _wrapping?.LinkStartsItsOwnLine(link)
+        ?? _facts.StartLine(link.OperatorToken) != _facts.StartLine(link.Expression.GetLastToken(includeZeroWidth: true));
 
     bool StartsAfterArrow(ArrowExpressionClauseSyntax clause) =>
         _facts.StartLine(clause.Expression.GetFirstToken(includeZeroWidth: true))
