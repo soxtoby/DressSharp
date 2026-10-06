@@ -14,7 +14,7 @@ sealed class LambdaBodyRule : ISyntaxFormattingRule
             ExpandedCaption = RuleMetadata.Humanize(RuleKey.DressLambdaBody.ToName()),
             GroupName = "Braces and bodies",
             SubgroupName = "Body styles",
-            Description = "Controls lambda bodies. A single return or expression statement and its expression-bodied form represent the same expression.",
+            Description = "Controls lambda bodies. A single return statement and its expression-bodied form represent the same expression.",
             Values = RuleValues.From(["block", "expression"]),
             DefaultValue = "expression",
             Example = """
@@ -24,7 +24,7 @@ sealed class LambdaBodyRule : ISyntaxFormattingRule
                 }
                 """,
             OwnedSyntax = "lambda bodies",
-            Invariant = "A single return or expression statement and its expression-bodied form represent the same expression."
+            Invariant = "A single return statement and its expression-bodied form represent the same expression."
         };
 
     public System.Collections.Immutable.ImmutableArray<SyntaxKind> TargetKinds { get; } =
@@ -40,33 +40,16 @@ sealed class LambdaBodyRule : ISyntaxFormattingRule
 
         T Rewrite<T>(T node) where T : LambdaExpressionSyntax
         {
-            if (!CanConvert(node) || !SyntaxRuleSafety.CanRewrite(node, context))
-                return node;
-            if (expression)
-            {
-                switch (node.Body)
-                {
-                    case BlockSyntax { Statements: [ReturnStatementSyntax { Expression: { } returned }] }:
-                        return (T)node.WithBody(returned
-                            .WithLeadingTrivia(((BlockSyntax)node.Body).OpenBraceToken.LeadingTrivia)
-                            .WithTrailingTrivia(((BlockSyntax)node.Body)
-                                .CloseBraceToken.TrailingTrivia));
-                    case BlockSyntax { Statements: [ExpressionStatementSyntax statement] }:
-                        return (T)node.WithBody(statement.Expression
-                            .WithLeadingTrivia(((BlockSyntax)node.Body).OpenBraceToken.LeadingTrivia)
-                            .WithTrailingTrivia(((BlockSyntax)node.Body).CloseBraceToken.TrailingTrivia));
-                }
-            }
-
             // Without type information an expression lambda may bind to either a value- or void-returning delegate.
-            // Choosing return versus an expression-statement can change overload resolution, so block conversion is unsafe.
-            return node;
+            // Converting `{ expr; }` to `expr` can change which overload is picked, as can converting an expression body
+            // to a block, so only a block holding a single return statement is rewritten.
+            if (!expression
+                || node.Body is not BlockSyntax { Statements: [ReturnStatementSyntax { Expression: { } returned }] } block
+                || !SyntaxRuleSafety.CanRewrite(node, context))
+                return node;
+            return (T)node.WithBody(returned
+                .WithLeadingTrivia(block.OpenBraceToken.LeadingTrivia)
+                .WithTrailingTrivia(block.CloseBraceToken.TrailingTrivia));
         }
-
-        bool CanConvert(LambdaExpressionSyntax node) => expression
-            && node.Body is BlockSyntax
-            {
-                Statements: [ReturnStatementSyntax { Expression: not null } or ExpressionStatementSyntax]
-            };
     }
 }

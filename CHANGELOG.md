@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- `dress_lambda_body = expression` converts only a lambda block holding a single `return` statement, since that is the form whose expression body binds to the same overload.
+
 ## v0.3.0
 
 ### Changed

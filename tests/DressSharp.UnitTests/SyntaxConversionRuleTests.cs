@@ -48,6 +48,16 @@ public class SyntaxConversionRuleTests
     public void Converts_expression_bodies_to_blocks(string key, string source, string expected) =>
         AssertFormatted(expected, Transform(source, (key, "block")));
 
+    [Theory]
+    [InlineData("class C { System.Action F = () => { Work(); }; static void Work() {} }")]
+    [InlineData("class C { System.Action<int> F = x => { Work(x); }; static void Work(int x) {} }")]
+    [InlineData("class C { System.Func<int> F = () => 1; }")]
+    public void Lambda_bodies_other_than_a_single_return_are_kept(string source)
+    {
+        AssertFormatted(source, Transform(source, ("dress_lambda_body", "expression")));
+        AssertFormatted(source, Transform(source, ("dress_lambda_body", "block")));
+    }
+
     [Fact]
     public void Converts_namespace_forms_both_directions()
     {
