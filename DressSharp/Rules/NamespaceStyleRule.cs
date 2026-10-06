@@ -13,7 +13,7 @@ sealed class NamespaceStyleRule : ISyntaxFormattingRule
             Caption = RuleMetadata.Humanize(RuleKey.DressNamespaceStyle.ToName()),
             GroupName = "Braces and bodies",
             Description =
-                "Controls compilation-unit namespace declaration. The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.",
+                "Controls the namespace declaration form in a file with a single namespace. The namespace name, externs, usings, attributes, and members are preserved while only the namespace delimiter form changes.",
             Values = RuleValues.From(["file_scoped", "block_scoped"]),
             DefaultValue = "file_scoped",
             Example = """
@@ -37,7 +37,11 @@ sealed class NamespaceStyleRule : ISyntaxFormattingRule
 
     static CompilationUnitSyntax ToFileScoped(CompilationUnitSyntax unit, RuleContext context)
     {
-        if (unit.Members is not [NamespaceDeclarationSyntax declaration] || !SyntaxRuleSafety.CanRewrite(declaration, context))
+        // Only a file with a single namespace converts: a file-scoped namespace cannot sit beside
+        // another namespace or hold one.
+        if (unit.Members is not [NamespaceDeclarationSyntax declaration]
+            || declaration.Members.Any(SyntaxKind.NamespaceDeclaration)
+            || !SyntaxRuleSafety.CanRewrite(declaration, context))
             return unit;
         var converted = SyntaxFactory.FileScopedNamespaceDeclaration(
             declaration.AttributeLists,

@@ -66,6 +66,15 @@ public class SyntaxConversionRuleTests
     }
 
     [Theory]
+    [InlineData("namespace A { namespace B { class C {} } }")]
+    [InlineData("namespace A { class C {} } namespace B { class D {} }")]
+    [InlineData("namespace A { namespace B { class C {} } class D {} }")]
+    public void File_scoped_namespace_skips_nested_and_multiple_namespaces(string source)
+    {
+        AssertFormatted(source, Transform(source, ("dress_namespace_style", "file_scoped")));
+    }
+
+    [Theory]
     [InlineData("\n")]
     [InlineData("\r\n")]
     public void File_scoped_namespace_semicolon_follows_name(string newline)
