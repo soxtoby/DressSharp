@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.4.0
+
 ### Changed
 - `dress_namespace_style = file_scoped` converts only files with a single namespace, since a file-scoped namespace cannot share a file with a block namespace.
 - `dress_lambda_body = expression` converts only a lambda block holding a single `return` statement, since that is the form whose expression body binds to the same overload.
