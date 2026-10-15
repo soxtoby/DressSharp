@@ -56,6 +56,37 @@ public class OrderingRuleTests
     }
 
     [Fact]
+    public void Modifier_order_keeps_trivia_in_place()
+    {
+        const string order = "public,protected,internal,private,file,new,static,abstract,virtual,sealed,override,readonly,unsafe,required,volatile,async";
+        var result = Format(
+            """
+            class C
+            {
+                static public readonly int A = 1;
+
+                // The comment belongs to B.
+
+                static public int B => 2;
+            }
+
+            """,
+            ("csharp_preferred_modifier_order", order));
+
+        result.ShouldBe("""
+            class C
+            {
+                public static readonly int A = 1;
+
+                // The comment belongs to B.
+
+                public static int B => 2;
+            }
+
+            """);
+    }
+
+    [Fact]
     public void Ordering_stops_at_comments_and_directives()
     {
         Format(

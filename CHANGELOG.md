@@ -6,6 +6,9 @@
 - `dress_namespace_style = file_scoped` converts only files with a single namespace, since a file-scoped namespace cannot share a file with a block namespace.
 - `dress_lambda_body = expression` converts only a lambda block holding a single `return` statement, since that is the form whose expression body binds to the same overload.
 
+### Fixed
+- `csharp_preferred_modifier_order` keeps a member's comments and indentation where they were when it reorders modifiers, instead of carrying them along with the moved keyword and leaving the member uncompilable.
+
 ## v0.3.0
 
 ### Changed

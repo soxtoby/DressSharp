@@ -127,8 +127,30 @@ sealed class ModifierOrderRule : ISyntaxFormattingRule
             .Select((name, rank) => (name, rank))
             .ToDictionary(entry => entry.name, entry => entry.rank));
         return IsOutOfOrder(member.Modifiers, ranks) && !context.IsUnsafe(member)
-            ? member.WithModifiers(SyntaxFactory.TokenList(member.Modifiers.OrderBy(modifier => Rank(modifier, ranks))))
+            ? member.WithModifiers(Reorder(member.Modifiers, ranks))
             : member;
+    }
+
+    /// <summary>
+    /// Sorts the modifiers while every slot keeps its trivia.
+    /// </summary>
+    /// <remarks>
+    /// Trivia belongs to the position, not the keyword: the first modifier carries the member's
+    /// leading comments and indentation, and each modifier's trailing space separates it from the
+    /// next. Moving a keyword with its trivia would drag the member's comment into the middle of the
+    /// modifier list and leave the keyword that replaced it with no indentation at all.
+    /// </remarks>
+    static SyntaxTokenList Reorder(SyntaxTokenList modifiers, Dictionary<string, int> ranks)
+    {
+        var sorted = modifiers.OrderBy(modifier => Rank(modifier, ranks)).ToArray();
+        for (var slot = 0; slot < sorted.Length; slot++)
+        {
+            var original = modifiers[slot];
+            sorted[slot] = sorted[slot]
+                .WithLeadingTrivia(original.LeadingTrivia)
+                .WithTrailingTrivia(original.TrailingTrivia);
+        }
+        return SyntaxFactory.TokenList(sorted);
     }
 
     /// <summary>
