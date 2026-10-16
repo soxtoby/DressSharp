@@ -47,6 +47,10 @@ Then format every C# file in the current directory and below:
 dotnet dress
 ```
 
+## Editor extensions
+
+The [Rider plugin](extensions/DressSharpRider/README.md) formats C# files on save and adds a **Code | Format with DressSharp** action. See its README for build and installation instructions.
+
 ## Learn more
 
 - [Getting started](https://soxtoby.github.io/DressSharp/getting-started/): install, choose your rules, and format for the first time.

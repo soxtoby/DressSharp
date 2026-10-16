@@ -1,0 +1,30 @@
+<idea-plugin>
+    <id>com.soxtoby.dresssharp</id>
+    <name>DressSharp</name>
+    <vendor url="https://github.com/soxtoby/DressSharp">Simon Oxtoby</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.rider</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="DressSharp" displayType="BALLOON"/>
+
+        <projectConfigurable parentId="tools"
+                             id="dresssharp.settings"
+                             displayName="DressSharp"
+                             nonDefaultProject="true"
+                             instance="com.soxtoby.dresssharp.rider.DressSharpConfigurable"/>
+
+        <actionOnSave id="DressSharpOnSave" implementation="com.soxtoby.dresssharp.rider.DressSharpOnSave"/>
+        <actionOnSaveInfoProvider id="DressSharpOnSaveInfoProvider" implementation="com.soxtoby.dresssharp.rider.DressSharpOnSaveInfoProvider"/>
+    </extensions>
+
+    <actions>
+        <action id="DressSharp.Format"
+                class="com.soxtoby.dresssharp.rider.FormatWithDressSharpAction"
+                text="Format with DressSharp"
+                description="Format the selected C# files with DressSharp, the formatter that applies only the EditorConfig rules you set">
+            <add-to-group group-id="CodeFormatGroup" anchor="after" relative-to-action="ReformatCode"/>
+        </action>
+    </actions>
+</idea-plugin>

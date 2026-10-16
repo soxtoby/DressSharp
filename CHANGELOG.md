@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Rider plugin with format on save and a **Code | Format with DressSharp** action for repositories using DressSharp as a local .NET tool.
+
 ## v0.4.0
 
 ### Changed
