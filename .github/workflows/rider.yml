@@ -1,0 +1,52 @@
+name: Rider plugin
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - extensions/DressSharpRider/**
+      - DressSharp/DressSharp.csproj
+      - .github/workflows/rider.yml
+      - .github/workflows/release.yml
+  pull_request:
+    paths:
+      - extensions/DressSharpRider/**
+      - DressSharp/DressSharp.csproj
+      - .github/workflows/rider.yml
+      - .github/workflows/release.yml
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      artifact-id:
+        description: Installable Rider plugin ZIP.
+        value: ${{ jobs.build.outputs.artifact-id }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: extensions/DressSharpRider
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+      - name: Build, test, and package
+        run: sh ./gradlew --no-daemon --console=plain build buildPlugin verifyPluginStructure
+      - name: Upload plugin ZIP
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          path: extensions/DressSharpRider/build/distributions/*.zip
+          archive: false
+          if-no-files-found: error

@@ -111,4 +111,4 @@ A tracked, non-blocking expectation measured on the product owner's documented m
 A local, reviewable move of the Unreleased changelog entries under a new version heading, with the package version to match, which also advances this repository's pinned DressSharp to the latest release. It does not commit, tag, push, or publish.
 
 **Release**:
-A tagged, immutable version whose project version, changelog heading, Git tag, NuGet packages, and GitHub release share one `v`-prefixed identity, except that NuGet's package version omits the prefix.
+A tagged, immutable version shared by the formatter, editor extension packages, changelog, and GitHub release. Git tags and release headings use the `v` prefix; package versions omit it.

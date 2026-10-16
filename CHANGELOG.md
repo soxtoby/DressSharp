@@ -4,6 +4,7 @@
 
 ### Added
 - Rider plugin with format on save and a **Code | Format with DressSharp** action for repositories using DressSharp as a local .NET tool.
+- Downloadable Rider plugin builds in GitHub Actions and installable ZIPs alongside the formatter in each GitHub release, sharing its version and release notes.
 
 ## v0.4.0
 

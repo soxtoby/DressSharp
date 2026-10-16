@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using DotNetDo;
 using static DotNetDo.Tools;
 
-[assembly: TaskDescription("Publish the packed NuGet packages and the GitHub release.")]
+[assembly: TaskDescription("Publish the packed NuGet packages and Rider plugin in one GitHub release.")]
 
 var tag = Do.GitHubActions?.Workflow.ReferenceName is { } defaultTag
     ? Do.Param("tag", defaultTag, "Release tag.").Value
@@ -38,6 +38,10 @@ var names = packageFiles.Select(package => package.Name!).ToArray();
 if (!names.Order(StringComparer.Ordinal).SequenceEqual(expected.Order(StringComparer.Ordinal)))
     throw new InvalidOperationException($"Expected {expected.JoinWith(", ")} but found {names.JoinWith(", ")}.");
 
+var riderPackage = Do.RootDirectory / $"extensions/DressSharpRider/build/distributions/DressSharpRider-{version}.zip";
+if (!File.Exists(riderPackage.ToString()))
+    throw new InvalidOperationException($"Expected Rider plugin package '{riderPackage}'. Build the plugin before publishing the release.");
+
 // Push the tool package last, so it never resolves to a runtime package that isn't there yet.
 foreach (var name in expected)
 {
@@ -52,5 +56,7 @@ foreach (var name in expected)
 
 var notesFile = Do.CreateTempFile("dresssharp-release-notes-", ".md");
 notesFile.WriteText(notesMatch.Groups["notes"].Value.Trim() + Environment.NewLine);
-var assets = expected.Select(name => (packages / name).QuotedArgument()).JoinWith(" ");
+var assets = expected.Select(name => (packages / name).QuotedArgument())
+    .Append(riderPackage.QuotedArgument())
+    .JoinWith(" ");
 await Do.Exec($"gh release create {tag.QuotedArgument()} {assets} --title {tag.QuotedArgument()} --notes-file {notesFile.QuotedArgument()}");

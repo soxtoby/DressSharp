@@ -1,4 +1,7 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.xml.sax.InputSource
+import java.io.StringReader
+import javax.xml.parsers.DocumentBuilderFactory
 
 plugins {
     id("java")
@@ -7,7 +10,13 @@ plugins {
 }
 
 group = providers.gradleProperty("pluginGroup").get()
-version = providers.gradleProperty("pluginVersion").get()
+val formatterProject = providers.fileContents(layout.projectDirectory.file("../../DressSharp/DressSharp.csproj"))
+version = formatterProject.asText.map { source ->
+    DocumentBuilderFactory.newInstance().newDocumentBuilder()
+        .parse(InputSource(StringReader(source)))
+        .getElementsByTagName("Version")
+        .item(0).textContent
+}.get()
 
 repositories {
     mavenCentral()
@@ -56,10 +65,7 @@ intellijPlatform {
             </ul>
         """.trimIndent()
         changeNotes = """
-            <h3>0.1.0</h3>
-            <ul>
-            <li>Format on save and the Code | Format with DressSharp action, for files with DressSharp installed as a local tool and an .editorconfig in scope.</li>
-            </ul>
+            See the <a href="https://github.com/soxtoby/DressSharp/releases/tag/v${project.version}">DressSharp ${project.version} release notes</a>.
         """.trimIndent()
         ideaVersion {
             sinceBuild = "252"

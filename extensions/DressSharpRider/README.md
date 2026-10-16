@@ -25,9 +25,15 @@ Settings | Tools | DressSharp has:
 - **Format C# files with DressSharp on save**, per solution.
 - **dotnet executable**, per machine. Leave empty to use the `dotnet` on the PATH, falling back to `DOTNET_ROOT` and the usual SDK install locations.
 
+## Install
+
+Download `DressSharpRider-<version>.zip` from a [DressSharp GitHub release](https://github.com/soxtoby/DressSharp/releases). In Rider, open Settings | Plugins | ⚙ | Install Plugin from Disk and select the ZIP without unpacking it.
+
+For a development build, open the [Rider plugin workflow](https://github.com/soxtoby/DressSharp/actions/workflows/rider.yml), choose a successful run, and download its plugin ZIP artifact. GitHub requires you to sign in to download workflow artifacts, and they expire according to the repository's retention settings.
+
 ## Building
 
-The build needs a JDK 21 or later; Rider's bundled runtime works. Building against an installed Rider avoids downloading one:
+The pinned Rider SDK needs JDK 25; that Rider version's bundled runtime works. Building against an installed Rider avoids downloading one:
 
 ```sh
 cd extensions/DressSharpRider
@@ -35,11 +41,21 @@ export JAVA_HOME="C:/Users/me/AppData/Local/Programs/Rider/jbr"
 sh ./gradlew build buildPlugin -PriderPath="C:/Users/me/AppData/Local/Programs/Rider"
 ```
 
-Without `riderPath`, the build downloads the Rider release named by `platformVersion` in `gradle.properties`. The plugin zip is written to `build/distributions/`. Install it from Settings | Plugins | ⚙ | Install Plugin from Disk.
+Without `riderPath`, the build downloads the Rider release named by `platformVersion` in `gradle.properties`. The plugin version comes from `DressSharp/DressSharp.csproj`, and the plugin ZIP is written to `build/distributions/`.
 
 On Windows, set `JAVA_HOME` to Rider's `jbr` directory and use `gradlew.bat` in place of `sh ./gradlew`.
 
 `sh ./gradlew runIde -PriderPath=...` starts a Rider with the plugin loaded.
+
+## Releasing
+
+The formatter and editor extensions share one version, changelog, and release cycle. Add release notes under **Unreleased** in the root `CHANGELOG.md`; the plugin links to those same notes.
+
+From a clean worktree, run `./do prepare-release` at the repository root, review and commit the version and changelog changes, and push the matching `v<version>` tag. The **Release** workflow builds and tests the formatter and Rider plugin, then publishes one GitHub Release containing the NuGet packages and plugin ZIP. The plugin is included even when only the formatter changed.
+
+The shared release version does not require a repository to install the same DressSharp tool version as its Rider plugin.
+
+Pull requests and pushes to `master` build the plugin when its directory, the shared project version, or a release workflow changes. **Run workflow** creates a downloadable development build without publishing a release. For a local release, build the plugin and run `./do pack` before `./do release`.
 
 ## Compatibility
 
