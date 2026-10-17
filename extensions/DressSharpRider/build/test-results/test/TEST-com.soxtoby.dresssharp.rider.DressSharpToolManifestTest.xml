@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.soxtoby.dresssharp.rider.DressSharpToolManifestTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-16T05:55:27.166Z" hostname="ZAP000710" time="0.136">
+  <properties/>
+  <testcase name="a root manifest without DressSharp ends the search()" classname="com.soxtoby.dresssharp.rider.DressSharpToolManifestTest" time="0.036"/>
+  <testcase name="matches the package id in any case and by its command name()" classname="com.soxtoby.dresssharp.rider.DressSharpToolManifestTest" time="0.027"/>
+  <testcase name="a manifest dotnet could not read is passed over()" classname="com.soxtoby.dresssharp.rider.DressSharpToolManifestTest" time="0.026"/>
+  <testcase name="accepts a manifest directly in a directory()" classname="com.soxtoby.dresssharp.rider.DressSharpToolManifestTest" time="0.004"/>
+  <testcase name="finds nothing when no manifest installs DressSharp()" classname="com.soxtoby.dresssharp.rider.DressSharpToolManifestTest" time="0.013"/>
+  <testcase name="finds the manifest in the config directory above a nested file()" classname="com.soxtoby.dresssharp.rider.DressSharpToolManifestTest" time="0.008"/>
+  <testcase name="a manifest that is not a root is combined with those above it()" classname="com.soxtoby.dresssharp.rider.DressSharpToolManifestTest" time="0.019"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

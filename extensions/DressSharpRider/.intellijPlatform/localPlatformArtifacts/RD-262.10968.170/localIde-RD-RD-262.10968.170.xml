@@ -1,0 +1,11 @@
+<?xml version='1.1' ?>
+<ivy-module version="2.0">
+  <info organisation="localIde" module="RD" revision="RD-262.10968.170" />
+  <configurations>
+    <conf name="default" visibility="public" />
+  </configurations>
+  <publications>
+    <artifact name="Users/soxtoby/AppData/Local/Programs/Rider" ext="directory" conf="default" />
+  </publications>
+  <dependencies />
+</ivy-module>

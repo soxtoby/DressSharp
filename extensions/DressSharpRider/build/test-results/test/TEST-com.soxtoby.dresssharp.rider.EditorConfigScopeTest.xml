@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.soxtoby.dresssharp.rider.EditorConfigScopeTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-16T05:55:27.303Z" hostname="ZAP000710" time="0.015">
+  <properties/>
+  <testcase name="the nearest editorconfig above the file is in scope()" classname="com.soxtoby.dresssharp.rider.EditorConfigScopeTest" time="0.01"/>
+  <testcase name="a directory named editorconfig does not count()" classname="com.soxtoby.dresssharp.rider.EditorConfigScopeTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,14 @@
+Manifest-Version: 1.0
+Created-By: Gradle 9.8.1
+Version: 0.4.0
+Build-JVM: 25.0.4 (JetBrains s.r.o. 25.0.4+1-b508.27)
+Build-OS: Windows 11 10.0 amd64
+Build-Plugin: IntelliJ Platform Gradle Plugin
+Build-Plugin-Version: 2.19.0
+Platform-Type: RD
+Platform-Version: 2026.2.3.1
+Platform-Build: 262.10968.170
+Kotlin-Available: true
+Kotlin-Stdlib-Bundled: false
+Kotlin-Version: 2.4.21
+

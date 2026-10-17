@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- `dress_base_type_lists_layout = auto` measures the base types from the colon's new line once the colon wraps, so a list such as `: IFoo, IBar` that fits there stays on one line instead of taking a line per type. A base list whose source breaks after the colon no longer joins to a line over the limit.
+
 ## v0.4.0
 
 ### Changed

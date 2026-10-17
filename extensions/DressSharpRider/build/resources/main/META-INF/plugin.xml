@@ -1,0 +1,32 @@
+<idea-plugin>
+  <idea-version since-build="252" />
+  <change-notes><![CDATA[See the <a href="https://github.com/soxtoby/DressSharp/releases/tag/v0.4.0">DressSharp 0.4.0 release notes</a>.]]></change-notes>
+  <description><![CDATA[Formats C# files with <a href="https://github.com/soxtoby/DressSharp">DressSharp</a>, the unopinionated
+formatter that applies only the rules you set in EditorConfig.
+<p>
+A file is formatted when the repository installs DressSharp as a local .NET tool, in a
+<code>.config/dotnet-tools.json</code> above the file, and an <code>.editorconfig</code> applies to it.
+Other files are left alone, so the plugin is safe to leave enabled across every solution.
+</p>
+<ul>
+<li><b>Format on save</b>, switched on and off from Settings | Tools | Actions on Save.</li>
+<li><b>Code | Format with DressSharp</b> for the current file or the files selected in the Solution Explorer.</li>
+</ul>]]></description>
+  <version>0.4.0</version>
+  <id>com.soxtoby.dresssharp</id>
+  <name>DressSharp</name>
+  <vendor url="https://github.com/soxtoby/DressSharp">Simon Oxtoby</vendor>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.modules.rider</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <notificationGroup id="DressSharp" displayType="BALLOON" />
+    <projectConfigurable parentId="tools" id="dresssharp.settings" displayName="DressSharp" nonDefaultProject="true" instance="com.soxtoby.dresssharp.rider.DressSharpConfigurable" />
+    <actionOnSave id="DressSharpOnSave" implementation="com.soxtoby.dresssharp.rider.DressSharpOnSave" />
+    <actionOnSaveInfoProvider id="DressSharpOnSaveInfoProvider" implementation="com.soxtoby.dresssharp.rider.DressSharpOnSaveInfoProvider" />
+  </extensions>
+  <actions>
+    <action id="DressSharp.Format" class="com.soxtoby.dresssharp.rider.FormatWithDressSharpAction" text="Format with DressSharp" description="Format the selected C# files with DressSharp, the formatter that applies only the EditorConfig rules you set">
+      <add-to-group group-id="CodeFormatGroup" anchor="after" relative-to-action="ReformatCode" />
+    </action>
+  </actions>
+</idea-plugin>
