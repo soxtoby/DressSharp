@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Text;
 using DressSharp.CommandLine;
 using DressSharp.Configuration;
 using DressSharp.Execution;
@@ -141,6 +142,9 @@ static class Program
         var command = new Command(name, description) { includes, scope.Staged, scope.Changed };
         command.TreatUnmatchedTokensAsErrors = true;
         command.Validators.Add(scope.Validate);
+        if (kind == CommandKind.Format)
+            return AddStandardInput(command, includes, scope, verbose, configuration);
+
         command.SetAction(parseResult => RunSelectionAsync(
             new CommandRequest(
                 kind,
@@ -150,6 +154,48 @@ static class Program
                 scope.Read(parseResult)),
             Environment.CurrentDirectory));
         return command;
+    }
+
+    /// <summary>
+    /// Lets an editor format the text it holds: <c>format --stdin Program.cs</c> reads standard input
+    /// in place of that file and writes the result to standard output without touching the file.
+    /// </summary>
+    static Command AddStandardInput(
+        Command format,
+        Option<string[]> includes,
+        ScopeOptions scope,
+        Option<bool> verbose,
+        Option<string?> configuration)
+    {
+        var stdin = new Option<string?>("--stdin")
+            {
+                Description = "Format standard input as the file at this path, writing the result to standard output and leaving the file alone.",
+                HelpName = "path",
+            };
+        format.Add(stdin);
+        format.Validators.Add(result =>
+            {
+                if (result.GetResult(stdin) is null)
+                    return;
+                foreach (var option in new Option[] { includes, scope.Staged, scope.Changed })
+                {
+                    if (result.GetResult(option) is not null)
+                        result.AddError($"Option '--stdin' cannot be combined with '{option.Name}'.");
+                }
+            });
+        format.SetAction((parseResult, cancellationToken) =>
+            {
+                var request = new CommandRequest(
+                    CommandKind.Format,
+                    parseResult.GetValue(includes) ?? [],
+                    parseResult.GetValue(verbose),
+                    parseResult.GetValue(configuration),
+                    scope.Read(parseResult));
+                return parseResult.GetValue(stdin) is { } path
+                    ? RunStandardInputAsync(path, request, Environment.CurrentDirectory, cancellationToken)
+                    : RunSelectionAsync(request, Environment.CurrentDirectory);
+            });
+        return format;
     }
 
     static ScopeOptions CreateScopeOptions() => new(
@@ -175,6 +221,31 @@ static class Program
             Arity = ArgumentArity.OneOrMore,
             AllowMultipleArgumentsPerToken = false,
         };
+
+    /// <remarks>
+    /// The console streams are opened directly so that the text crosses them as UTF-8, whatever code
+    /// page the console reports, and the editor on the other end reads it back the same way.
+    /// </remarks>
+    static async Task<int> RunStandardInputAsync(string path, CommandRequest request, string invocationDirectory, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false, true));
+            await using var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false));
+            return await new FormatExecutor(invocationDirectory).RunStandardInput(
+                path,
+                request.BuildConfiguration,
+                request.Verbose,
+                input,
+                output,
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await Console.Error.WriteLineAsync(exception.Message);
+            return 2;
+        }
+    }
 
     static async Task<int> RunSelectionAsync(CommandRequest request, string invocationDirectory)
     {

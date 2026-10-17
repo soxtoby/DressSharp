@@ -88,6 +88,32 @@ public sealed class CommandTests
     }
 
     [Fact]
+    public void Format_stdin_names_the_file_the_input_stands_in_for()
+    {
+        var sut = Program.CreateCommand();
+
+        var result = sut.Parse(["format", "--stdin", "src/Program.cs"]);
+        result.Errors.ShouldBeEmpty();
+        sut.Subcommands.Where(command => command.Name == "format")
+            .ShouldBeASingular<Command>()
+            .And.Options.OfType<Option<string?>>()
+            .Where(option => option.Name == "--stdin").ShouldBeASingular<Option<string?>>()
+            .And(o => result.GetValue(o).ShouldBe("src/Program.cs"));
+    }
+
+    [Theory]
+    [InlineData("format --stdin a.cs --include b.cs")]
+    [InlineData("format --stdin a.cs --staged")]
+    [InlineData("format --stdin a.cs --changed")]
+    [InlineData("format --stdin")]
+    [InlineData("check --stdin a.cs")]
+    [InlineData("--stdin a.cs")]
+    public void Stdin_is_rejected_where_it_has_no_file_to_stand_in_for(string commandLine)
+    {
+        Program.CreateCommand().Parse(commandLine).Errors.ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public void Init_target_is_an_option()
     {
         var sut = Program.CreateCommand();

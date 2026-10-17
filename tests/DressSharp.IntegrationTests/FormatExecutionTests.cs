@@ -173,6 +173,51 @@ public sealed class FormatExecutionTests : IDisposable
     }
 
     [Fact]
+    public async Task Stdin_is_formatted_as_the_named_file_and_the_file_is_left_alone()
+    {
+        const string onDisk = "class OnDisk { }";
+        var path = Source(onDisk);
+        var timestamp = File.GetLastWriteTimeUtc(path);
+
+        var (exitCode, output, error) = await RunStandardInput("Program.cs", "class C { void M(int a,int b) { } }");
+
+        exitCode.ShouldBe(0);
+        ExactAssert.Text("class C { void M(int a, int b) { } }\n", output);
+        ExactAssert.Text(string.Empty, error);
+        (await File.ReadAllTextAsync(path, Token)).ShouldBe(onDisk);
+        File.GetLastWriteTimeUtc(path).ShouldBe(timestamp);
+    }
+
+    [Fact]
+    public async Task Stdin_that_already_matches_the_preferences_comes_back_as_it_went_in()
+    {
+        const string source = "class C { void M(int a, int b) { } }\n";
+        Source(source);
+
+        var (exitCode, output, error) = await RunStandardInput("Program.cs", source);
+
+        exitCode.ShouldBe(0);
+        ExactAssert.Text(source, output);
+        ExactAssert.Text(string.Empty, error);
+    }
+
+    [Fact]
+    public async Task Stdin_for_a_file_whose_project_cannot_be_read_comes_back_unchanged_with_a_warning()
+    {
+        const string source = "class C { void M(int a,int b) { } }";
+        var broken = Path.Combine(_directory, "Broken", "Broken.csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(broken)!);
+        await File.WriteAllTextAsync(broken, "<Project Sdk=\"Microsoft.NET.Sdk\"><Import Project=\"Missing.props\" /></Project>", Token);
+        Source(source, Path.Combine("Broken", "First.cs"));
+
+        var (exitCode, output, error) = await RunStandardInput("Broken/First.cs", source);
+
+        exitCode.ShouldBe(0);
+        ExactAssert.Text(source, output);
+        error.ShouldStartWith($"warning: skipping 1 file in {broken}: project evaluation failed. ");
+    }
+
+    [Fact]
     public async Task Invalid_configuration_fails_before_any_write()
     {
         const string firstSource = """class A { void M(int a,int b) { } }""";
@@ -329,6 +374,15 @@ public sealed class FormatExecutionTests : IDisposable
             new(kind, [], verbose, null, scope),
             [new SelectedFile(path, Path.GetFileName(path))],
             Token);
+        return (exitCode, output.ToString(), error.ToString());
+    }
+
+    async Task<(int ExitCode, string Output, string Error)> RunStandardInput(string path, string input)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var exitCode = await new FormatExecutor(_directory, output, error)
+            .RunStandardInput(path, null, false, new StringReader(input), output, Token);
         return (exitCode, output.ToString(), error.ToString());
     }
 
