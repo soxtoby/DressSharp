@@ -713,7 +713,7 @@ public sealed class InitializerIndentationEmitterTests
             C M() => new C
                 {
                 X = 1
-            /* keep */    };
+                /* keep */ };
             int X;
             }
             """);
@@ -789,5 +789,232 @@ public sealed class InitializerIndentationEmitterTests
         Format(directive, ("dress_object_initializer_indentation", "indented")).ShouldBe(Format(directive));
         Format(malformed, ("dress_object_initializer_indentation", "indented")).ShouldBe(Format(malformed));
         Format(commentedResult, ("dress_object_initializer_indentation", "indented")).ShouldBe(commentedResult);
+    }
+
+    [Theory]
+    [InlineData("false")]
+    [InlineData("true")]
+    public void Comments_in_a_wrapped_initializer_move_with_the_members_they_lead(string align)
+    {
+        (string, string)[] preferences =
+            [
+                ("dress_object_initializer_layout", "expanded"),
+                ("dress_object_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("dress_comment_align", align)
+            ];
+
+        var result = Format(
+            """
+            class C
+            {
+                C M() => new C
+                {
+                    // first
+                    X = 1,
+                    // second
+                    // lines
+                    Y = 2,
+                    /* block */
+                    Z = 3
+                };
+                int X, Y, Z;
+            }
+            """,
+            preferences);
+
+        result.ShouldBe("""
+            class C
+            {
+                C M() => new C
+                    {
+                        // first
+                        X = 1,
+                        // second
+                        // lines
+                        Y = 2,
+                        /* block */
+                        Z = 3
+                    };
+                int X, Y, Z;
+            }
+            """);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void An_unaligned_comment_before_a_wrapped_initializers_closing_brace_keeps_its_distance_from_the_brace()
+    {
+        (string, string)[] preferences =
+            [
+                ("dress_object_initializer_layout", "expanded"),
+                ("dress_object_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("dress_comment_align", "false")
+            ];
+
+        var result = Format(
+            """
+            class C
+            {
+                C M() => new C
+                {
+                    X = 1
+                    // last
+                };
+                int X;
+            }
+            """,
+            preferences);
+
+        result.ShouldBe("""
+            class C
+            {
+                C M() => new C
+                    {
+                        X = 1
+                        // last
+                    };
+                int X;
+            }
+            """);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("false", "                // deeper")]
+    [InlineData("true", "            // deeper")]
+    public void A_comment_set_in_from_a_wrapped_initializer_member_keeps_its_distance_unless_aligned(string align, string comment)
+    {
+        (string, string)[] preferences =
+            [
+                ("dress_object_initializer_layout", "expanded"),
+                ("dress_object_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("dress_comment_align", align)
+            ];
+
+        var result = Format(
+            """
+            class C
+            {
+                C M() => new C
+                {
+                    X = 1,
+                        // deeper
+                    Y = 2
+                };
+                int X, Y;
+            }
+            """,
+            preferences);
+
+        result.ShouldBe($$"""
+            class C
+            {
+                C M() => new C
+                    {
+                        X = 1,
+            {{comment}}
+                        Y = 2
+                    };
+                int X, Y;
+            }
+            """);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void An_aligned_comment_before_an_initializer_member_takes_that_members_indent()
+    {
+        (string, string)[] preferences =
+            [
+                ("dress_object_initializer_layout", "auto"),
+                ("dress_object_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("dress_comment_align", "true")
+            ];
+
+        var result = Format(
+            """
+            class A
+            {
+                object M(int x) => new()
+                    {
+                        First = x switch
+                        {
+                            1 => "one",
+                            _ => "many",
+                        },
+                    // Explains Second.
+                        Second = 2,
+                    /* Explains Third. */
+                        Third = 3
+                    };
+            }
+            """,
+            preferences);
+
+        result.ShouldBe("""
+            class A
+            {
+                object M(int x) => new()
+                    {
+                        First = x switch
+                        {
+                            1 => "one",
+                            _ => "many",
+                        },
+                        // Explains Second.
+                        Second = 2,
+                        /* Explains Third. */
+                        Third = 3
+                    };
+            }
+            """);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("false")]
+    [InlineData("true")]
+    public void A_block_comment_spanning_lines_ahead_of_a_wrapped_initializer_member_moves_whole(string align)
+    {
+        (string, string)[] preferences =
+            [
+                ("dress_object_initializer_layout", "expanded"),
+                ("dress_object_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("dress_comment_align", align)
+            ];
+
+        var result = Format(
+            """
+            class C
+            {
+                C M() => new C
+                {
+                    // own
+                    /* top
+                       bottom */ X = 1
+                };
+                int X;
+            }
+            """,
+            preferences);
+
+        result.ShouldBe("""
+            class C
+            {
+                C M() => new C
+                    {
+                        // own
+                        /* top
+                           bottom */ X = 1
+                    };
+                int X;
+            }
+            """);
+        Format(result, preferences).ShouldBe(result);
     }
 }

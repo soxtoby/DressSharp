@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -87,82 +88,121 @@ static class SyntaxWrappingRendering
             return singleLineGap;
         var leftTrailing = trivia.Trailing(boundary.RightIndex - 1);
         var rightLeading = trivia.Leading(boundary.RightIndex);
+        var planned = ClosingIndent(boundary.Style, indent, baseIndent);
         if (!HasSignificantTrivia(leftTrailing)
             && !HasSignificantTrivia(rightLeading))
         {
             if (multi)
-            {
-                return lineEnding + (boundary.Style is
-                    GapStyle.DelimitedClose
-                    or GapStyle.DelimitedSpacedClose
-                    or GapStyle.InitializerOpen
-                        ? baseIndent
-                        : indent);
-            }
+                return lineEnding + planned;
             return WantsSingleSpace(boundary.Style) ? " " : "";
         }
 
-        var line = SyntaxFactory.TriviaList(
-            SyntaxFactory.EndOfLine(lineEnding),
-            SyntaxFactory.Whitespace(indent));
-        var baseLine = SyntaxFactory.TriviaList(
-            SyntaxFactory.EndOfLine(lineEnding),
-            SyntaxFactory.Whitespace(baseIndent));
-        var space = SyntaxFactory.TriviaList(SyntaxFactory.Space);
-        SyntaxTriviaList left;
-        SyntaxTriviaList right;
-        switch (boundary.Style)
-        {
-            case GapStyle.DelimitedFirst:
-                left = Trailing(leftTrailing, multi ? line : default);
-                right = Leading(rightLeading, default);
-                break;
-            case GapStyle.DelimitedSpacedFirst:
-                left = Trailing(leftTrailing, multi ? line : space);
-                right = Leading(rightLeading, default);
-                break;
-            case GapStyle.DelimitedLater:
-                left = Trailing(leftTrailing, multi ? line : space);
-                right = Leading(rightLeading, default);
-                break;
-            case GapStyle.DelimitedClose:
-                left = WithoutWhitespace(leftTrailing);
-                right = Leading(rightLeading, multi ? baseLine : default);
-                break;
-            case GapStyle.DelimitedSpacedClose:
-                left = WithoutWhitespace(leftTrailing);
-                right = Leading(rightLeading, multi ? baseLine : space);
-                break;
-            case GapStyle.InitializerOpen:
-                left = Trailing(leftTrailing, multi ? baseLine : space);
-                right = Leading(rightLeading, default);
-                break;
-            case GapStyle.SeparatedFirst:
-                left = WithoutWhitespace(leftTrailing);
-                right = Leading(rightLeading, multi ? line : space);
-                break;
-            case GapStyle.SeparatedLater:
-                left = Trailing(leftTrailing, multi ? default : space);
-                right = Leading(rightLeading, multi ? line : default);
-                break;
-            case GapStyle.CompactItem:
-                left = WithoutWhitespace(leftTrailing);
-                right = Leading(rightLeading, multi ? line : default);
-                break;
-            default:
-                left = WithoutWhitespace(leftTrailing);
-                right = Leading(rightLeading, multi ? line : space);
-                break;
-        }
+        if (multi)
+            return RenderLines(leftTrailing, rightLeading, lineEnding, planned);
+
+        // A comment trailing the opening token keeps the gap's whitespace after it where the style
+        // attaches the gap to that token; elsewhere the whitespace goes with the following token.
+        var whitespace = WantsSingleSpace(boundary.Style) ? SyntaxFactory.TriviaList(SyntaxFactory.Space) : default;
+        var (left, right) = boundary.Style is
+            GapStyle.DelimitedFirst
+            or GapStyle.DelimitedSpacedFirst
+            or GapStyle.DelimitedLater
+            or GapStyle.InitializerOpen
+            or GapStyle.SeparatedLater
+                ? (Trailing(leftTrailing, whitespace), Leading(rightLeading, default))
+                : (WithoutWhitespace(leftTrailing), Leading(rightLeading, whitespace));
 
         // Whatever the style asked for, a gap may not end inside a line comment: the token written
-        // after it would land in the comment and disappear from the file. Styles that place the
-        // following token on a new line pass an empty whitespace list here, so this is the one
-        // place that can see the finished gap and close the comment.
+        // after it would land in the comment and disappear from the file. This is the one place
+        // that can see the finished gap and close the comment.
         return EndsInsideLineComment(left, right)
-            ? left.ToFullString() + right.ToFullString() + lineEnding + ClosingIndent(boundary.Style, indent, baseIndent)
+            ? left.ToFullString() + right.ToFullString() + lineEnding + planned
             : left.ToFullString() + right.ToFullString();
     }
+
+    /// <summary>
+    /// The gap with a line break planned before the token it leads, keeping every comment in it on
+    /// the line its author gave it.
+    /// </summary>
+    /// <remarks>
+    /// A comment on a line of its own keeps that line and the column it arrived at, which is what
+    /// the emitter measures its move from. A comment on the token's line goes with the token, as does
+    /// a block comment trailing the opening token with nothing between them, since the break falls
+    /// before it. Blank lines are not kept, as in a gap holding no comment.
+    /// </remarks>
+    static string RenderLines(
+        SyntaxTriviaList leftTrailing,
+        SyntaxTriviaList rightLeading,
+        string lineEnding,
+        string indent)
+    {
+        List<List<SyntaxTrivia>> lines = [[]];
+        foreach (var list in (ReadOnlySpan<SyntaxTriviaList>)[leftTrailing, rightLeading])
+        {
+            foreach (var trivia in list)
+            {
+                if (trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+                    lines.Add([]);
+                else
+                    lines[^1].Add(trivia);
+            }
+        }
+
+        var output = new StringBuilder();
+        var leading = lines.Count == 1 ? Content(lines[0]) : null;
+        if (lines.Count > 1)
+        {
+            var ownLines = false;
+            for (var index = 1; index < lines.Count - 1; index++)
+                ownLines |= HasContent(lines[index]);
+            if (Content(lines[0]) is { } trailing)
+            {
+                // A line comment is the last trivia on its line, so this is the one to check.
+                if (ownLines || lines[0][^1].IsKind(SyntaxKind.SingleLineCommentTrivia))
+                    output.Append(' ').Append(trailing);
+                else
+                    leading = trailing;
+            }
+
+            for (var index = 1; index < lines.Count - 1; index++)
+            {
+                if (Content(lines[index]) is { } content)
+                    output.Append(lineEnding).Append(Indent(lines[index])).Append(content);
+            }
+
+            if (Content(lines[^1]) is { } attached)
+                leading = leading is null ? attached : leading + " " + attached;
+        }
+
+        output.Append(lineEnding).Append(indent);
+        if (leading is not null)
+            output.Append(leading).Append(' ');
+        return output.ToString();
+    }
+
+    static bool HasContent(List<SyntaxTrivia> line) =>
+        line.Exists(trivia => !trivia.IsKind(SyntaxKind.WhitespaceTrivia));
+
+    /// <summary>The text from the first to the last comment on a line, or null when the line holds none.</summary>
+    static string? Content(List<SyntaxTrivia> line)
+    {
+        var first = 0;
+        while (first < line.Count && line[first].IsKind(SyntaxKind.WhitespaceTrivia))
+            first++;
+        if (first == line.Count)
+            return null;
+
+        var last = line.Count;
+        while (line[last - 1].IsKind(SyntaxKind.WhitespaceTrivia))
+            last--;
+        var content = new StringBuilder();
+        for (var index = first; index < last; index++)
+            content.Append(line[index].ToFullString());
+        return content.ToString();
+    }
+
+    static string Indent(List<SyntaxTrivia> line) =>
+        line.Count > 0 && line[0].IsKind(SyntaxKind.WhitespaceTrivia) ? line[0].ToFullString() : "";
 
     static string ClosingIndent(GapStyle style, string indent, string baseIndent) =>
         style is GapStyle.DelimitedClose or GapStyle.DelimitedSpacedClose or GapStyle.InitializerOpen

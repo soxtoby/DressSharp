@@ -454,41 +454,96 @@ sealed class SinglePassEmitter
             Append(" ");
     }
 
+    /// <summary>
+    /// Writes a gap syntax wrapping laid out, moving the comment lines in it with the token they lead.
+    /// </summary>
+    /// <remarks>
+    /// The plan's last line is the token's. A closing delimiter takes its opener's indentation there
+    /// and an initializer item the initializer's. The comment lines ahead of it arrive at the columns
+    /// their author gave them, as in a copied gap, and follow the token the same way: aligned to
+    /// where it goes, or keeping their distance from where it stood in the source.
+    /// </remarks>
     void EmitWrappingGap(string gap, SyntaxToken right)
     {
-        var lastBreak = gap.LastIndexOfAny(LineBreaks);
-        // The plan names the opening token; the line actually written there supplies its indent.
-        // This includes member-chain and initializer placement that moved the opener this run.
-        if (lastBreak >= 0 && _delimiterLineIndents.Remove(_syntaxWrapping.OpeningForClose(_index), out var openingIndent))
+        var lastBreak = TokenLineBreak(gap);
+        if (lastBreak < 0)
         {
-            // Consecutive own-line closes share a line when their opening lines align.
-            // A preceding planned close also covers a close already joined to this group.
-            if (_syntaxWrapping.OpeningForClose(_index - 1) >= 0 && _lineIndent == openingIndent)
-                return;
-            var indentStart = gap.Length;
-            while (indentStart > lastBreak + 1 && gap[indentStart - 1] is ' ' or '\t')
-                indentStart--;
-            Append(gap[..indentStart]);
-            _lineIndent = openingIndent;
-            Append(openingIndent);
-            return;
-        }
-        if (lastBreak >= 0 && InitializerIndentFor(right) is { } initializerIndent)
-        {
-            if (_plan.AlignComments && _triviaLayout.HasMeaningfulGap(_index))
-            {
-                gap = AlignedGap(gap, initializerIndent) ?? gap;
-                lastBreak = gap.LastIndexOfAny(LineBreaks);
-            }
-            var indentStart = gap.Length;
-            while (indentStart > lastBreak + 1 && gap[indentStart - 1] is ' ' or '\t')
-                indentStart--;
-            Append(gap[..indentStart]);
-            WriteIndent(right);
+            Append(gap);
             return;
         }
 
-        Append(gap);
+        // The plan names the opening token; the line actually written there supplies its indent.
+        // This includes member-chain and initializer placement that moved the opener this run.
+        var closing = _delimiterLineIndents.Remove(_syntaxWrapping.OpeningForClose(_index), out var openingIndent);
+        // Consecutive own-line closes share a line when their opening lines align.
+        // A preceding planned close also covers a close already joined to this group.
+        if (closing && _syntaxWrapping.OpeningForClose(_index - 1) >= 0 && _lineIndent == openingIndent)
+            return;
+
+        var lastLine = gap[(lastBreak + 1)..];
+        var attached = lastLine[InitialIndentLength(lastLine)..];
+        var indent = openingIndent ?? InitializerIndentFor(right) ?? lastLine[..^attached.Length];
+        var breakStart = lastBreak > 0 && gap[lastBreak] == '\n' && gap[lastBreak - 1] == '\r' ? lastBreak - 1 : lastBreak;
+        var head = gap[..breakStart];
+        // A block comment ahead of the token may span lines; its later lines move with its first.
+        var spans = attached.IndexOfAny(LineBreaks) >= 0;
+        if ((head.Length > 0 || spans) && HoldsOnlyComments(_index) && SourceLineIndent(_index) is { } source)
+        {
+            head = (_plan.AlignComments ? AlignedGap(head, indent) : Rebased(head, source, indent)) ?? head;
+            if (spans)
+                attached = Rebased(attached, source, indent) ?? attached;
+        }
+
+        Append(head);
+        Append(gap[breakStart..(lastBreak + 1)]);
+        Append(indent);
+        Append(attached);
+    }
+
+    /// <summary>
+    /// The indentation the token's line starts with in the source, counted from a comment ahead of
+    /// the token when one starts the line, or null when the token does not start a line.
+    /// </summary>
+    string? SourceLineIndent(int index)
+    {
+        string? indent = null;
+        var atLineStart = false;
+        foreach (var list in (ReadOnlySpan<SyntaxTriviaList>)[_triviaLayout.Trailing(index - 1), _triviaLayout.Leading(index)])
+        {
+            foreach (var trivia in list)
+            {
+                if (trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+                {
+                    indent = "";
+                    atLineStart = true;
+                }
+                else if (atLineStart)
+                {
+                    if (trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                        indent = trivia.ToFullString();
+                    atLineStart = false;
+                }
+            }
+        }
+
+        return indent;
+    }
+
+    /// <summary>
+    /// The last line break in <paramref name="gap"/> that no block comment spans, which starts the
+    /// token's line, or -1 when the gap holds none.
+    /// </summary>
+    static int TokenLineBreak(string gap)
+    {
+        var lastBreak = gap.LastIndexOfAny(LineBreaks);
+        if (lastBreak < 0 || !gap.AsSpan(lastBreak).Contains("*/", StringComparison.Ordinal))
+            return lastBreak;
+
+        if (BlockComments(gap) is not { } blocks)
+            return lastBreak;
+        while (blocks.Exists(block => block.Open < lastBreak && lastBreak < block.Close))
+            lastBreak = gap.LastIndexOfAny(LineBreaks, lastBreak - 1);
+        return lastBreak;
     }
 
     /// <summary>
@@ -603,8 +658,8 @@ sealed class SinglePassEmitter
         (_plan.IndentBlockContents is not null || _plan.AlignComments)
         && ((_indentation.DirectContentFor(token) is { } content
             && content.GetFirstToken(includeZeroWidth: true) == token)
-        || (token.Parent is SwitchLabelSyntax label
-            && label.GetFirstToken(includeZeroWidth: true) == token));
+            || (token.Parent is SwitchLabelSyntax label
+                && label.GetFirstToken(includeZeroWidth: true) == token));
 
     bool HoldsOnlyComments(int index)
     {
@@ -668,7 +723,16 @@ sealed class SinglePassEmitter
             return null;
 
         var source = text[(lastBreak + 1)..];
-        if (source.Length != InitialIndentLength(source) || source == indent)
+        return source.Length == InitialIndentLength(source) ? Rebased(text, source, indent) : null;
+    }
+
+    /// <summary>
+    /// <paramref name="text"/> with every line it starts moved from <paramref name="source"/> to
+    /// <paramref name="indent"/>, or null when nothing moves.
+    /// </summary>
+    static string? Rebased(string text, string source, string indent)
+    {
+        if (source == indent)
             return null;
 
         var output = new StringBuilder(text.Length);

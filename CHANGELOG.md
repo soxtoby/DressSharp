@@ -3,7 +3,9 @@
 ## Unreleased
 
 ### Fixed
-- `dress_base_type_lists_layout = auto` measures the base types from the colon's new line once the colon wraps, so a list such as `: IFoo, IBar` that fits there stays on one line instead of taking a line per type. A base list whose source breaks after the colon no longer joins to a line over the limit.
+- With `dress_base_type_lists_layout = auto`, a base type list that fits on the line after a wrapped colon, such as `: IFoo, IBar`, stays on one line instead of taking a line per type, and one already broken after the colon no longer joins into a line over the limit.
+- Comments inside a wrapped object initializer or argument list keep their own lines and indent with the item that follows. They could be merged onto one line, pulled onto the item's line, or left one level out with `dress_comment_align = false`.
+- A comment just before a closing bracket or brace keeps the space between them.
 
 ## v0.4.0
 

@@ -1879,6 +1879,40 @@ public class SyntaxWrappingRuleTests
         Format(first, (key, mode)).ShouldBe(expected);
     }
 
+    [Theory]
+    [InlineData("false", "            // gamma")]
+    [InlineData("true", "    // gamma")]
+    public void Item_wrapping_keeps_own_line_comments_on_their_lines_and_moves_them_with_their_items(string align, string gammaComment)
+    {
+        const string source = """
+            Call(alpha,
+                    // one
+                    // two
+                    beta,
+                    /* three */
+                    gamma,
+                            // gamma
+                    delta);
+            """;
+        (string Key, string Value)[] preferences = [("dress_arguments_layout", "always_multi"), ("dress_comment_align", align)];
+
+        var first = Format(source, preferences);
+
+        first.ShouldBe($$"""
+            Call(
+                alpha,
+                // one
+                // two
+                beta,
+                /* three */
+                gamma,
+            {{gammaComment}}
+                delta
+            );
+            """);
+        Format(first, preferences).ShouldBe(first);
+    }
+
     [Fact]
     public void Configured_line_endings_and_tab_indentation_are_preserved()
     {
