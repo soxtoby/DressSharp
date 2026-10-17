@@ -14,12 +14,26 @@ class DressSharpInvocation(val root: Path, files: Collection<Path>) {
     fun commandLine(dotnet: Path): GeneralCommandLine {
         val command = GeneralCommandLine(dotnet.toString(), "dress", "format", "--verbose")
         for (include in includes) command.addParameters("--include", include)
-        return command
-            .withWorkingDirectory(root)
-            .withCharset(Charsets.UTF_8)
-            .withEnvironment("DOTNET_NOLOGO", "1")
+        return command.fromRoot(root)
+    }
+
+    companion object {
+        /**
+         * A `dotnet dress format --stdin` run that formats what it is given on standard input as [file],
+         * writing the result to standard output and leaving the file on disk alone.
+         */
+        fun standardInput(root: Path, file: Path, dotnet: Path): GeneralCommandLine {
+            val relative = root.relativize(file.toAbsolutePath().normalize()).toString().replace('\\', '/')
+            return GeneralCommandLine(dotnet.toString(), "dress", "format", "--stdin", relative).fromRoot(root)
+        }
     }
 }
+
+/** Runs from the manifest's directory, so that the dotnet CLI finds the local tool. */
+private fun GeneralCommandLine.fromRoot(root: Path): GeneralCommandLine = this
+    .withWorkingDirectory(root)
+    .withCharset(Charsets.UTF_8)
+    .withEnvironment("DOTNET_NOLOGO", "1")
 
 /** What a `dotnet dress format --verbose` run reported on standard output. */
 data class DressSharpOutput(

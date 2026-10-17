@@ -25,6 +25,15 @@ class DressSharpInvocationTest {
     }
 
     @Test
+    fun `a standard input run names the file it stands in for relative to the manifest root`() {
+        val command = DressSharpInvocation.standardInput(root, root.resolve("src/../src/A.cs"), Path.of("dotnet"))
+
+        assertEquals(listOf("dotnet", "dress", "format", "--stdin", "src/A.cs"), command.getCommandLineList(null))
+        assertEquals(root, command.workingDirectory)
+        assertEquals("1", command.environment["DOTNET_NOLOGO"])
+    }
+
+    @Test
     fun `verbose output names the files that changed and counts the selection`() {
         val stdout = "src/A.cs\nFormatted 1 of 2 files in 0.42 s.\n"
 

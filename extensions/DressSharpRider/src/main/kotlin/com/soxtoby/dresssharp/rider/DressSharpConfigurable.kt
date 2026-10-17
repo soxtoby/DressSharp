@@ -29,6 +29,14 @@ class DressSharpConfigurable(private val project: Project) : BoundSearchableConf
                     )
                     .component
             }
+            row {
+                checkBox("Format the statement or block just finished when you type ; or }")
+                    .bindSelected(projectState::formatOnType)
+                    .comment(
+                        "Experimental. Runs <code>dotnet dress format --stdin</code> on the unsaved file after each <code>;</code> " +
+                            "or <code>}</code>, and applies only the changes to the lines just completed.",
+                    )
+            }
             row("dotnet executable:") {
                 textFieldWithBrowseButton(FileChooserDescriptorFactory.singleFile().withTitle("Select dotnet Executable"), project)
                     .bindText({ applicationState.dotnetPath.orEmpty() }, { applicationState.dotnetPath = it.trim().ifEmpty { null } })

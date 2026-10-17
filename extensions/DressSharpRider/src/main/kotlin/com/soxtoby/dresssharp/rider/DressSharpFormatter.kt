@@ -156,7 +156,7 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
         }
     }
 
-    private fun locateDotnet(): Path? = when (val located = DotnetLocator.locate(DressSharpApplicationSettings.getInstance().state.dotnetPath)) {
+    internal fun locateDotnet(): Path? = when (val located = DotnetLocator.locate(DressSharpApplicationSettings.getInstance().state.dotnetPath)) {
         is DotnetLocator.Result.Found -> located.path
         is DotnetLocator.Result.ConfiguredPathMissing -> {
             notify(
@@ -199,7 +199,7 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
     }
 
     /** Warnings such as an EditorConfig with no DressSharp rules. Each new set is shown once per session, or every time the user asks. */
-    private fun reportWarnings(stderr: String, manual: Boolean) {
+    internal fun reportWarnings(stderr: String, manual: Boolean) {
         val warnings = stderr.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         if (warnings.isEmpty()) return
         val isNew = synchronized(lock) {
@@ -230,7 +230,7 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
         ShowSettingsUtil.getInstance().showSettingsDialog(project, DressSharpConfigurable::class.java)
     }
 
-    private fun notify(type: NotificationType, content: String, actions: List<AnAction> = emptyList()) {
+    internal fun notify(type: NotificationType, content: String, actions: List<AnAction> = emptyList()) {
         val notification = NotificationGroupManager.getInstance().getNotificationGroup(NOTIFICATION_GROUP).createNotification("DressSharp", content, type)
         actions.forEach(notification::addAction)
         notification.notify(project)

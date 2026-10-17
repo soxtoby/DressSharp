@@ -17,6 +17,12 @@
 
         <actionOnSave id="DressSharpOnSave" implementation="com.soxtoby.dresssharp.rider.DressSharpOnSave"/>
         <actionOnSaveInfoProvider id="DressSharpOnSaveInfoProvider" implementation="com.soxtoby.dresssharp.rider.DressSharpOnSaveInfoProvider"/>
+
+        <!-- Rider's own delegate, rdClientFrontend, can end the chain once it has sent a C# keystroke to
+             its backend, so this one goes before it, as Rider's inlay handler does. -->
+        <typedHandler id="dressSharpFormatOnType"
+                      implementation="com.soxtoby.dresssharp.rider.DressSharpTypedHandler"
+                      order="first, before rdClientFrontend"/>
     </extensions>
 
     <actions>

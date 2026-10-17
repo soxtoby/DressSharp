@@ -14,6 +14,9 @@ import com.intellij.openapi.project.Project
 class DressSharpProjectSettings : SimplePersistentStateComponent<DressSharpProjectSettings.State>(State()) {
     class State : BaseState() {
         var formatOnSave by property(true)
+
+        /** Experimental: format the statement or block just finished when `;` or `}` is typed. */
+        var formatOnType by property(false)
     }
 
     companion object {

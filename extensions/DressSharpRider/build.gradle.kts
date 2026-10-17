@@ -62,6 +62,8 @@ intellijPlatform {
             <ul>
             <li><b>Format on save</b>, switched on and off from Settings | Tools | Actions on Save.</li>
             <li><b>Code | Format with DressSharp</b> for the current file or the files selected in the Solution Explorer.</li>
+            <li><b>Format as you type</b>, experimental and off by default: finishing a statement with <code>;</code> or a
+            block with <code>}</code> formats the lines just completed.</li>
             </ul>
         """.trimIndent()
         changeNotes = """
