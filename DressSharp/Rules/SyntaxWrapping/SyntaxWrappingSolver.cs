@@ -23,7 +23,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     TriviaLayoutPlan? _trivia;
     SparseGapWidths? _plannedWidths;
     Dictionary<int, int>? _baseGapWidths;
-    readonly Dictionary<int, bool> _chainBoundaryBreaks = [];
+    readonly Dictionary<int, bool> _boundaryBreaks = [];
     readonly Dictionary<int, string> _plannedLineBreaks = [];
     readonly Dictionary<int, string> _plannedBases = [];
     readonly HashSet<int> _settledBreaks = [];
@@ -322,7 +322,14 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 && occurrence.Setting is
                     { Mode: WrappingMode.Auto or WrappingMode.Compact, MaximumLineLength: not int.MaxValue })
             {
-                if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax or BaseArgumentListSyntax or BaseListSyntax or BinaryExpressionSyntax
+                if (occurrence.Node is BaseListSyntax)
+                {
+                    var breaks = BaseListBreaks(occurrence, occurrenceIndex);
+                    for (var offset = 0; offset < breaks.Length; offset++)
+                        _boundaryBreaks[occurrence.BoundaryStart + offset] = breaks[offset];
+                    multi = breaks.Any(value => value);
+                }
+                else if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax or BaseArgumentListSyntax or BinaryExpressionSyntax
                     && MeasureMultilineBoundaries(occurrence) is { } breaks)
                 {
                     if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax)
@@ -331,7 +338,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                         if (held >= 0)
                             breaks[held] = false;
                         for (var offset = 0; offset < breaks.Length; offset++)
-                            _chainBoundaryBreaks[occurrence.BoundaryStart + offset] = breaks[offset];
+                            _boundaryBreaks[occurrence.BoundaryStart + offset] = breaks[offset];
                     }
                     multi = breaks.Any(value => value);
                 }
@@ -360,7 +367,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                         var held = HeldChainBreak(occurrence, occurrenceIndex, start);
                         multi = ChainBreakGivesRoom(occurrence, occurrenceIndex, start, held);
                         if (multi && held >= 0)
-                            _chainBoundaryBreaks[occurrence.BoundaryStart + held] = false;
+                            _boundaryBreaks[occurrence.BoundaryStart + held] = false;
                     }
                 }
             }
@@ -569,7 +576,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             return false;
         if (occurrence.Setting is { Mode: WrappingMode.Preserve, NestedStyle: null } && boundary.OperatorIndex >= 0)
             return _trivia!.HasLineBreak(boundary.OperatorIndex) || _trivia.HasLineBreak(boundary.OperatorIndex + 1);
-        return _chainBoundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, occurrence.Multi);
+        return _boundaryBreaks.GetValueOrDefault(occurrence.BoundaryStart + offset, occurrence.Multi);
     }
 
     static bool IsClose(Boundary boundary) =>
@@ -581,7 +588,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         || existingMultilineList
             && !(IsClose(boundary) && occurrence.Setting.ClosingPosition is not null)
             && (boundary.Style == GapStyle.DelimitedClose
-            || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex));
+                || _emitterPlan.IndentBlockContents is null && _trivia!.HasLineBreak(boundary.RightIndex));
 
     bool PlannedMultiline(Occurrence occurrence, IReadOnlyDictionary<int, string> gaps)
     {
@@ -682,15 +689,67 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     // Nested argument and lambda-body lines must not contribute to another line's width.
     bool[]? MeasureMultilineBoundaries(Occurrence occurrence)
     {
+        var lineWidths = MeasureLines(occurrence, VisualStartColumn(occurrence), false, out var boundaryLines);
+        if (lineWidths.Count == 1)
+            return null;
+        return boundaryLines.Select(line => lineWidths[line] > occurrence.Setting.MaximumLineLength).ToArray();
+    }
+
+    /// <summary>
+    /// Which of a base list's boundaries break, measured from where the plan puts each line.
+    /// </summary>
+    /// <remarks>
+    /// A base list is laid out in two steps. The colon joins the declaration when the line holding
+    /// it fits, and otherwise opens a continuation line. The types then join one another when the
+    /// line holding them fits, measured from the colon's planned column, and otherwise each takes a
+    /// line. Measuring the types from the column the colon leaves, rather than from the column the
+    /// source holds, is what lets a list that fits once the colon has broken stay on one line.
+    /// </remarks>
+    bool[] BaseListBreaks(Occurrence occurrence, int occurrenceIndex)
+    {
+        var breaks = MeasureBaseListLines(occurrence, VisualStartColumn(occurrence));
+        if (breaks.Length == 0 || !breaks[0])
+            return breaks;
+        breaks = MeasureBaseListLines(occurrence, VisualWidth(Indent(occurrenceIndex, 1), _settings.TabWidth));
+        breaks[0] = true;
+        return breaks;
+    }
+
+    bool[] MeasureBaseListLines(Occurrence occurrence, int column)
+    {
+        var lineWidths = MeasureLines(occurrence, column, true, out var boundaryLines);
+        return boundaryLines.Select(line => lineWidths[line] > occurrence.Setting.MaximumLineLength).ToArray();
+    }
+
+    /// <summary>
+    /// The width of each line this occurrence spans from <paramref name="column"/>, and the line
+    /// each of its boundaries sits on.
+    /// </summary>
+    /// <param name="joinOwnBoundaries">
+    /// Whether the occurrence's own boundaries are measured joined, as the decision being made
+    /// would lay them out, rather than as the source holds them.
+    /// </param>
+    List<int> MeasureLines(Occurrence occurrence, int column, bool joinOwnBoundaries, out int[] boundaryLines)
+    {
         var lineWidths = new List<int>();
-        var boundaryLines = new int[occurrence.BoundaryCount];
-        var column = VisualStartColumn(occurrence);
+        boundaryLines = new int[occurrence.BoundaryCount];
         var offset = 0;
         for (var index = occurrence.FirstToken; index <= occurrence.LastToken; index++)
         {
+            var owned = offset < boundaryLines.Length
+                && _boundaries[occurrence.BoundaryStart + offset].RightIndex == index;
             if (index != occurrence.FirstToken)
             {
-                if (_plannedLineBreaks.TryGetValue(index, out var gap))
+                if (owned && joinOwnBoundaries)
+                {
+                    column += PlannedWidth(
+                        _boundaries[occurrence.BoundaryStart + offset],
+                        _trivia!,
+                        false,
+                        _lineEnding,
+                        _settings.TabWidth);
+                }
+                else if (_plannedLineBreaks.TryGetValue(index, out var gap))
                 {
                     Advance(gap);
                 }
@@ -711,18 +770,13 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 }
             }
 
-            if (offset < boundaryLines.Length
-                && _boundaries[occurrence.BoundaryStart + offset].RightIndex == index)
-            {
+            if (owned)
                 boundaryLines[offset++] = lineWidths.Count;
-            }
             Advance(_stream.Pieces[index].Token.Text);
         }
 
-        if (lineWidths.Count == 0)
-            return null;
         lineWidths.Add(column);
-        return boundaryLines.Select(line => lineWidths[line] > occurrence.Setting.MaximumLineLength).ToArray();
+        return lineWidths;
 
         void Advance(string text)
         {

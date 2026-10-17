@@ -1960,6 +1960,79 @@ public class SyntaxWrappingRuleTests
         Format(joined, loose).ShouldBe(joined);
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Auto_base_list_that_fits_on_its_own_line_wraps_only_at_the_colon(string lineEnding)
+    {
+        const string source = """
+            public class Receipt(kasldjflasdjflkasjdfaksjdfladsdjflkasdjfklasdjflk asjdflkjdkfjdjflsadfjkadsjflkasjfkncskjslkfjnsdkjkjjasdjfhjaksdhfkasjdaksdfhhdjfhjhdfjdf)
+              : IFoo, IBar
+            {
+            }
+            """;
+        const string joined = """
+            public class Receipt(kasldjflasdjflkasjdfaksjdfladsdjflkasdjfklasdjflk asjdflkjdkfjdjflsadfjkadsjflkasjfkncskjslkfjnsdkjkjjasdjfhjaksdhfkasjdaksdfhhdjfhjhdfjdf) : IFoo, IBar
+            {
+            }
+            """;
+        const string expected = """
+            public class Receipt(kasldjflasdjflkasjdfaksjdfladsdjflkasdjfklasdjflk asjdflkjdkfjdjflsadfjkadsjflkasjfkncskjslkfjnsdkjkjjasdjfhjaksdhfkasjdaksdfhhdjfhjhdfjdf)
+                : IFoo, IBar
+            {
+            }
+            """;
+        (string Key, string Value)[] preferences = [("dress_base_type_lists_layout", "auto"), ("max_line_length", "160")];
+
+        Format(source.ReplaceLineEndings(lineEnding), preferences).ShouldBe(expected.ReplaceLineEndings(lineEnding));
+        Format(joined.ReplaceLineEndings(lineEnding), preferences).ShouldBe(expected.ReplaceLineEndings(lineEnding));
+        Format(expected.ReplaceLineEndings(lineEnding), preferences).ShouldBe(expected.ReplaceLineEndings(lineEnding));
+    }
+
+    [Fact]
+    public void Auto_base_list_broken_after_its_colon_moves_the_colon_when_the_joined_line_does_not_fit()
+    {
+        const string source = """
+            class ConjoinedGenderedScaleNumberToWordsConverter(ConjoinedGenderedScaleNumberToWordsProfile profile) :
+                GenderedNumberToWordsConverter(GrammaticalGender.Neuter)
+            {
+            }
+            """;
+        const string expected = """
+            class ConjoinedGenderedScaleNumberToWordsConverter(ConjoinedGenderedScaleNumberToWordsProfile profile)
+                : GenderedNumberToWordsConverter(GrammaticalGender.Neuter)
+            {
+            }
+            """;
+        (string Key, string Value)[] preferences = [("dress_base_type_lists_layout", "auto"), ("max_line_length", "160")];
+
+        Format(source, preferences).ShouldBe(expected);
+        Format(expected, preferences).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Auto_base_list_that_does_not_fit_after_its_colon_puts_each_base_type_on_its_own_line()
+    {
+        const string source = """
+            public class Receipt(kasldjflasdjflkasjdfaksjdfladsdjflkasdjfklasdjflk asjdflkjdkfjdjflsadfjkadsjflkasjfkncskjslkfjnsdkjkjjasdjfhjaksdhfkasjdaksdfhhdjfhjhdfjdf) : IFooFooFooFooFooFooFooFooFooFooFooFooFooFooFooFoo, IBarBarBarBarBarBarBarBarBarBarBarBarBarBarBarBar, IBazBazBazBazBazBazBazBazBazBazBazBazBazBazBazBaz, IQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQux
+            {
+            }
+            """;
+        const string expected = """
+            public class Receipt(kasldjflasdjflkasjdfaksjdfladsdjflkasdjfklasdjflk asjdflkjdkfjdjflsadfjkadsjflkasjfkncskjslkfjnsdkjkjjasdjfhjaksdhfkasjdaksdfhhdjfhjhdfjdf)
+                : IFooFooFooFooFooFooFooFooFooFooFooFooFooFooFooFoo,
+                IBarBarBarBarBarBarBarBarBarBarBarBarBarBarBarBar,
+                IBazBazBazBazBazBazBazBazBazBazBazBazBazBazBazBaz,
+                IQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQuxQux
+            {
+            }
+            """;
+        (string Key, string Value)[] preferences = [("dress_base_type_lists_layout", "auto"), ("max_line_length", "160")];
+
+        Format(source, preferences).ShouldBe(expected);
+        Format(expected, preferences).ShouldBe(expected);
+    }
+
     static string Format(string source, params (string Key, string Value)[] preferences) =>
         EmitterTestHarness.Format(source, preferences);
 }
