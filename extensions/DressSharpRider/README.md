@@ -45,19 +45,20 @@ For a development build, open the [Rider plugin workflow](https://github.com/sox
 
 ## Building
 
+From the repository root, run `./do build-rider` to build and test the plugin and write `dist/DressSharpRider-<version>.zip`. The plugin version comes from `DressSharp/DressSharp.csproj`.
+
 The pinned Rider SDK needs JDK 25; that Rider version's bundled runtime works. Building against an installed Rider avoids downloading one:
 
 ```sh
-cd extensions/DressSharpRider
 export JAVA_HOME="C:/Users/me/AppData/Local/Programs/Rider/jbr"
-sh ./gradlew build buildPlugin -PriderPath="C:/Users/me/AppData/Local/Programs/Rider"
+./do build-rider --rider-path="C:/Users/me/AppData/Local/Programs/Rider"
 ```
 
-Without `riderPath`, the build downloads the Rider release named by `platformVersion` in `gradle.properties`. The plugin version comes from `DressSharp/DressSharp.csproj`, and the plugin ZIP is written to `build/distributions/`.
+Without `--rider-path` or `DRESSSHARP_RIDER_PATH`, the build downloads the Rider release named by `platformVersion` in `gradle.properties`. Gradle also keeps the plugin ZIP in `extensions/DressSharpRider/build/distributions/`.
 
-On Windows, set `JAVA_HOME` to Rider's `jbr` directory and use `gradlew.bat` in place of `sh ./gradlew`.
+On Windows, set `JAVA_HOME` to Rider's `jbr` directory and run `./do build-rider`; the task uses `gradlew.bat` automatically.
 
-`sh ./gradlew runIde -PriderPath=...` starts a Rider with the plugin loaded.
+From `extensions/DressSharpRider`, `sh ./gradlew runIde -PriderPath=...` starts a Rider with the plugin loaded.
 
 ## Releasing
 
@@ -67,7 +68,7 @@ From a clean worktree, run `./do prepare-release` at the repository root, review
 
 The shared release version does not require a repository to install the same DressSharp tool version as its Rider plugin.
 
-Pull requests and pushes to `master` build the plugin when its directory, the shared project version, or a release workflow changes. **Run workflow** creates a downloadable development build without publishing a release. For a local release, build the plugin and run `./do pack` before `./do release`.
+Pull requests and pushes to `master` build the plugin when its directory, the shared project version, or a release workflow changes. **Run workflow** creates a downloadable development build without publishing a release. For a local release, run `./do build-rider` and `./do pack` before `./do release`.
 
 ## Compatibility
 

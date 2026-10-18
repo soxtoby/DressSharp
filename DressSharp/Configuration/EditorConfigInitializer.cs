@@ -33,6 +33,7 @@ static class EditorConfigInitializer
         {
             if (lines.Count != 0 && !string.IsNullOrWhiteSpace(lines[^1]))
                 lines.Add(string.Empty);
+
             lines.Add("[*.cs]");
             sectionIndex = lines.Count - 1;
         }

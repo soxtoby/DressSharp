@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- `./do build-rider` builds and tests the Rider plugin and writes its installable ZIP to `dist/`.
 - Rider plugin with format on save and a **Code | Format with DressSharp** action for repositories using DressSharp as a local .NET tool.
 - `dotnet dress format --stdin <path>` formats standard input as the file at that path, using its EditorConfig and project, and writes the result to standard output without touching the file, so an editor can format unsaved text.
 - Experimental **format as you type** in the Rider plugin, off by default: typing `;` or `}` formats the statement or block just finished.
