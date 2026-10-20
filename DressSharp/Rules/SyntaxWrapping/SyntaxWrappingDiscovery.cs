@@ -114,6 +114,20 @@ sealed class SyntaxWrappingDiscovery
             case SyntaxKind.QuestionToken:
                 DiscoverQuestion(token);
                 break;
+            case SyntaxKind.LessThanToken:
+                // An unbound generic such as typeof(Dictionary<,>) holds only omitted arguments,
+                // zero-width tokens with nothing to put on a line.
+                if (Enabled(SyntaxWrappingKind.TypeArguments) is not null
+                    && token.Parent is TypeArgumentListSyntax { Arguments.Count: > 0 } typeArguments
+                    && token == typeArguments.LessThanToken
+                    && typeArguments.Arguments[0] is not OmittedTypeArgumentSyntax)
+                {
+                    AddOccurrence(typeArguments, SyntaxWrappingKind.TypeArguments);
+                }
+                else
+                    DiscoverBinary(token);
+
+                break;
             default:
                 DiscoverBinary(token);
                 break;
@@ -285,6 +299,9 @@ sealed class SyntaxWrappingDiscovery
             case BracketedParameterListSyntax list:
                 Delimited(list.Parameters, list.CloseBracketToken);
                 break;
+            case TypeArgumentListSyntax list:
+                Delimited(list.Arguments, list.GreaterThanToken, keepCloseAttached: true);
+                break;
             case InitializerExpressionSyntax initializer:
                 AddBoundary(initializer.OpenBraceToken, GapStyle.InitializerOpen);
                 Delimited(initializer.Expressions, initializer.CloseBraceToken, spacesInside: true);
@@ -297,7 +314,7 @@ sealed class SyntaxWrappingDiscovery
                 Delimited(collection.Elements, collection.CloseBracketToken);
                 break;
             case AttributeListSyntax attributes:
-                Delimited(attributes.Attributes, attributes.CloseBracketToken, keepDelimitersAttached: true);
+                Delimited(attributes.Attributes, attributes.CloseBracketToken, keepOpenAttached: true, keepCloseAttached: true);
                 break;
             case BaseListSyntax baseList:
                 AddBoundary(baseList.ColonToken, GapStyle.SeparatedFirst);
@@ -505,7 +522,9 @@ sealed class SyntaxWrappingDiscovery
         SeparatedSyntaxList<T> items,
         SyntaxToken close,
         bool spacesInside = false,
-        bool keepDelimitersAttached = false) where T : SyntaxNode
+        bool keepOpenAttached = false,
+        bool keepCloseAttached = false)
+        where T : SyntaxNode
     {
         for (var index = 0; index < items.Count; index++)
         {
@@ -516,9 +535,9 @@ sealed class SyntaxWrappingDiscovery
                         ? GapStyle.DelimitedSpacedFirst
                         : GapStyle.DelimitedFirst
                     : GapStyle.DelimitedLater,
-                breakWhenMulti: index != 0 || !keepDelimitersAttached);
+                breakWhenMulti: index != 0 || !keepOpenAttached);
         }
-        AddBoundary(close, spacesInside ? GapStyle.DelimitedSpacedClose : GapStyle.DelimitedClose, breakWhenMulti: !keepDelimitersAttached);
+        AddBoundary(close, spacesInside ? GapStyle.DelimitedSpacedClose : GapStyle.DelimitedClose, breakWhenMulti: !keepCloseAttached);
     }
 
     void Constraints<T>(SyntaxList<T> clauses) where T : SyntaxNode

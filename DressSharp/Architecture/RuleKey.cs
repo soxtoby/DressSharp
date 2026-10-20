@@ -64,6 +64,7 @@ enum RuleKey
     DotnetSeparateImportDirectiveGroups,
     DressArgumentsLayout,
     DressParametersLayout,
+    DressTypeArgumentsLayout,
     DressArgumentsClosingDelimiterPosition,
     DressParametersClosingDelimiterPosition,
     DressObjectInitializerClosingDelimiterPosition,

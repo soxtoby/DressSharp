@@ -52,6 +52,7 @@ dotnet_sort_system_directives_first = true
 dotnet_separate_import_directive_groups = false
 dress_arguments_layout = auto
 dress_parameters_layout = auto
+dress_type_arguments_layout = auto
 dress_multiline_parameters_closing_parenthesis_position = own_line
 dress_object_initializer_layout = auto
 dress_collection_initializer_layout = auto

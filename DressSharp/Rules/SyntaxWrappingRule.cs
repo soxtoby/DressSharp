@@ -21,6 +21,7 @@ sealed class SyntaxWrappingRule(
                     : kind == SyntaxWrappingKind.ConditionalExpressions ? " Wrapped branches indent one level beyond the deepest formatted line of a multiline condition."
                     : kind == SyntaxWrappingKind.MemberAccessChains ? " A wrapped chain keeps its first call with a receiver no wider than the continuation indent, since breaking there would gain no room."
                     : kind == SyntaxWrappingKind.Attributes ? " Square brackets stay attached to the first and last attributes when the list wraps."
+                    : kind == SyntaxWrappingKind.TypeArguments ? " The closing bracket stays attached to the last type argument when the list wraps. Auto keeps the first argument on the opening line when the text before the bracket is no wider than the continuation indent, since breaking there would gain no room."
                     : ""),
             Values = RuleValues.From(InitializerKindFor(kind) is not null
                 ? ["compact", "auto", "expanded"]
@@ -29,6 +30,7 @@ sealed class SyntaxWrappingRule(
             Example = kind switch
                 {
                     SyntaxWrappingKind.Parameters => "class Example { void Run(int first, int second, int third) { } }",
+                    SyntaxWrappingKind.TypeArguments => "class Example { Dictionary<string, List<int>> Values { get; set; } }",
                     SyntaxWrappingKind.ObjectInitializers => "var value = new Example { First = 1, Second = 2 };",
                     SyntaxWrappingKind.CollectionInitializers => "var values = new List<int> { 1, 2, 3 };",
                     SyntaxWrappingKind.ArrayInitializers => "var values = new[] { 1, 2, 3 };",
@@ -73,6 +75,7 @@ enum SyntaxWrappingKind
 {
     Arguments,
     Parameters,
+    TypeArguments,
     ObjectInitializers,
     CollectionInitializers,
     ArrayInitializers,

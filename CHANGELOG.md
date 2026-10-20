@@ -5,6 +5,7 @@
 ### Added
 - `dress_declaration_open_brace_position`, `dress_statement_open_brace_position`, and `dress_lambda_open_brace_position` place opening braces by what owns them, `same_line` or `next_line`, in place of the category list of `csharp_new_line_before_open_brace`. They also place the braces of block namespaces and `switch` statements, which the standard key never covered.
 - `dress_single_line_blocks = preserve | expand | expand_unless_trivial` says what happens to a block written on one line, in place of `csharp_preserve_single_line_blocks` and `dress_preserve_trivial_single_line_blocks` together.
+- `dress_type_arguments_layout = always_single | auto | always_multi` wraps a generic type's argument list, one argument per line with the closing `>` kept on the last argument. `auto` wraps a list that passes `max_line_length`, and keeps the first argument on the opening line when the text before `<` is no wider than the continuation indent, since breaking there would gain no room. `init` adds it at `auto`.
 
 ### Changed
 - `dotnet dress init` no longer writes `csharp_new_line_before_open_brace` or `csharp_preserve_single_line_blocks`, so Visual Studio and Rider stop acting on DressSharp's brace and single-line block settings. Both keys still work where set, but only where no `dress_` rule decided. `init` adds the new rules at their defaults, which match the old defaults, so remove the two standard keys once it has run.

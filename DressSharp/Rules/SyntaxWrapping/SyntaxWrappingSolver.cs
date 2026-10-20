@@ -287,7 +287,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
             var occurrence = _occurrences[occurrenceIndex];
             var initializerLayout = SyntaxWrappingRule.InitializerKindFor(occurrence.Kind) is not null;
             var itemPerLineLayout = occurrence.Kind is SyntaxWrappingKind.Arguments or SyntaxWrappingKind.Parameters
-                or SyntaxWrappingKind.CollectionExpressions or SyntaxWrappingKind.Attributes;
+                or SyntaxWrappingKind.CollectionExpressions or SyntaxWrappingKind.Attributes or SyntaxWrappingKind.TypeArguments;
             var hasLineBreak = HasLineBreak(occurrence);
             var hasNestedLineBreak = (initializerLayout || occurrence.Node is BaseArgumentListSyntax { Arguments.Count: > 1 })
                 && HasUnownedLineBreak(occurrence);
@@ -335,7 +335,7 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                 {
                     if (occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax)
                     {
-                        var held = HeldChainBreak(occurrence, occurrenceIndex, VisualStartColumn(occurrence));
+                        var held = HeldFirstBreak(occurrence, occurrenceIndex, VisualStartColumn(occurrence));
                         if (held >= 0)
                             breaks[held] = false;
                         for (var offset = 0; offset < breaks.Length; offset++)
@@ -365,12 +365,24 @@ sealed class SyntaxWrappingSolver : IWrappedItems
                     multi = (long)start + width > occurrence.Setting.MaximumLineLength;
                     if (multi && occurrence.Node is MemberAccessExpressionSyntax or ConditionalAccessExpressionSyntax)
                     {
-                        var held = HeldChainBreak(occurrence, occurrenceIndex, start);
+                        var held = HeldFirstBreak(occurrence, occurrenceIndex, start);
                         multi = ChainBreakGivesRoom(occurrence, occurrenceIndex, start, held);
                         if (multi && held >= 0)
                             _boundaryBreaks[occurrence.BoundaryStart + held] = false;
                     }
                 }
+            }
+
+            // A type argument list breaks after its opening bracket like any list, unless the text
+            // before the bracket ends at or before the continuation column, where the break would
+            // spend a line and gain no room; the first argument then stays on the bracket's line.
+            // A list already broken in the source is held the same way, or the second run would
+            // break what the first held.
+            if (multi
+                && occurrence is { Kind: SyntaxWrappingKind.TypeArguments, Setting.Mode: WrappingMode.Auto }
+                && HeldFirstBreak(occurrence, occurrenceIndex, VisualStartColumn(occurrence)) is >= 0 and var heldArgument)
+            {
+                _boundaryBreaks[occurrence.BoundaryStart + heldArgument] = false;
             }
 
             if (!multi
@@ -488,15 +500,16 @@ sealed class SyntaxWrappingSolver : IWrappedItems
     }
 
     /// <summary>
-    /// The offset of a chain's first breakable boundary when breaking there gains no room, otherwise -1.
+    /// The offset of an occurrence's first breakable boundary when breaking there gains no room, otherwise -1.
     /// </summary>
     /// <remarks>
-    /// A break moves the member after it to the continuation column. A receiver that ends at or before that
-    /// column, as <c>_sut</c> or <c>this</c> does at the start of a statement, already has its first call start
-    /// no further right than a continuation line would, so the break spends a line and gains nothing. The chain
-    /// then breaks from its second call on, with the first call still attached to its receiver.
+    /// A break moves the item after it to the continuation column. What precedes the break, a receiver such as
+    /// <c>_sut</c> or <c>this</c> at the start of a statement or a short type name's opening bracket, may end at
+    /// or before that column, so the item already starts no further right than a continuation line would, and
+    /// the break spends a line and gains nothing. The occurrence then breaks from its second item on, with the
+    /// first still attached to what precedes it.
     /// </remarks>
-    int HeldChainBreak(Occurrence occurrence, int occurrenceIndex, int start)
+    int HeldFirstBreak(Occurrence occurrence, int occurrenceIndex, int start)
     {
         for (var offset = 0; offset < occurrence.BoundaryCount; offset++)
         {
@@ -585,7 +598,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
 
     bool PreservesBoundary(Occurrence occurrence, Boundary boundary, bool existingMultilineList) =>
         IsClose(boundary)
-            && (occurrence.Setting.ClosingPosition is not null || occurrence.Kind == SyntaxWrappingKind.Attributes)
+            && (occurrence.Setting.ClosingPosition is not null
+            || occurrence.Kind is SyntaxWrappingKind.Attributes or SyntaxWrappingKind.TypeArguments)
             && _trivia!.HasMeaningfulGap(boundary.RightIndex)
         || occurrence.Setting is { Mode: WrappingMode.Preserve, ClosingPosition: not null } && !IsClose(boundary)
         || existingMultilineList

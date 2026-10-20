@@ -59,6 +59,186 @@ public class SyntaxWrappingRuleTests
         Format(result, preferences).ShouldBe(result);
     }
 
+    [Fact]
+    public void Format_long_type_arguments_take_a_line_each_with_the_closing_bracket_attached()
+    {
+        const string source = """
+            class C
+            {
+                public OneOf<DeliveryScheduleNightly, DeliveryScheduleWeekend, DeliveryScheduleStandard, DeliveryScheduleReservedForBulkShipments, DeliveryScheduleSignedOvernight> DeliveryPreferences { get; set; }
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                public OneOf<
+                    DeliveryScheduleNightly,
+                    DeliveryScheduleWeekend,
+                    DeliveryScheduleStandard,
+                    DeliveryScheduleReservedForBulkShipments,
+                    DeliveryScheduleSignedOvernight> DeliveryPreferences { get; set; }
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Format_long_type_arguments_in_a_wrapped_parameter_indent_from_the_parameter()
+    {
+        const string source = """
+            class C
+            {
+                public void Foo(OneOf<DeliveryScheduleNightly, DeliveryScheduleWeekend, DeliveryScheduleStandard, DeliveryScheduleReservedForBulkShipments, DeliveryScheduleSignedOvernight> deliveryPreferences, string bar) { }
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                public void Foo(
+                    OneOf<
+                        DeliveryScheduleNightly,
+                        DeliveryScheduleWeekend,
+                        DeliveryScheduleStandard,
+                        DeliveryScheduleReservedForBulkShipments,
+                        DeliveryScheduleSignedOvernight> deliveryPreferences,
+                    string bar
+                ) { }
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData(
+        "Map",
+        """
+        class C
+        {
+            Map<FirstTypeArgumentWithAVeryLongNameIndeed,
+                SecondTypeArgumentWithAVeryLongNameIndeed,
+                ThirdTypeArgumentWithAVeryLongNameIndeed,
+                FourthTypeArgumentWithAVeryLongNameIndeed> Held;
+        }
+        """)]
+    [InlineData(
+        "Maps",
+        """
+        class C
+        {
+            Maps<
+                FirstTypeArgumentWithAVeryLongNameIndeed,
+                SecondTypeArgumentWithAVeryLongNameIndeed,
+                ThirdTypeArgumentWithAVeryLongNameIndeed,
+                FourthTypeArgumentWithAVeryLongNameIndeed> Held;
+        }
+        """)]
+    public void Auto_holds_the_first_type_argument_when_the_text_before_the_bracket_ends_by_the_continuation_column(string typeName, string expected)
+    {
+        var source = $$"""
+            class C
+            {
+                {{typeName}}<FirstTypeArgumentWithAVeryLongNameIndeed, SecondTypeArgumentWithAVeryLongNameIndeed, ThirdTypeArgumentWithAVeryLongNameIndeed, FourthTypeArgumentWithAVeryLongNameIndeed> Held;
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Format_nested_type_arguments_indent_each_list_from_the_line_it_starts_on()
+    {
+        const string source = """
+            class C
+            {
+                Task<Dictionary<string, List<SomeVeryLongTypeNameNumberOne, SomeVeryLongTypeNameNumberTwo, SomeVeryLongTypeNameNumberThree, SomeVeryLongTypeNameNumberFourteen>>> Nested { get; }
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                Task<
+                    Dictionary<
+                        string,
+                        List<SomeVeryLongTypeNameNumberOne, SomeVeryLongTypeNameNumberTwo, SomeVeryLongTypeNameNumberThree, SomeVeryLongTypeNameNumberFourteen>>> Nested { get; }
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Format_wrapped_type_arguments_pull_a_closing_bracket_on_its_own_line_up_to_the_last_argument()
+    {
+        const string source = """
+            class C
+            {
+                Dictionary<
+                    string,
+                    int
+                > Values;
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                Dictionary<
+                    string,
+                    int> Values;
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Format_wrapped_type_arguments_keep_a_line_comment_from_swallowing_the_closing_bracket()
+    {
+        const string source = """
+            class C
+            {
+                Dictionary<string, int // keep
+                > Values;
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                Dictionary<
+                    string,
+                    int // keep
+                > Values;
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Theory]
     [InlineData("\n", "MultipleChoice([\n    \"accessors\",\n    \"types\"\n], \"all\", \"none\");")]
     [InlineData("\r\n", "MultipleChoice([\n    \"accessors\",\n    \"types\"\n], \"all\", \"none\");")]
@@ -394,6 +574,15 @@ public class SyntaxWrappingRuleTests
         """
         [A,
             B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}
+        """)]
+    [InlineData(
+        "dress_type_arguments_layout",
+        "class C { System.Collections.Generic.Dictionary<string, int> Values { get; set; } }",
+        "class C { System.Collections.Generic.Dictionary<string, int> Values { get; set; } }",
+        """
+        class C { System.Collections.Generic.Dictionary<
+            string,
+            int> Values { get; set; } }
         """)]
     [Theory]
     public void Each_syntax_shape_supports_all_layout_modes_and_is_idempotent(
@@ -1968,7 +2157,8 @@ public class SyntaxWrappingRuleTests
                 "dress_binary_expressions_layout",
                 "dress_conditional_expressions_layout",
                 "dress_query_clauses_layout",
-                "dress_attributes_layout"
+                "dress_attributes_layout",
+                "dress_type_arguments_layout"
             ];
 
         var defaults = PreferenceCatalog.Defaults.ToDictionary(item => item.Key, item => item.Default);

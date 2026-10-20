@@ -11,7 +11,8 @@ readonly record struct SyntaxWrappingTriggerMask(
     bool From,
     bool Member,
     bool Question,
-    bool Binary)
+    bool Binary,
+    bool TypeArguments)
 {
     internal static SyntaxWrappingTriggerMask For(SyntaxWrappingSettings.Setting?[] byKind)
     {
@@ -34,7 +35,8 @@ readonly record struct SyntaxWrappingTriggerMask(
             Enabled(SyntaxWrappingKind.QueryClauses),
             member,
             member || Enabled(SyntaxWrappingKind.ConditionalExpressions),
-            Enabled(SyntaxWrappingKind.BinaryExpressions));
+            Enabled(SyntaxWrappingKind.BinaryExpressions),
+            Enabled(SyntaxWrappingKind.TypeArguments));
     }
 
     internal bool Matches(SyntaxKind kind) => kind switch
@@ -47,6 +49,7 @@ readonly record struct SyntaxWrappingTriggerMask(
             SyntaxKind.FromKeyword => From,
             SyntaxKind.DotToken or SyntaxKind.MinusGreaterThanToken => Member,
             SyntaxKind.QuestionToken => Question,
+            SyntaxKind.LessThanToken => TypeArguments || Binary,
             _ => Binary && IsBinaryOperator(kind)
         };
 

@@ -235,6 +235,7 @@ sealed class RuleCatalog
             [
                 new SyntaxWrappingRule(RuleKey.DressArgumentsLayout, "Arguments", "Lists", SyntaxWrappingKind.Arguments, "auto"),
                 new SyntaxWrappingRule(RuleKey.DressParametersLayout, "Parameters", "Lists", SyntaxWrappingKind.Parameters, "auto"),
+                new SyntaxWrappingRule(RuleKey.DressTypeArgumentsLayout, "Type arguments", "Lists", SyntaxWrappingKind.TypeArguments, "auto"),
                 new SyntaxWrappingRule(RuleKey.DressObjectInitializerLayout, "Object initializer", "Initializers", SyntaxWrappingKind.ObjectInitializers, "auto"),
                 new SyntaxWrappingRule(
                     RuleKey.DressCollectionInitializerLayout,
