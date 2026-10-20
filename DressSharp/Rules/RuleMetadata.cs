@@ -112,6 +112,11 @@ sealed record RuleMetadata
     /// <see cref="Example"/> still holds every option, so any selection of them can be tried against it.
     /// </summary>
     public ImmutableDictionary<string, string> OptionExamples { get; init; } = ImmutableDictionary<string, string>.Empty;
+    /// <summary>
+    /// The standard preference this one stands in for. The standard key decides only what no such
+    /// preference did, and Default preferences leave it out, so a tool that acts on it finds nothing.
+    /// </summary>
+    public RuleKey? StandardCounterpart { get; init; }
     public required string OwnedSyntax { get; init; }
     public required string Invariant { get; init; }
 

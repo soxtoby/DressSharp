@@ -17,6 +17,9 @@ enum RuleKey
     IndentSize,
     TabWidth,
     MaxLineLength,
+    DressDeclarationOpenBracePosition,
+    DressStatementOpenBracePosition,
+    DressLambdaOpenBracePosition,
     CSharpNewLineBeforeOpenBrace,
     CSharpNewLineBeforeElse,
     CSharpNewLineBeforeCatch,
@@ -54,9 +57,9 @@ enum RuleKey
     CSharpSpaceBetweenSquareBrackets,
     DressSpaceAfterCollectionSpreadOperator,
     DressSpaceAfterAttributeTargetColon,
+    DressSingleLineBlocks,
     CSharpPreserveSingleLineBlocks,
     CSharpPreserveSingleLineStatements,
-    DressPreserveTrivialSingleLineBlocks,
     DotnetSortSystemDirectivesFirst,
     DotnetSeparateImportDirectiveGroups,
     DressArgumentsLayout,
@@ -150,9 +153,9 @@ static class RuleKeys
             var startsWord = index > 0
                 && char.IsUpper(current)
                 && (char.IsLower(name[index - 1])
-                || !TryGet(name, index + 1, out var next)
-                || char.IsUpper(next)
-                || index > 1 && char.IsUpper(name[index - 2]));
+                    || !TryGet(name, index + 1, out var next)
+                    || char.IsUpper(next)
+                    || index > 1 && char.IsUpper(name[index - 2]));
             if (startsWord)
                 buffer[length++] = '_';
             buffer[length++] = char.ToLowerInvariant(current);

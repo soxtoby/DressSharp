@@ -40,6 +40,9 @@ sealed class EmitterPlan
         EmbeddedStatementSettings embeddedStatements,
         string? parametersClosingDelimiterPosition,
         string? multilineParameterListOpenBracePosition,
+        bool? declarationOpenBrace,
+        bool? statementOpenBrace,
+        bool? lambdaOpenBrace,
         bool alignComments)
     {
         Spacing = spacing;
@@ -67,6 +70,9 @@ sealed class EmitterPlan
         EmbeddedStatements = embeddedStatements;
         ParametersClosingDelimiterPosition = parametersClosingDelimiterPosition;
         MultilineParameterListOpenBracePosition = multilineParameterListOpenBracePosition;
+        DeclarationOpenBrace = declarationOpenBrace;
+        StatementOpenBrace = statementOpenBrace;
+        LambdaOpenBrace = lambdaOpenBrace;
         AlignComments = alignComments;
     }
 
@@ -94,6 +100,11 @@ sealed class EmitterPlan
     internal EmbeddedStatementSettings EmbeddedStatements { get; }
     internal string? ParametersClosingDelimiterPosition { get; }
     internal string? MultilineParameterListOpenBracePosition { get; }
+
+    /// <summary>Whether a brace of this family goes on the line after its header, where its rule is set.</summary>
+    internal bool? DeclarationOpenBrace { get; }
+    internal bool? StatementOpenBrace { get; }
+    internal bool? LambdaOpenBrace { get; }
     internal bool AlignComments { get; }
     internal ulong InitializerMemberBoundaryRules { get; }
 
@@ -193,6 +204,7 @@ sealed class EmitterPlan
                 && !preference.Equals("unset", StringComparison.OrdinalIgnoreCase);
         }
 
+        var singleLineBlocks = SingleLineBlocks(configuration);
         return new(
             [.. spacing],
             [.. newLines],
@@ -209,17 +221,41 @@ sealed class EmitterPlan
             OptionalBoolean(configuration, RuleKey.CSharpIndentCaseContents),
             OptionalLabelIndentation(configuration),
             OptionalBoolean(configuration, RuleKey.CSharpIndentCaseContentsWhenBlock),
-            OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == true,
-            OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) == false,
+            singleLineBlocks == "preserve",
+            singleLineBlocks is "expand" or "expand_unless_trivial",
             OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineStatements) == false,
-            OptionalBoolean(configuration, RuleKey.DressPreserveTrivialSingleLineBlocks) == true,
+            singleLineBlocks == "expand_unless_trivial",
             initializerIndentations,
             initializerLayouts,
             EmbeddedStatementSettings.From(configuration),
             OptionalPreference(configuration, RuleKey.DressParametersClosingDelimiterPosition),
             OptionalPreference(configuration, RuleKey.DressMultilineParameterListOpenBracePosition),
+            OptionalNextLine(configuration, RuleKey.DressDeclarationOpenBracePosition),
+            OptionalNextLine(configuration, RuleKey.DressStatementOpenBracePosition),
+            OptionalNextLine(configuration, RuleKey.DressLambdaOpenBracePosition),
             OptionalBoolean(configuration, RuleKey.DressCommentAlign) == true);
     }
+
+    /// <summary>
+    /// What happens to a block written on one line: the dress preference, or the standard one while
+    /// the dress one is unset.
+    /// </summary>
+    static string? SingleLineBlocks(FormattingConfiguration configuration) =>
+        OptionalPreference(configuration, RuleKey.DressSingleLineBlocks)
+        ?? OptionalBoolean(configuration, RuleKey.CSharpPreserveSingleLineBlocks) switch
+            {
+                true => "preserve",
+                false => "expand",
+                null => null
+            };
+
+    static bool? OptionalNextLine(FormattingConfiguration configuration, RuleKey key) =>
+        OptionalPreference(configuration, key) switch
+            {
+                "next_line" => true,
+                "same_line" => false,
+                _ => null
+            };
 
     static bool? OptionalBoolean(FormattingConfiguration configuration, RuleKey key) =>
         configuration.Preferences.TryGetValue(key, out var value)

@@ -186,8 +186,30 @@ public sealed class EditorConfigTests : IDisposable
         text.ShouldContain("dress_embedded_statement_braces = balanced\n");
         text.ShouldContain("dress_braces_for_multiline_statement_header = true\n");
         text.ShouldNotContain("dress_control_flow_braces");
+        text.ShouldContain("dress_declaration_open_brace_position = next_line\n");
+        text.ShouldContain("dress_single_line_blocks = expand_unless_trivial\n");
+        text.ShouldNotContain("csharp_new_line_before_open_brace");
+        text.ShouldNotContain("csharp_preserve_single_line_blocks");
         foreach (var (key, value) in PreferenceCatalog.Defaults)
             text.ShouldContain($"{key.ToName()} = {value}\n");
+    }
+
+    [Fact]
+    public async Task Init_adds_the_dress_rules_beside_a_standard_key_the_file_sets()
+    {
+        var path = Path.Combine(_directory, ".editorconfig");
+        const string original = "[*.cs]\ncsharp_new_line_before_open_brace = all\ncsharp_preserve_single_line_blocks = false\n";
+        await File.WriteAllTextAsync(path, original, TestContext.Current.CancellationToken);
+
+        await EditorConfigInitializer.InitializeAsync(path, _directory, TestContext.Current.CancellationToken);
+
+        var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+        text.ShouldStartWith(original);
+        text.ShouldContain("dress_declaration_open_brace_position = next_line\n");
+        text.ShouldContain("dress_statement_open_brace_position = next_line\n");
+        text.ShouldContain("dress_lambda_open_brace_position = next_line\n");
+        text.ShouldContain("dress_single_line_blocks = expand_unless_trivial\n");
+        (text.Split("csharp_new_line_before_open_brace", StringSplitOptions.None).Length - 1).ShouldBe(1);
     }
 
     [Fact]

@@ -116,6 +116,58 @@ public class MicrosoftCompatibilityRuleTests
         Format(first, ("csharp_new_line_before_open_brace", value)).ShouldBe(first);
     }
 
+    [Theory]
+    [
+        InlineData(
+        "dress_declaration_open_brace_position",
+        "namespace N { class C { int P { get { return 0; } } void M() { void L() { } } } }",
+        "namespace N\n{ class C\n{ int P\n{ get\n{ return 0; } } void M()\n{ void L()\n{ } } } }")
+    ]
+    [
+        InlineData(
+        "dress_statement_open_brace_position",
+        "class C { void M() { try { Work(); } finally { } switch (x) { } { } } }",
+        "class C { void M() { try\n{ Work(); } finally\n{ } switch (x)\n{ }\n{ } } }")
+    ]
+    [
+        InlineData(
+        "dress_lambda_open_brace_position",
+        "class C { Action A = () => { Work(); }; Action B = delegate { Work(); }; }",
+        "class C { Action A = () =>\n{ Work(); }; Action B = delegate\n{ Work(); }; }")
+    ]
+    public void Open_brace_position_rules_place_only_their_family(string key, string source, string expected)
+    {
+        Format(source, (key, "next_line")).ShouldBe(expected);
+        Format(expected, (key, "same_line")).ShouldBe(source);
+    }
+
+    [Fact]
+    public void Open_brace_position_rules_decide_before_the_standard_key_which_places_the_rest()
+    {
+        const string source = "class C { Action A = () => { }; void M() { } }";
+
+        Format(source, ("dress_declaration_open_brace_position", "same_line"), ("csharp_new_line_before_open_brace", "all"))
+            .ShouldBe("class C { Action A = () =>\n{ }; void M() { } }");
+        Format(source, ("dress_lambda_open_brace_position", "same_line"), ("csharp_new_line_before_open_brace", "all"))
+            .ShouldBe("class C\n{ Action A = () => { }; void M()\n{ } }");
+    }
+
+    [Fact]
+    public void Single_line_blocks_rule_is_read_in_place_of_the_standard_key()
+    {
+        const string source = "class C { bool Ready { get; } void Empty() { } void Body() { Work(); } }";
+
+        Format(source, ("dress_single_line_blocks", "preserve"), ("csharp_preserve_single_line_blocks", "false")).ShouldBe(source);
+        Format(source, ("dress_single_line_blocks", "expand")).ShouldBe(Format(source, ("csharp_preserve_single_line_blocks", "false")));
+        Format(source, ("dress_single_line_blocks", "expand_unless_trivial")).ShouldBe("""
+            class C {
+            bool Ready { get; } void Empty() { } void Body() {
+            Work();
+            }
+            }
+            """);
+    }
+
     [Fact]
     public void Single_line_block_preservation_wins_over_open_brace_newlines()
     {
@@ -540,9 +592,8 @@ public class MicrosoftCompatibilityRuleTests
     {
         (string, string)[] preferences =
             [
-                ("csharp_preserve_single_line_blocks", "false"),
-                ("csharp_preserve_single_line_statements", "false"),
-                ("dress_preserve_trivial_single_line_blocks", "true")
+                ("dress_single_line_blocks", "expand_unless_trivial"),
+                ("csharp_preserve_single_line_statements", "false")
             ];
         var first = Format("""
             namespace Empty { }
@@ -595,9 +646,8 @@ public class MicrosoftCompatibilityRuleTests
     {
         (string, string)[] preferences =
             [
-                ("csharp_preserve_single_line_blocks", "false"),
+                ("dress_single_line_blocks", "expand_unless_trivial"),
                 ("csharp_preserve_single_line_statements", "false"),
-                ("dress_preserve_trivial_single_line_blocks", "true"),
                 ("csharp_new_line_before_open_brace", "all"),
                 ("csharp_new_line_before_else", "true"),
                 ("csharp_indent_block_contents", "true"),
@@ -635,14 +685,10 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Fact]
-    public void Preserving_trivial_blocks_does_nothing_while_blocks_are_preserved()
+    public void Standard_block_preservation_key_is_read_while_the_dress_rule_is_unset()
     {
         const string source = "class C { bool Ready { get; } void Empty() { } void Body() { Work(); } }";
-        Format(
-            source,
-            ("csharp_preserve_single_line_blocks", "true"),
-            ("dress_preserve_trivial_single_line_blocks", "true"))
-            .ShouldBe(source);
+        Format(source, ("csharp_preserve_single_line_blocks", "true")).ShouldBe(source);
     }
 
     [Fact]

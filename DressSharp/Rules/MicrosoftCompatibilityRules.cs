@@ -389,11 +389,11 @@ sealed class DeclarationSpacingRule() : TokenSpacingRule(
             return null;
 
         return (left.IsKind(SyntaxKind.EqualsToken)
-            || right.IsKind(SyntaxKind.EqualsToken))
+                || right.IsKind(SyntaxKind.EqualsToken))
             && (left.Parent is EqualsValueClauseSyntax
-            || right.Parent is EqualsValueClauseSyntax)
-                ? true
-                : null;
+                || right.Parent is EqualsValueClauseSyntax)
+                    ? true
+                    : null;
     }
 }
 
@@ -427,7 +427,7 @@ sealed class BracketSpacingRule(RuleKey ruleKey, string caption, string? subgrou
 
     static bool IsNonEmptyEdge(SyntaxToken left, SyntaxToken right) =>
         (left.IsKind(SyntaxKind.OpenBracketToken) && left.Parent is BracketedArgumentListSyntax or ArrayRankSpecifierSyntax
-        || right.IsKind(SyntaxKind.CloseBracketToken) && right.Parent is BracketedArgumentListSyntax or ArrayRankSpecifierSyntax)
+            || right.IsKind(SyntaxKind.CloseBracketToken) && right.Parent is BracketedArgumentListSyntax or ArrayRankSpecifierSyntax)
         && !IsEmptyRank(left)
         && !IsEmptyRank(right);
 
@@ -464,11 +464,16 @@ sealed class BracketSpacingRule(RuleKey ruleKey, string caption, string? subgrou
 enum SingleLinePreservationKind
 {
     Blocks,
-    Statements,
-    TrivialBlocks
+    Statements
 }
 
-sealed class SingleLinePreservationRule(RuleKey ruleKey, string caption, string? subgroupName, SingleLinePreservationKind kind) : IFormattingRule
+sealed class SingleLinePreservationRule(
+    RuleKey ruleKey,
+    string caption,
+    string? subgroupName,
+    SingleLinePreservationKind kind,
+    string defaultValue = "false",
+    string? note = null) : IFormattingRule
 {
     public RuleMetadata Metadata { get; } = new()
         {
@@ -477,32 +482,21 @@ sealed class SingleLinePreservationRule(RuleKey ruleKey, string caption, string?
             ExpandedCaption = RuleMetadata.Humanize(ruleKey.ToName()),
             GroupName = "Braces and bodies",
             SubgroupName = subgroupName,
-            Description = $"Controls {OwnedSyntax(kind)}. {Invariant(kind)}.",
+            Description = $"Controls {OwnedSyntax(kind)}. {Invariant(kind)}." + (note is null ? "" : " " + note),
             Values = RuleValues.From(["true", "false"]),
-            DefaultValue = kind == SingleLinePreservationKind.TrivialBlocks ? "true" : "false",
-            Example = kind == SingleLinePreservationKind.TrivialBlocks
-                ? "class Example { bool Ready { get; } void Run() { } void Work() { Ready = true; } }"
-                : "class Example { void Run() { Work(); } void Work() { } }",
-            ExamplePreferences = kind == SingleLinePreservationKind.TrivialBlocks
-                ? ImmutableDictionary<RuleKey, string>.Empty.Add(RuleKey.CSharpPreserveSingleLineBlocks, "false")
-                : ImmutableDictionary<RuleKey, string>.Empty,
+            DefaultValue = defaultValue,
+            Example = "class Example { void Run() { Work(); } void Work() { } }",
             OwnedSyntax = OwnedSyntax(kind),
             Invariant = Invariant(kind)
         };
 
-    static string OwnedSyntax(SingleLinePreservationKind kind) => kind switch
-        {
-            SingleLinePreservationKind.Blocks => "existing single-line blocks and accessor lists",
-            SingleLinePreservationKind.Statements => "adjacent statements and member declarations",
-            _ => "existing single-line empty blocks and auto-accessor lists"
-        };
+    static string OwnedSyntax(SingleLinePreservationKind kind) => kind == SingleLinePreservationKind.Blocks
+        ? "existing single-line blocks and accessor lists"
+        : "adjacent statements and member declarations";
 
-    static string Invariant(SingleLinePreservationKind kind) => kind switch
-        {
-            SingleLinePreservationKind.Blocks => "False expands safe single-line blocks and accessor lists",
-            SingleLinePreservationKind.Statements => "False separates safe adjacent statements and members",
-            _ => "True keeps empty blocks and accessor lists without bodies on one line when single-line blocks expand"
-        };
+    static string Invariant(SingleLinePreservationKind kind) => kind == SingleLinePreservationKind.Blocks
+        ? "False expands safe single-line blocks and accessor lists"
+        : "False separates safe adjacent statements and members";
 }
 
 abstract class UsingDirectiveRule(

@@ -10,3 +10,10 @@ node_modules/
 benchmarks/corpus/files/
 benchmarks/results/
 .idea/
+# Rider plugin build output and tool caches under extensions/; its sources are tracked on the rider-plugin branch.
+extensions/**/.gradle/
+extensions/**/.intellijPlatform/
+extensions/**/.kotlin/
+extensions/**/build/
+extensions/**/*.iml
+extensions/**/local.properties

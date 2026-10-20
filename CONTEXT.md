@@ -23,6 +23,9 @@ An EditorConfig key and value that selects a formatting rule's outcome. Missing 
 The complete, explicit set of formatting preferences written by `dresssharp init`. It is not an implicit formatter fallback.
 _Avoid_: Familiar preferences, Familiar preset
 
+**Standard counterpart**:
+The standard `csharp_*` preference that one or more `dress_*` preferences stand in for. The standard preference decides only what none of them did. Default preferences set the `dress_*` preferences and leave the standard one out, so a tool that acts on it finds nothing.
+
 **Default preference initialization**:
 Adding each missing supported preference to an EditorConfig file. Existing assignments in any section remain authoritative; missing preferences go into an existing `[*.cs]` section or a new one at the end.
 _Avoid_: Managed configuration block

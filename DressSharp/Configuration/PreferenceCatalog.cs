@@ -5,7 +5,9 @@ namespace DressSharp.Configuration;
 
 static class PreferenceCatalog
 {
+    // A standard key with a counterpart is left out, so a tool that acts on it finds nothing.
     internal static IReadOnlyList<(RuleKey Key, string Default)> Defaults { get; } = RuleCatalog.BuiltIn.Rules
+        .Where(rule => !RuleCatalog.BuiltIn.StandardCounterparts.Any(pair => pair.Standard == rule.Metadata.RuleKey))
         .Select(rule => (RuleKey: rule.Metadata.RuleKey, rule.Metadata.DefaultValue))
         .ToArray();
 

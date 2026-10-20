@@ -2,7 +2,16 @@
 
 ## Unreleased
 
+### Added
+- `dress_declaration_open_brace_position`, `dress_statement_open_brace_position`, and `dress_lambda_open_brace_position` place opening braces by what owns them, `same_line` or `next_line`, in place of the category list of `csharp_new_line_before_open_brace`. They also place the braces of block namespaces and `switch` statements, which the standard key never covered.
+- `dress_single_line_blocks = preserve | expand | expand_unless_trivial` says what happens to a block written on one line, in place of `csharp_preserve_single_line_blocks` and `dress_preserve_trivial_single_line_blocks` together.
+
+### Changed
+- `dotnet dress init` no longer writes `csharp_new_line_before_open_brace` or `csharp_preserve_single_line_blocks`, so Visual Studio and Rider stop acting on DressSharp's brace and single-line block settings. Both keys still work where set, but only where no `dress_` rule decided. `init` adds the new rules at their defaults, which match the old defaults, so remove the two standard keys once it has run.
+- `dress_preserve_trivial_single_line_blocks` is no longer read. `dress_single_line_blocks = expand_unless_trivial`, which `init` adds, gives the same result.
+
 ### Fixed
+- A multi-line collection initializer of `{ key, value }` elements, such as a dictionary, puts one element per line like any other wrapped initializer, instead of leaving them all on one line.
 - With `dress_base_type_lists_layout = auto`, a base type list that fits on the line after a wrapped colon, such as `: IFoo, IBar`, stays on one line instead of taking a line per type, and one already broken after the colon no longer joins into a line over the limit.
 - Comments inside a wrapped object initializer or argument list keep their own lines and indent with the item that follows. They could be merged onto one line, pulled onto the item's line, or left one level out with `dress_comment_align = false`.
 - A comment just before a closing bracket or brace keeps the space between them.

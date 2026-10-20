@@ -74,10 +74,28 @@ public class RuleCatalogTests
     }
 
     [Fact]
-    public void Defaults_are_projected_from_rule_metadata()
+    public void Defaults_are_projected_from_rule_metadata_without_standard_keys_that_have_counterparts()
     {
+        var standard = RuleCatalog.BuiltIn.StandardCounterparts.Select(pair => pair.Standard).Distinct().ToArray();
+
         PreferenceCatalog.Defaults.ToArray().ShouldMatch(
-            RuleCatalog.BuiltIn.Rules.Select(rule => (RuleKey: rule.Metadata.RuleKey, rule.Metadata.DefaultValue)).ToArray());
+            RuleCatalog.BuiltIn.Rules
+                .Where(rule => !standard.Contains(rule.Metadata.RuleKey))
+                .Select(rule => (RuleKey: rule.Metadata.RuleKey, rule.Metadata.DefaultValue))
+                .ToArray());
+        standard.ShouldMatch([RuleKey.CSharpNewLineBeforeOpenBrace, RuleKey.CSharpPreserveSingleLineBlocks]);
+    }
+
+    [Fact]
+    public void Dress_rules_stand_in_for_the_standard_keys_other_tools_act_on()
+    {
+        RuleCatalog.BuiltIn.StandardCounterparts.ToArray().ShouldMatch(
+            [
+                (RuleKey.DressDeclarationOpenBracePosition, RuleKey.CSharpNewLineBeforeOpenBrace),
+                (RuleKey.DressStatementOpenBracePosition, RuleKey.CSharpNewLineBeforeOpenBrace),
+                (RuleKey.DressLambdaOpenBracePosition, RuleKey.CSharpNewLineBeforeOpenBrace),
+                (RuleKey.DressSingleLineBlocks, RuleKey.CSharpPreserveSingleLineBlocks)
+            ]);
     }
 
     [Fact]

@@ -6,7 +6,17 @@ namespace DressSharp.UnitTests;
 public sealed class ClosingDelimiterPositionRuleTests
 {
     public static TheoryData<string, string, string> Lists => new()
-        { { "arguments", "Call(\n    first,\n    second", ");" }, { "arguments", "var value = items[\n    first,\n    second", "];" }, { "parameters", "class C(\n    int first,\n    int second", ") { }" }, { "parameters", "class C\n{\n    int this[\n        int first,\n        int second", "] => 0;\n}" }, { "object_initializer", "var value = new C\n{\n    First = 1,\n    Second = 2", "};" }, { "object_initializer", "var value = new\n{\n    First = 1,\n    Second = 2", "};" }, { "collection_initializer", "var value = new List<int>\n{\n    1,\n    2", "};" }, { "array_initializer", "var value = new[]\n{\n    1,\n    2", "};" }, { "with_initializer", "var value = original with\n{\n    First = 1,\n    Second = 2", "};" }, { "collection_expression", "int[] value = [\n    1,\n    2", "];" }
+        {
+            { "arguments", "Call(\n    first,\n    second", ");" },
+            { "arguments", "var value = items[\n    first,\n    second", "];" },
+            { "parameters", "class C(\n    int first,\n    int second", ") { }" },
+            { "parameters", "class C\n{\n    int this[\n        int first,\n        int second", "] => 0;\n}" },
+            { "object_initializer", "var value = new C\n{\n    First = 1,\n    Second = 2", "};" },
+            { "object_initializer", "var value = new\n{\n    First = 1,\n    Second = 2", "};" },
+            { "collection_initializer", "var value = new List<int>\n{\n    1,\n    2", "};" },
+            { "array_initializer", "var value = new[]\n{\n    1,\n    2", "};" },
+            { "with_initializer", "var value = original with\n{\n    First = 1,\n    Second = 2", "};" },
+            { "collection_expression", "int[] value = [\n    1,\n    2", "];" }
         };
 
     [Theory]

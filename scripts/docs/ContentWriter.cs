@@ -147,7 +147,10 @@ sealed class ContentWriter(string root)
         section.Append(Text(metadata.Description)).Append("\n\n");
 
         section.Append($"- **Values:** {ValueList(metadata)}\n");
-        section.Append($"- **Default:** {Code(metadata.DefaultValue)}{(rule.IsDefaultUnset ? " (the rule makes no change unless you set it)" : "")}\n");
+        var defaultNote = !rule.Counterparts.IsEmpty ? $" (left out by {Code("dotnet dress init")}, which sets {string.Join(", ", rule.Counterparts.Select(Code))} instead)"
+            : rule.IsDefaultUnset ? " (the rule makes no change unless you set it)"
+            : "";
+        section.Append($"- **Default:** {Code(metadata.DefaultValue)}{defaultNote}\n");
         section.Append($"- **Applies to:** {Text(Sentence(metadata.OwnedSyntax))}\n");
         section.Append($"- **Guarantee:** {Text(Sentence(metadata.Invariant))}\n");
         if (!rule.Companions.IsEmpty)

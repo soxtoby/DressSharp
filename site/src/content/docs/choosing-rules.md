@@ -37,7 +37,7 @@ Your rules live in a plain `.editorconfig` file, so you can also change them in 
 [*.cs]
 max_line_length = 120
 dress_namespace_style = file_scoped
-csharp_new_line_before_open_brace = all
+dress_declaration_open_brace_position = next_line
 ```
 
 A few things are worth knowing:
@@ -54,6 +54,6 @@ Most rules make small adjustments, but a few decide most of how your code looks.
 
 - [`max_line_length`](../rules/wrapping/#max_line_length): where long lines start to wrap.
 - [`dress_namespace_style`](../rules/braces-and-bodies/#dress_namespace_style): file-scoped or block namespaces.
-- [`csharp_new_line_before_open_brace`](../rules/braces-and-bodies/#csharp_new_line_before_open_brace): whether braces go on their own line.
+- [`dress_declaration_open_brace_position`](../rules/braces-and-bodies/#dress_declaration_open_brace_position) and its statement and lambda siblings: whether braces go on their own line.
 - [Body styles](../rules/braces-and-bodies/#dress_method_body): expression bodies (`=>`) or block bodies.
 - [`indent_style` and `indent_size`](../rules/indentation/#indent_style): tabs or spaces, and how many.

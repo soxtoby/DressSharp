@@ -116,6 +116,23 @@ sealed class RuleCatalog
                 new CollectionSpreadSpacingRule(),
                 new AttributeTargetSpacingRule()
             ];
+        var openBraceValues = RuleValues.MultipleChoice(
+            [
+                "accessors",
+                "anonymous_methods",
+                "anonymous_types",
+                "control_blocks",
+                "events",
+                "indexers",
+                "lambdas",
+                "local_functions",
+                "methods",
+                "object_collection_array_initializers",
+                "properties",
+                "types"
+            ],
+            "all",
+            "none");
         NewLineRule[] newLineRules =
             [
                 new NewLineRule(
@@ -123,24 +140,9 @@ sealed class RuleCatalog
                     "Before open brace",
                     "Newlines",
                     NewLineKind.OpenBrace,
-                    RuleValues.MultipleChoice(
-                        [
-                            "accessors",
-                            "anonymous_methods",
-                            "anonymous_types",
-                            "control_blocks",
-                            "events",
-                            "indexers",
-                            "lambdas",
-                            "local_functions",
-                            "methods",
-                            "object_collection_array_initializers",
-                            "properties",
-                            "types"
-                        ],
-                        "all",
-                        "none"),
-                    "accessors,anonymous_methods,anonymous_types,control_blocks,events,indexers,lambdas,local_functions,methods,properties,types"),
+                    openBraceValues,
+                    "unset",
+                    note: "Places only the braces no open brace position rule decided. Default preferences leave it out, since Visual Studio and Rider act on it too."),
                 new NewLineRule(RuleKey.CSharpNewLineBeforeElse, "Before else", "Newlines", NewLineKind.Else, RuleValues.Boolean(), "true"),
                 new NewLineRule(RuleKey.CSharpNewLineBeforeCatch, "Before catch", "Newlines", NewLineKind.Catch, RuleValues.Boolean(), "true"),
                 new NewLineRule(RuleKey.CSharpNewLineBeforeFinally, "Before finally", "Newlines", NewLineKind.Finally, RuleValues.Boolean(), "true"),
@@ -177,17 +179,18 @@ sealed class RuleCatalog
             ];
         SingleLinePreservationRule[] preservationRules =
             [
-                new SingleLinePreservationRule(RuleKey.CSharpPreserveSingleLineBlocks, "Blocks", "Preserve single line", SingleLinePreservationKind.Blocks),
+                new SingleLinePreservationRule(
+                    RuleKey.CSharpPreserveSingleLineBlocks,
+                    "Blocks (standard key)",
+                    "Preserve single line",
+                    SingleLinePreservationKind.Blocks,
+                    "unset",
+                    "Read only while dress_single_line_blocks is unset. Default preferences leave it out, since Visual Studio and Rider act on it too."),
                 new SingleLinePreservationRule(
                     RuleKey.CSharpPreserveSingleLineStatements,
                     "Statements",
                     "Preserve single line",
-                    SingleLinePreservationKind.Statements),
-                new SingleLinePreservationRule(
-                    RuleKey.DressPreserveTrivialSingleLineBlocks,
-                    "Trivial blocks",
-                    "Preserve single line",
-                    SingleLinePreservationKind.TrivialBlocks)
+                    SingleLinePreservationKind.Statements)
             ];
         InitializerIndentationRule[] initializerIndentationRules =
             [
@@ -306,6 +309,8 @@ sealed class RuleCatalog
             .Append(new OperatorPlacementRule())
             .Concat(ClosingDelimiterPositionRule.All())
             .Append(new MultilineParameterListOpenBracePositionRule())
+            .Concat(OpenBracePositionRule.All())
+            .Append(new SingleLineBlocksRule())
             .Concat(newLineRules)
             .Concat(indentationRules)
             .Append(new SwitchExpressionIndentationRule())
@@ -376,6 +381,10 @@ sealed class RuleCatalog
             .ToDictionary(rule => rule.Metadata.RuleKey);
         Rules = Enum.GetValues<RuleKey>().Select(key => rulesByKey[key]).ToImmutableArray();
         Validate(Rules);
+        StandardCounterparts = Rules
+            .Where(rule => rule.Metadata.StandardCounterpart is not null)
+            .Select(rule => (rule.Metadata.RuleKey, rule.Metadata.StandardCounterpart!.Value))
+            .ToImmutableArray();
 
         FileRules = Rules.OfType<NamespaceStyleRule>().Cast<ISyntaxFormattingRule>().ToImmutableArray();
         UsingRules = Rules.OfType<IUsingFormattingRule>().ToImmutableArray();
@@ -437,6 +446,9 @@ sealed class RuleCatalog
 
     internal int Version { get; } = CurrentVersion;
     internal ImmutableArray<IRule> Rules { get; }
+
+    /// <summary>Each preference that stands in for a standard one, with that standard key.</summary>
+    internal ImmutableArray<(RuleKey Key, RuleKey Standard)> StandardCounterparts { get; }
     internal ImmutableArray<ISyntaxFormattingRule> FileRules { get; }
     internal ImmutableArray<IUsingFormattingRule> UsingRules { get; }
     internal ImmutableArray<ISyntaxFormattingRule> MemberRules { get; }
@@ -475,6 +487,11 @@ sealed class RuleCatalog
             throw new ArgumentException("Rule accepted values must be unique.", nameof(rules));
         if (rules.Length != Enum.GetValues<RuleKey>().Length)
             throw new ArgumentException("Every supported preference requires exactly one rule.", nameof(rules));
+        if (rules.Any(rule => rule.Metadata.StandardCounterpart is { } standard
+            && !rules.Any(other => other.Metadata.RuleKey == standard && other.Metadata.DefaultValue.Equals("unset", StringComparison.OrdinalIgnoreCase))))
+        {
+            throw new ArgumentException("A standard key with a counterpart must be a rule whose Default is unset.", nameof(rules));
+        }
     }
 }
 

@@ -17,6 +17,12 @@ sealed record RuleDocumentation(
     ImmutableArray<(string Key, string Value)> Companions)
 {
     internal bool IsDefaultUnset => Metadata.DefaultValue.Equals("unset", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The preferences that stand in for this one, when this is a standard key left out of the Defaults.</summary>
+    internal ImmutableArray<string> Counterparts => RuleCatalog.BuiltIn.StandardCounterparts
+        .Where(pair => pair.Standard == Metadata.RuleKey)
+        .Select(pair => pair.Key.ToName())
+        .ToImmutableArray();
 }
 
 sealed record RuleGroup(string Name, ImmutableArray<RuleSubgroup> Subgroups)

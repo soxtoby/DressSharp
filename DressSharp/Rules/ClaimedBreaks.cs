@@ -86,6 +86,9 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
         if (MultilineParameterListBraceBreak(left, token, leftOpenedItsLine) is { } parameterListBraceBreak)
             return parameterListBraceBreak;
 
+        if (OpenBracePositionBreak(token) is { } positioned)
+            return positioned;
+
         var candidates = plan.NewLineTrigger(token.RawKind);
         if (candidates == 0 || _checkMalformedRegions && IsUnsafeOriginal(token))
             return null;
@@ -113,6 +116,23 @@ sealed class ClaimedBreaks(EmitterPlan plan, RuleContext context, SyntaxNode roo
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Where the open brace position rule for the family of syntax owning this brace puts it, or
+    /// null where no such rule is set, so the standard open-brace rule can still claim it.
+    /// </summary>
+    bool? OpenBracePositionBreak(SyntaxToken token)
+    {
+        if (!token.IsKind(SyntaxKind.OpenBraceToken) || OpenBracePositionRule.FamilyOf(token) is not { } family)
+            return null;
+        var position = family switch
+            {
+                OpenBraceFamily.Declaration => plan.DeclarationOpenBrace,
+                OpenBraceFamily.Statement => plan.StatementOpenBrace,
+                _ => plan.LambdaOpenBrace
+            };
+        return position is null || _checkMalformedRegions && IsUnsafeOriginal(token) ? null : position;
     }
 
     bool? MultilineParameterListBraceBreak(SyntaxToken left, SyntaxToken right, bool leftOpenedItsLine)
