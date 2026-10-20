@@ -69,8 +69,7 @@ public sealed class InitializerLayoutRuleTests
     }
 
     [Theory]
-    [
-        InlineData(
+    [InlineData(
         "dress_object_initializer_layout",
         "dress_object_initializer_indentation",
         "C M() => new C { X = 1, Y = 2 };",
@@ -80,10 +79,8 @@ public sealed class InitializerLayoutRuleTests
             X = 1,
             Y = 2
         };
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_collection_initializer_layout",
         "dress_collection_initializer_indentation",
         "List<int> M() => new() { 1, 2 };",
@@ -93,10 +90,8 @@ public sealed class InitializerLayoutRuleTests
             1,
             2
         };
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_array_initializer_layout",
         "dress_array_initializer_indentation",
         "int[] M() => new[] { 1, 2 };",
@@ -106,10 +101,8 @@ public sealed class InitializerLayoutRuleTests
             1,
             2
         };
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_with_initializer_layout",
         "dress_with_initializer_indentation",
         "C M(C value) => value with { X = 1, Y = 2 };",
@@ -119,8 +112,7 @@ public sealed class InitializerLayoutRuleTests
             X = 1,
             Y = 2
         };
-        """)
-    ]
+        """)]
     public void Each_initializer_kind_has_an_independent_layout_rule(
         string layoutKey,
         string indentationKey,

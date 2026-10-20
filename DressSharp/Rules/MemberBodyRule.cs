@@ -143,7 +143,7 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
             switch (expression)
             {
                 case true when (node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body: not null } accessor]
-                        && TryExpression(accessor.Body, false, out var value)):
+                            && TryExpression(accessor.Body, false, out var value)):
                     var rewritten = node
                         .WithAccessorList(null)
                         .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(value)
@@ -170,7 +170,7 @@ sealed class MemberBodyRule(RuleKey ruleKey, string caption, string? subgroupNam
             switch (expression)
             {
                 case true when (node.AccessorList?.Accessors is [{ Keyword.RawKind: (int)SyntaxKind.GetKeyword, Body: not null } accessor]
-                        && TryExpression(accessor.Body, false, out var value)):
+                            && TryExpression(accessor.Body, false, out var value)):
                     var rewritten = node
                         .WithAccessorList(null)
                         .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(value)

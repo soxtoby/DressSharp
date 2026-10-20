@@ -215,9 +215,7 @@ public class SyntaxWrappingRuleTests
     [InlineData("\r\n", "dress_arguments_layout", "M(alpha, beta,\n    gamma);", "M(\n    alpha,\n    beta,\n    gamma);")]
     [InlineData("\n", "dress_arguments_layout", "new C(alpha, beta,\n    gamma);", "new C(\n    alpha,\n    beta,\n    gamma);")]
     [InlineData("\n", "dress_parameters_layout", "void M(int alpha, int beta,\n    int gamma) {}", "void M(\n    int alpha,\n    int beta,\n    int gamma) {}")]
-    [
-        InlineData("\r\n", "dress_parameters_layout", "void M(int alpha, int beta,\n    int gamma) {}", "void M(\n    int alpha,\n    int beta,\n    int gamma) {}")
-    ]
+    [InlineData("\r\n", "dress_parameters_layout", "void M(int alpha, int beta,\n    int gamma) {}", "void M(\n    int alpha,\n    int beta,\n    int gamma) {}")]
     public void Auto_puts_each_item_of_a_multiline_list_on_its_own_line(string lineEnding, string key, string source, string expected)
     {
         var preferences = new[] { (key, "auto"), ("max_line_length", "500") };
@@ -306,8 +304,7 @@ public class SyntaxWrappingRuleTests
         Format(result, preferences).ShouldBe(result);
     }
 
-    [
-        InlineData(
+    [InlineData(
         "dress_arguments_layout",
         "class C { void M() { N(alpha, beta); } void N(int a, int b) {} int alpha; int beta; }",
         "class C { void M() { N(alpha, beta); } void N(int a, int b) {} int alpha; int beta; }",
@@ -316,10 +313,8 @@ public class SyntaxWrappingRuleTests
             alpha,
             beta
         ); } void N(int a, int b) {} int alpha; int beta; }
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_parameters_layout",
         "class C { void M(int alpha, string beta) {} }",
         "class C { void M(int alpha, string beta) {} }",
@@ -328,10 +323,8 @@ public class SyntaxWrappingRuleTests
             int alpha,
             string beta
         ) {} }
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_collection_expressions_layout",
         "class C { int[] M() => [alpha, beta]; int alpha; int beta; }",
         "class C { int[] M() => [alpha, beta]; int alpha; int beta; }",
@@ -340,10 +333,8 @@ public class SyntaxWrappingRuleTests
             alpha,
             beta
         ]; int alpha; int beta; }
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_base_type_lists_layout",
         "class C : Alpha, IBeta {} class Alpha {} interface IBeta {}",
         "class C : Alpha, IBeta {} class Alpha {} interface IBeta {}",
@@ -351,10 +342,8 @@ public class SyntaxWrappingRuleTests
         class C
             : Alpha,
             IBeta {} class Alpha {} interface IBeta {}
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_constraint_clauses_layout",
         "class C<T, U> where T : class where U : struct {}",
         "class C<T, U> where T : class where U : struct {}",
@@ -362,10 +351,8 @@ public class SyntaxWrappingRuleTests
         class C<T, U>
             where T : class
             where U : struct {}
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_member_access_chains_layout",
         """class C { string M() => value.Trim().ToString(); string value = ""; }""",
         """class C { string M() => value.Trim().ToString(); string value = ""; }""",
@@ -373,20 +360,16 @@ public class SyntaxWrappingRuleTests
         class C { string M() => value
             .Trim()
             .ToString(); string value = ""; }
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_binary_expressions_layout",
         "class C { bool M() => alpha && beta; bool alpha; bool beta; }",
         "class C { bool M() => alpha && beta; bool alpha; bool beta; }",
         """
         class C { bool M() => alpha
             && beta; bool alpha; bool beta; }
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_conditional_expressions_layout",
         "class C { int M() => condition ? alpha : beta; bool condition; int alpha; int beta; }",
         "class C { int M() => condition ? alpha : beta; bool condition; int alpha; int beta; }",
@@ -394,10 +377,8 @@ public class SyntaxWrappingRuleTests
         class C { int M() => condition
             ? alpha
             : beta; bool condition; int alpha; int beta; }
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_query_clauses_layout",
         "class C { object M(int[] xs) => from x in xs where x > 0 select x; }",
         "class C { object M(int[] xs) => from x in xs where x > 0 select x; }",
@@ -405,18 +386,15 @@ public class SyntaxWrappingRuleTests
         class C { object M(int[] xs) => from x in xs
             where x > 0
             select x; }
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "dress_attributes_layout",
         "[A, B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}",
         "[A, B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}",
         """
         [A,
             B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}
-        """)
-    ]
+        """)]
     [Theory]
     public void Each_syntax_shape_supports_all_layout_modes_and_is_idempotent(
         string key,
@@ -787,8 +765,7 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
-    [
-        InlineData("dress_arguments_layout",
+    [InlineData("dress_arguments_layout",
         "class C { object M() => Outer(Inner(firstArgument, secondArgument), thirdArgument); }",
         """
         class C { object M() => Outer(
@@ -798,10 +775,8 @@ public class SyntaxWrappingRuleTests
             ),
             thirdArgument
         ); }
-        """)
-    ]
-    [
-        InlineData("dress_collection_expressions_layout",
+        """)]
+    [InlineData("dress_collection_expressions_layout",
         "class C { object[] M() => [N(firstArgument, secondArgument), thirdArgument]; }",
         """
         class C { object[] M() => [
@@ -811,10 +786,8 @@ public class SyntaxWrappingRuleTests
             ),
             thirdArgument
         ]; }
-        """)
-    ]
-    [
-        InlineData("dress_member_access_chains_layout",
+        """)]
+    [InlineData("dress_member_access_chains_layout",
         "class C { object M() => N(firstArgument, secondArgument).First.Second; }",
         """
         class C { object M() => N(
@@ -823,10 +796,8 @@ public class SyntaxWrappingRuleTests
         )
             .First
             .Second; }
-        """)
-    ]
-    [
-        InlineData("dress_binary_expressions_layout",
+        """)]
+    [InlineData("dress_binary_expressions_layout",
         "class C { int M() => N(firstArgument, secondArgument) + thirdArgument; }",
         """
         class C { int M() => N(
@@ -834,10 +805,8 @@ public class SyntaxWrappingRuleTests
             secondArgument
         )
             + thirdArgument; }
-        """)
-    ]
-    [
-        InlineData("dress_conditional_expressions_layout",
+        """)]
+    [InlineData("dress_conditional_expressions_layout",
         "class C { int M() => N(firstArgument, secondArgument) ? firstArgument : secondArgument; }",
         """
         class C { int M() => N(
@@ -846,10 +815,8 @@ public class SyntaxWrappingRuleTests
         )
                 ? firstArgument
                 : secondArgument; }
-        """)
-    ]
-    [
-        InlineData("dress_query_clauses_layout",
+        """)]
+    [InlineData("dress_query_clauses_layout",
         "class C { object M(int[] xs) => from x in xs where N(firstArgument, secondArgument) select x; }",
         """
         class C { object M(int[] xs) => from x in xs
@@ -858,8 +825,7 @@ public class SyntaxWrappingRuleTests
                 secondArgument
             )
             select x; }
-        """)
-    ]
+        """)]
     public void Outer_auto_layout_kinds_keep_stable_source_anchors_after_inner_rewrite(
         string outerKey,
         string source,
@@ -1694,25 +1660,21 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
-    [
-        InlineData(
+    [InlineData(
         "class C { string M(string value) => value?.Trim(); }",
         "class C { string M(string value) => value?.Trim(); }",
         """
         class C { string M(string value) => value
             ?.Trim(); }
-        """)
-    ]
-    [
-        InlineData(
+        """)]
+    [InlineData(
         "class C { string M(string value) => value?.Trim().ToString(); }",
         "class C { string M(string value) => value?.Trim().ToString(); }",
         """
         class C { string M(string value) => value
             ?.Trim()
             .ToString(); }
-        """)
-    ]
+        """)]
     public void Conditional_access_chains_support_all_modes_without_splitting_question_dot(
         string source,
         string expectedSingle,
@@ -1789,8 +1751,7 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
-    [
-        InlineData("indented",
+    [InlineData("indented",
         """
         class C
         {
@@ -1802,10 +1763,8 @@ public class SyntaxWrappingRuleTests
             int X;
             int Y;
         }
-        """)
-    ]
-    [
-        InlineData("not_indented",
+        """)]
+    [InlineData("not_indented",
         """
         class C
         {
@@ -1817,8 +1776,7 @@ public class SyntaxWrappingRuleTests
             int X;
             int Y;
         }
-        """)
-    ]
+        """)]
     public void Earlier_initializer_indentation_sets_the_base_used_by_syntax_wrapping(
         string indentation,
         string expected)

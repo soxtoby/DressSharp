@@ -11,9 +11,7 @@ public class SinglePassEmitterTests
     [InlineData("    using System;\n    public class Receipt;", "using System;\npublic class Receipt;")]
     [InlineData("    extern alias X;\n    public class Receipt;", "extern alias X;\npublic class Receipt;")]
     [InlineData("    [Obsolete]\n    public class Receipt;", "[Obsolete]\npublic class Receipt;")]
-    [
-        InlineData("    public class Receipt\n    {\n        int value;\n    }\n    public class Other;", "public class Receipt\n{\n    int value;\n}\npublic class Other;")
-    ]
+    [InlineData("    public class Receipt\n    {\n        int value;\n    }\n    public class Other;", "public class Receipt\n{\n    int value;\n}\npublic class Other;")]
     public void File_scoped_namespace_contents_obey_indentation(string sourceContents, string expectedContents)
     {
         var source = $"namespace Example;\n{sourceContents}";

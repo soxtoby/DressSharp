@@ -254,7 +254,7 @@ sealed class SyntaxWrappingDiscovery
             || token != binary.OperatorToken
             || binary.Parent is BinaryExpressionSyntax parent
                 && (Enabled(SyntaxWrappingKind.BinaryExpressions)?.Mode != SyntaxWrappingSettings.WrappingMode.Auto
-                || parent.RawKind == binary.RawKind))
+                    || parent.RawKind == binary.RawKind))
         {
             return;
         }
@@ -381,10 +381,10 @@ sealed class SyntaxWrappingDiscovery
             var token = pieces[index].Token;
             if (BelongsToOccurrence(token, occurrence)
                 && (token.IsKind(SyntaxKind.QuestionToken)
-                    && token.Parent is ConditionalAccessExpressionSyntax
-                || (token.IsKind(SyntaxKind.DotToken)
-                    && !token.GetPreviousToken().IsKind(SyntaxKind.QuestionToken))
-                || token.IsKind(SyntaxKind.MinusGreaterThanToken)))
+                        && token.Parent is ConditionalAccessExpressionSyntax
+                    || (token.IsKind(SyntaxKind.DotToken)
+                        && !token.GetPreviousToken().IsKind(SyntaxKind.QuestionToken))
+                    || token.IsKind(SyntaxKind.MinusGreaterThanToken)))
             {
                 if (firstCall < 0 && CallsMember(token))
                     firstCall = _boundaries.Count;
@@ -445,7 +445,7 @@ sealed class SyntaxWrappingDiscovery
             if (token.Parent is BinaryExpressionSyntax expression
                 && token == expression.OperatorToken
                 && (Enabled(SyntaxWrappingKind.BinaryExpressions)?.Mode != SyntaxWrappingSettings.WrappingMode.Auto
-                || BelongsToBinary(expression, root)))
+                    || BelongsToBinary(expression, root)))
             {
                 OperatorBoundary(index, SyntaxWrappingKind.BinaryExpressions);
             }
@@ -557,7 +557,7 @@ sealed class SyntaxWrappingDiscovery
                     && candidate.FirstToken <= occurrence.FirstToken
                     && occurrence.LastToken <= candidate.LastToken
                     && (candidate.FirstToken != occurrence.FirstToken
-                    || candidate.LastToken != occurrence.LastToken))
+                        || candidate.LastToken != occurrence.LastToken))
                 {
                     break;
                 }

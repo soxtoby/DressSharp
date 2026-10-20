@@ -129,12 +129,8 @@ public class IndentationOwnershipTests
     }
 
     [Theory]
-    [
-        InlineData("flat", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;")
-    ]
-    [
-        InlineData("precedence", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n        && _safetyContext?.IsUnsafe(node) == true;")
-    ]
+    [InlineData("flat", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;")]
+    [InlineData("precedence", "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n        && _safetyContext?.IsUnsafe(node) == true;")]
     public void Binary_indentation_can_follow_operator_precedence(string indentation, string expected)
     {
         const string source = "bool Unsafe(SyntaxNode node) => node.ContainsDirectives\n    || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)\n    && _safetyContext?.IsUnsafe(node) == true;";

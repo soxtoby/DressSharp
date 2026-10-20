@@ -45,11 +45,11 @@ sealed class EffectiveTokenStream
                     var segmentIndex = segments?.Count ?? 0;
                     pieces.AddRange(replacement.Rewritten.DescendantTokens()
                         .Select(rewritten => new Piece(
-                        rewritten,
-                        replacement.Text,
-                        false,
-                        replacement.Original.Start,
-                        segmentIndex)));
+                            rewritten,
+                            replacement.Text,
+                            false,
+                            replacement.Original.Start,
+                            segmentIndex)));
                     (segments ??= []).Add(new(
                         replacement.Original,
                         replacementStart,

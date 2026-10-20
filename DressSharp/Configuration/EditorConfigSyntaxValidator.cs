@@ -9,7 +9,7 @@ static class EditorConfigSyntaxValidator
         var preambleLength = bytes.StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }) ? 3 : 0;
         if (preambleLength == 0
             && (bytes.StartsWith(new byte[] { 0xFF, 0xFE })
-            || bytes.StartsWith(new byte[] { 0xFE, 0xFF })))
+                || bytes.StartsWith(new byte[] { 0xFE, 0xFF })))
         {
             throw new ConfigurationException($"{path}: EditorConfig files must be UTF-8 encoded.");
         }

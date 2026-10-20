@@ -136,12 +136,12 @@ static class InteractiveEditorConfig
                 {
                     var key = rule.Metadata.RuleKey;
                     return new InteractivePreference(
-                    key,
-                    local.GetValueOrDefault(key, PreferenceAssignment.Absent),
-                    inherited.GetValueOrDefault(key, PreferenceAssignment.Absent),
-                    inheritedSources.GetValueOrDefault(key),
-                    effective.GetValueOrDefault(key),
-                    effectiveSources.GetValueOrDefault(key));
+                        key,
+                        local.GetValueOrDefault(key, PreferenceAssignment.Absent),
+                        inherited.GetValueOrDefault(key, PreferenceAssignment.Absent),
+                        inheritedSources.GetValueOrDefault(key),
+                        effective.GetValueOrDefault(key),
+                        effectiveSources.GetValueOrDefault(key));
                 })
             .ToImmutableArray();
         return new InteractiveEditorConfigData(
@@ -356,7 +356,7 @@ sealed class EditorConfigDocument
         var remaining = FindOccurrences(lines);
         var additions = edits
             .Where(edit => edit.DesiredLocal.Kind != PreferenceAssignmentKind.Absent
-            && !remaining.ContainsKey(edit.RuleKey))
+                && !remaining.ContainsKey(edit.RuleKey))
             .OrderBy(edit => CatalogIndex(edit.RuleKey))
             .ToArray();
         var hadFinalNewline = Source.Text.EndsWith('\r') || Source.Text.EndsWith('\n');

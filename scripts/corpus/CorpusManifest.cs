@@ -17,11 +17,11 @@ static class CorpusManifest
                     var bytes = File.ReadAllBytes(path);
                     var text = File.ReadAllText(path);
                     return new Entry(
-                    Path.GetRelativePath(corpus, path).Replace('\\', '/'),
-                    Convert.ToHexStringLower(SHA256.HashData(bytes)),
-                    bytes.Length,
-                    text.Length == 0 ? 0 : text.Count(character => character == '\n') + 1,
-                    CSharpSyntaxTree.ParseText(text).GetRoot().DescendantNodesAndSelf().Count());
+                        Path.GetRelativePath(corpus, path).Replace('\\', '/'),
+                        Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                        bytes.Length,
+                        text.Length == 0 ? 0 : text.Count(character => character == '\n') + 1,
+                        CSharpSyntaxTree.ParseText(text).GetRoot().DescendantNodesAndSelf().Count());
                 }).ToArray();
         var corpusHash = Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
             string.Join('\n', entries.Select(entry => $"{entry.Path}:{entry.Sha256}")))));

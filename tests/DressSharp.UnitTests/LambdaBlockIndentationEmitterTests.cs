@@ -79,9 +79,9 @@ public class LambdaBlockIndentationEmitterTests
             ("csharp_indent_braces", "false"),
             ("csharp_indent_block_contents", "true"))
             .ShouldBe(Format(
-            source,
-            ("csharp_indent_braces", "false"),
-            ("csharp_indent_block_contents", "true")));
+                source,
+                ("csharp_indent_braces", "false"),
+                ("csharp_indent_block_contents", "true")));
     }
 
     [Theory]

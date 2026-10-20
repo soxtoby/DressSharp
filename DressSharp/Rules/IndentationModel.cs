@@ -204,7 +204,7 @@ sealed class IndentationModel
                     ForNode(clause.Parent) + Unit(StartsAfterArrow(clause)),
                 SwitchExpressionArmSyntax arm when node == arm.Expression =>
                     ForNode(arm) + Unit(_facts.StartLine(arm.Expression.GetFirstToken(includeZeroWidth: true))
-                    > _facts.StartLine(arm.EqualsGreaterThanToken)),
+                        > _facts.StartLine(arm.EqualsGreaterThanToken)),
                 ConditionalExpressionSyntax conditional when node == conditional.WhenTrue || node == conditional.WhenFalse =>
                     ForNode(conditional) + _plan.IndentUnit,
                 BlockSyntax block => Contents(block),

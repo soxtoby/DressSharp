@@ -16,8 +16,7 @@ public class MicrosoftCompatibilityRuleTests
         { void M()
         { } }
         """)]
-    [
-        InlineData("none",
+    [InlineData("none",
         """
         class C
         {
@@ -31,8 +30,7 @@ public class MicrosoftCompatibilityRuleTests
             void M() {
             }
         }
-        """)
-    ]
+        """)]
     [InlineData("accessors",
         "class C { int P { get { return 1; } } }",
         """
@@ -57,14 +55,12 @@ public class MicrosoftCompatibilityRuleTests
         class C { void M() { if (true)
         { } } }
         """)]
-    [
-        InlineData("events",
+    [InlineData("events",
         "class C { event System.Action E { add { } remove { } } }",
         """
         class C { event System.Action E
         { add { } remove { } } }
-        """)
-    ]
+        """)]
     [InlineData("indexers",
         "class C { int this[int x] { get => 1; } }",
         """
@@ -89,14 +85,12 @@ public class MicrosoftCompatibilityRuleTests
         class C { void M()
         { } }
         """)]
-    [
-        InlineData("object_collection_array_initializers",
+    [InlineData("object_collection_array_initializers",
         "class C { int[] M() => new[] { 1 }; }",
         """
         class C { int[] M() => new[]
         { 1 }; }
-        """)
-    ]
+        """)]
     [InlineData("properties",
         "class C { int P { get; } }",
         """
@@ -117,24 +111,18 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Theory]
-    [
-        InlineData(
+    [InlineData(
         "dress_declaration_open_brace_position",
         "namespace N { class C { int P { get { return 0; } } void M() { void L() { } } } }",
-        "namespace N\n{ class C\n{ int P\n{ get\n{ return 0; } } void M()\n{ void L()\n{ } } } }")
-    ]
-    [
-        InlineData(
+        "namespace N\n{ class C\n{ int P\n{ get\n{ return 0; } } void M()\n{ void L()\n{ } } } }")]
+    [InlineData(
         "dress_statement_open_brace_position",
         "class C { void M() { try { Work(); } finally { } switch (x) { } { } } }",
-        "class C { void M() { try\n{ Work(); } finally\n{ } switch (x)\n{ }\n{ } } }")
-    ]
-    [
-        InlineData(
+        "class C { void M() { try\n{ Work(); } finally\n{ } switch (x)\n{ }\n{ } } }")]
+    [InlineData(
         "dress_lambda_open_brace_position",
         "class C { Action A = () => { Work(); }; Action B = delegate { Work(); }; }",
-        "class C { Action A = () =>\n{ Work(); }; Action B = delegate\n{ Work(); }; }")
-    ]
+        "class C { Action A = () =>\n{ Work(); }; Action B = delegate\n{ Work(); }; }")]
     public void Open_brace_position_rules_place_only_their_family(string key, string source, string expected)
     {
         Format(source, (key, "next_line")).ShouldBe(expected);
@@ -213,59 +201,47 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Theory]
-    [
-        InlineData("csharp_new_line_before_else",
+    [InlineData("csharp_new_line_before_else",
         "class C { void M() { if (true) { } else { } } }",
         """
         class C { void M() { if (true) { }
         else { } } }
-        """)
-    ]
-    [
-        InlineData("csharp_new_line_before_catch",
+        """)]
+    [InlineData("csharp_new_line_before_catch",
         "class C { void M() { try { } catch { } } }",
         """
         class C { void M() { try { }
         catch { } } }
-        """)
-    ]
-    [
-        InlineData("csharp_new_line_before_finally",
+        """)]
+    [InlineData("csharp_new_line_before_finally",
         "class C { void M() { try { } finally { } } }",
         """
         class C { void M() { try { }
         finally { } } }
-        """)
-    ]
-    [
-        InlineData("csharp_new_line_before_members_in_object_initializers",
+        """)]
+    [InlineData("csharp_new_line_before_members_in_object_initializers",
         "class C { object M() => new C { P = 1, Q = 2 }; int P; int Q; }",
         """
         class C { object M() => new C {
         P = 1,
         Q = 2
         }; int P; int Q; }
-        """)
-    ]
-    [
-        InlineData("csharp_new_line_before_members_in_anonymous_types",
+        """)]
+    [InlineData("csharp_new_line_before_members_in_anonymous_types",
         "class C { object M() => new { P = 1, Q = 2 }; }",
         """
         class C { object M() => new {
         P = 1,
         Q = 2
         }; }
-        """)
-    ]
-    [
-        InlineData("csharp_new_line_between_query_expression_clauses",
+        """)]
+    [InlineData("csharp_new_line_between_query_expression_clauses",
         "class C { object M(int[] xs) => from x in xs where x > 0 select x; }",
         """
         class C { object M(int[] xs) => from x in xs
         where x > 0
         select x; }
-        """)
-    ]
+        """)]
     public void Applies_boolean_newline_rules(string key, string source, string expected)
     {
         var first = Format(source, (key, "true"));
@@ -275,8 +251,7 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Theory]
-    [
-        InlineData("csharp_indent_block_contents",
+    [InlineData("csharp_indent_block_contents",
         "true",
         """
         class C
@@ -295,10 +270,8 @@ public class MicrosoftCompatibilityRuleTests
                 int x;
             }
         }
-        """)
-    ]
-    [
-        InlineData("csharp_indent_block_contents",
+        """)]
+    [InlineData("csharp_indent_block_contents",
         "false",
         """
         class C
@@ -317,10 +290,8 @@ public class MicrosoftCompatibilityRuleTests
             int x;
             }
         }
-        """)
-    ]
-    [
-        InlineData("csharp_indent_braces",
+        """)]
+    [InlineData("csharp_indent_braces",
         "true",
         """
         class C
@@ -337,10 +308,8 @@ public class MicrosoftCompatibilityRuleTests
             {
             }
             }
-        """)
-    ]
-    [
-        InlineData("csharp_indent_braces",
+        """)]
+    [InlineData("csharp_indent_braces",
         "false",
         """
         class C
@@ -357,8 +326,7 @@ public class MicrosoftCompatibilityRuleTests
         {
         }
         }
-        """)
-    ]
+        """)]
     public void Applies_indentation_values(string key, string value, string source, string expected)
     {
         var first = Format(source, (key, value));
@@ -429,68 +397,46 @@ public class MicrosoftCompatibilityRuleTests
     [Theory]
     [InlineData("csharp_space_after_cast", "true", "class C { int M(object x) => (int)x; }", "class C { int M(object x) => (int) x; }")]
     [InlineData("csharp_space_after_cast", "false", "class C { int M(object x) => (int) x; }", "class C { int M(object x) => (int)x; }")]
-    [
-        InlineData("csharp_space_after_keywords_in_control_flow_statements", "true", "class C { void M() { if(true) { } } }", "class C { void M() { if (true) { } } }")
-    ]
-    [
-        InlineData("csharp_space_after_keywords_in_control_flow_statements", "false", "class C { void M() { if (true) { } } }", "class C { void M() { if(true) { } } }")
-    ]
+    [InlineData("csharp_space_after_keywords_in_control_flow_statements", "true", "class C { void M() { if(true) { } } }", "class C { void M() { if (true) { } } }")]
+    [InlineData("csharp_space_after_keywords_in_control_flow_statements", "false", "class C { void M() { if (true) { } } }", "class C { void M() { if(true) { } } }")]
     [InlineData("csharp_space_before_colon_in_inheritance_clause", "false", "class C : B { } class B { }", "class C: B { } class B { }")]
     [InlineData("csharp_space_after_colon_in_inheritance_clause", "false", "class C : B { } class B { }", "class C :B { } class B { }")]
     [InlineData("csharp_space_around_binary_operators", "before_and_after", "class C { int M() => 1+2; }", "class C { int M() => 1 + 2; }")]
     [InlineData("csharp_space_around_binary_operators", "none", "class C { int M() => 1 + 2; }", "class C { int M() => 1+2; }")]
     [InlineData("csharp_space_around_binary_operators", "ignore", "class C { int M() => 1  +  2; }", "class C { int M() => 1  +  2; }")]
-    [
-        InlineData("csharp_space_between_method_declaration_parameter_list_parentheses", "true", "class C { void M(int x) { } }", "class C { void M( int x ) { } }")
-    ]
+    [InlineData("csharp_space_between_method_declaration_parameter_list_parentheses", "true", "class C { void M(int x) { } }", "class C { void M( int x ) { } }")]
     [InlineData("csharp_space_between_method_declaration_empty_parameter_list_parentheses", "true", "class C { void M() { } }", "class C { void M( ) { } }")]
     [InlineData("csharp_space_between_method_declaration_name_and_open_parenthesis", "true", "class C { void M() { } }", "class C { void M () { } }")]
-    [
-        InlineData("csharp_space_between_method_declaration_name_and_open_parenthesis",
+    [InlineData("csharp_space_between_method_declaration_name_and_open_parenthesis",
         "false",
         "class C { void M() { _occurrences.Sort(static (left, right) => 0); } }",
-        "class C { void M() { _occurrences.Sort(static (left, right) => 0); } }")
-    ]
-    [
-        InlineData("csharp_space_between_method_call_parameter_list_parentheses",
+        "class C { void M() { _occurrences.Sort(static (left, right) => 0); } }")]
+    [InlineData("csharp_space_between_method_call_parameter_list_parentheses",
         "true",
         "class C { void M() { N(1); } void N(int x) { } }",
-        "class C { void M() { N( 1 ); } void N(int x) { } }")
-    ]
-    [
-        InlineData("csharp_space_between_method_call_empty_parameter_list_parentheses",
+        "class C { void M() { N( 1 ); } void N(int x) { } }")]
+    [InlineData("csharp_space_between_method_call_empty_parameter_list_parentheses",
         "true",
         "class C { void M() { N(); } void N() { } }",
-        "class C { void M() { N( ); } void N() { } }")
-    ]
-    [
-        InlineData("csharp_space_between_method_call_name_and_opening_parenthesis",
+        "class C { void M() { N( ); } void N() { } }")]
+    [InlineData("csharp_space_between_method_call_name_and_opening_parenthesis",
         "true",
         "class C { void M() { N(); } void N() { } }",
-        "class C { void M() { N (); } void N() { } }")
-    ]
+        "class C { void M() { N (); } void N() { } }")]
     [InlineData("csharp_space_after_comma", "false", "class C { void M(int x, int y) { } }", "class C { void M(int x,int y) { } }")]
     [InlineData("csharp_space_before_comma", "true", "class C { void M(int x, int y) { } }", "class C { void M(int x , int y) { } }")]
     [InlineData("csharp_space_after_dot", "true", "class C { string M() => this.ToString(); }", "class C { string M() => this. ToString(); }")]
     [InlineData("csharp_space_before_dot", "true", "class C { string M() => this.ToString(); }", "class C { string M() => this .ToString(); }")]
-    [
-        InlineData("dress_space_after_collection_spread_operator", "true", "class C { int[] M(int[] values) => [..values]; }", "class C { int[] M(int[] values) => [.. values]; }")
-    ]
-    [
-        InlineData("dress_space_after_collection_spread_operator", "false", "class C { int[] M(int[] values) => [.. values]; }", "class C { int[] M(int[] values) => [..values]; }")
-    ]
-    [
-        InlineData("csharp_space_after_semicolon_in_for_statement",
+    [InlineData("dress_space_after_collection_spread_operator", "true", "class C { int[] M(int[] values) => [..values]; }", "class C { int[] M(int[] values) => [.. values]; }")]
+    [InlineData("dress_space_after_collection_spread_operator", "false", "class C { int[] M(int[] values) => [.. values]; }", "class C { int[] M(int[] values) => [..values]; }")]
+    [InlineData("csharp_space_after_semicolon_in_for_statement",
         "false",
         "class C { void M() { for (int i = 0; i < 1; i++) { } } }",
-        "class C { void M() { for (int i = 0;i < 1;i++) { } } }")
-    ]
-    [
-        InlineData("csharp_space_before_semicolon_in_for_statement",
+        "class C { void M() { for (int i = 0;i < 1;i++) { } } }")]
+    [InlineData("csharp_space_before_semicolon_in_for_statement",
         "true",
         "class C { void M() { for (int i = 0; i < 1; i++) { } } }",
-        "class C { void M() { for (int i = 0 ; i < 1 ; i++) { } } }")
-    ]
+        "class C { void M() { for (int i = 0 ; i < 1 ; i++) { } } }")]
     [InlineData("csharp_space_around_declaration_statements", "false", "class C { void M() { int x  =  1; } }", "class C { void M() { int x = 1; } }")]
     [InlineData("csharp_space_before_open_square_brackets", "true", "class C { int M(int[] x) => x[0]; }", "class C { int M(int [] x) => x [0]; }")]
     [InlineData("csharp_space_between_square_brackets", "true", "class C { int M(int[] x) => x[0]; }", "class C { int M(int[] x) => x[ 0 ]; }")]
@@ -1257,8 +1203,7 @@ public class MicrosoftCompatibilityRuleTests
     }
 
     [Theory]
-    [
-        InlineData("true",
+    [InlineData("true",
         """
         using System;
         using Zoo;
@@ -1272,10 +1217,8 @@ public class MicrosoftCompatibilityRuleTests
 
         using System.Text;
 
-        """)
-    ]
-    [
-        InlineData("false",
+        """)]
+    [InlineData("false",
         """
         using System;
 
@@ -1291,8 +1234,7 @@ public class MicrosoftCompatibilityRuleTests
         using Zoo;
         using System.Text;
 
-        """)
-    ]
+        """)]
     public void Separates_each_alternating_import_group_boundary(string value, string source, string expected)
     {
         var first = Format(source, ("dotnet_separate_import_directive_groups", value));
