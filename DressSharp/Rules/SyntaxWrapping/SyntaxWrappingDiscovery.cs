@@ -297,7 +297,7 @@ sealed class SyntaxWrappingDiscovery
                 Delimited(collection.Elements, collection.CloseBracketToken);
                 break;
             case AttributeListSyntax attributes:
-                Delimited(attributes.Attributes, attributes.CloseBracketToken);
+                Delimited(attributes.Attributes, attributes.CloseBracketToken, keepDelimitersAttached: true);
                 break;
             case BaseListSyntax baseList:
                 AddBoundary(baseList.ColonToken, GapStyle.SeparatedFirst);
@@ -501,7 +501,11 @@ sealed class SyntaxWrappingDiscovery
         return chain;
     }
 
-    void Delimited<T>(SeparatedSyntaxList<T> items, SyntaxToken close, bool spacesInside = false) where T : SyntaxNode
+    void Delimited<T>(
+        SeparatedSyntaxList<T> items,
+        SyntaxToken close,
+        bool spacesInside = false,
+        bool keepDelimitersAttached = false) where T : SyntaxNode
     {
         for (var index = 0; index < items.Count; index++)
         {
@@ -511,9 +515,10 @@ sealed class SyntaxWrappingDiscovery
                     ? spacesInside
                         ? GapStyle.DelimitedSpacedFirst
                         : GapStyle.DelimitedFirst
-                    : GapStyle.DelimitedLater);
+                    : GapStyle.DelimitedLater,
+                breakWhenMulti: index != 0 || !keepDelimitersAttached);
         }
-        AddBoundary(close, spacesInside ? GapStyle.DelimitedSpacedClose : GapStyle.DelimitedClose);
+        AddBoundary(close, spacesInside ? GapStyle.DelimitedSpacedClose : GapStyle.DelimitedClose, breakWhenMulti: !keepDelimitersAttached);
     }
 
     void Constraints<T>(SyntaxList<T> clauses) where T : SyntaxNode

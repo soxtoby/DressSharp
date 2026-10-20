@@ -11,10 +11,10 @@ public class AttributeTargetSpacingRuleTests
     [Fact]
     public void Auto_layout_measures_the_selected_target_spacing()
     {
-        Format("[assembly:A]", (Key, "false"), ("dress_attributes_layout", "auto"), ("max_line_length", "12"))
-            .ShouldBe("[assembly:A]");
-        Format("[assembly:A]", (Key, "true"), ("dress_attributes_layout", "auto"), ("max_line_length", "12"))
-            .ShouldBe("[assembly:\n    A\n]");
+        Format("[assembly:A, B]", (Key, "false"), ("dress_attributes_layout", "auto"), ("max_line_length", "15"))
+            .ShouldBe("[assembly:A, B]");
+        Format("[assembly:A, B]", (Key, "true"), ("dress_attributes_layout", "auto"), ("max_line_length", "15"))
+            .ShouldBe("[assembly: A,\n    B]");
     }
 
     [Theory]
@@ -46,7 +46,8 @@ public class AttributeTargetSpacingRuleTests
         {
             var preferences = new[] { (Key, value), ("dress_attributes_layout", "always_multi"), ("end_of_line", newline == "\n" ? "lf" : "crlf") };
             var result = Format($"[assembly: A, B]{newline}", preferences);
-            result.ShouldBe($"[assembly:{newline}    A,{newline}    B{newline}]{newline}");
+            var space = value == "false" ? "" : " ";
+            result.ShouldBe($"[assembly:{space}A,{newline}    B]{newline}");
             Format(result, preferences).ShouldBe(result);
         }
     }

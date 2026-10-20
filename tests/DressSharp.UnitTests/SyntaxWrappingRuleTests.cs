@@ -10,6 +10,56 @@ namespace DressSharp.UnitTests;
 public class SyntaxWrappingRuleTests
 {
     [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Format_long_attribute_keeps_its_square_brackets_attached(string lineEnding)
+    {
+        const string source = """
+            class C
+            {
+                [Description($"Configured values. Use {PipelineCopilotTools.GetPipelineEffectiveSourceIncrementalSettingsToolName} tool to see the effective values for processing.")]
+                public string Settings { get; set; }
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source.ReplaceLineEndings(lineEnding), preferences);
+
+        result.ShouldBe(source.ReplaceLineEndings(lineEnding));
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("auto", "\n")]
+    [InlineData("auto", "\r\n")]
+    [InlineData("always_multi", "\n")]
+    [InlineData("always_multi", "\r\n")]
+    public void Format_wrapped_attributes_attaches_brackets_to_the_first_and_last_attributes(string layout, string lineEnding)
+    {
+        const string source = "[\n    A,\n    B\n] class C {}";
+        const string expected = "[A,\n    B] class C {}";
+        var preferences = new[] { ("dress_attributes_layout", layout) };
+
+        var result = Format(source.ReplaceLineEndings(lineEnding), preferences);
+
+        result.ShouldBe(expected.ReplaceLineEndings(lineEnding));
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Format_wrapped_attributes_keeps_a_line_comment_from_swallowing_the_closing_bracket()
+    {
+        const string source = "[A, B // keep\n] class C {}";
+        const string expected = "[A,\n    B // keep\n] class C {}";
+        var preferences = new[] { ("dress_attributes_layout", "always_multi") };
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Theory]
     [InlineData("\n", "MultipleChoice([\n    \"accessors\",\n    \"types\"\n], \"all\", \"none\");")]
     [InlineData("\r\n", "MultipleChoice([\n    \"accessors\",\n    \"types\"\n], \"all\", \"none\");")]
     [InlineData("\n", "MultipleChoice([\"accessors\", \"types\"], \"all\", \"none\");")]
@@ -363,10 +413,8 @@ public class SyntaxWrappingRuleTests
         "[A, B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}",
         "[A, B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}",
         """
-        [
-            A,
-            B
-        ] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}
+        [A,
+            B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}
         """)
     ]
     [Theory]

@@ -286,7 +286,8 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         {
             var occurrence = _occurrences[occurrenceIndex];
             var initializerLayout = SyntaxWrappingRule.InitializerKindFor(occurrence.Kind) is not null;
-            var itemPerLineLayout = occurrence.Kind is SyntaxWrappingKind.Arguments or SyntaxWrappingKind.Parameters or SyntaxWrappingKind.CollectionExpressions;
+            var itemPerLineLayout = occurrence.Kind is SyntaxWrappingKind.Arguments or SyntaxWrappingKind.Parameters
+                or SyntaxWrappingKind.CollectionExpressions or SyntaxWrappingKind.Attributes;
             var hasLineBreak = HasLineBreak(occurrence);
             var hasNestedLineBreak = (initializerLayout || occurrence.Node is BaseArgumentListSyntax { Arguments.Count: > 1 })
                 && HasUnownedLineBreak(occurrence);
@@ -583,7 +584,9 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         boundary.Style is GapStyle.DelimitedClose or GapStyle.DelimitedSpacedClose;
 
     bool PreservesBoundary(Occurrence occurrence, Boundary boundary, bool existingMultilineList) =>
-        IsClose(boundary) && occurrence.Setting.ClosingPosition is not null && _trivia!.HasMeaningfulGap(boundary.RightIndex)
+        IsClose(boundary)
+            && (occurrence.Setting.ClosingPosition is not null || occurrence.Kind == SyntaxWrappingKind.Attributes)
+            && _trivia!.HasMeaningfulGap(boundary.RightIndex)
         || occurrence.Setting is { Mode: WrappingMode.Preserve, ClosingPosition: not null } && !IsClose(boundary)
         || existingMultilineList
             && !(IsClose(boundary) && occurrence.Setting.ClosingPosition is not null)
