@@ -763,7 +763,7 @@ public class IndentationEmitterTests
             }
             """,
             oppositePreferences).ShouldBe(Format(
-            """
+                """
             class C
             {
             void M(int x)
@@ -780,7 +780,7 @@ public class IndentationEmitterTests
             }
             }
             """,
-            firstPreferences));
+                firstPreferences));
     }
 
     [Theory]
@@ -812,7 +812,7 @@ public class IndentationEmitterTests
             """,
             ("csharp_indent_block_contents", "true"),
             (key, "unset")).ShouldBe(Format(
-            """
+                """
             class C
             {
             void M(int x)
@@ -829,7 +829,7 @@ public class IndentationEmitterTests
             }
             }
             """,
-            baseline));
+                baseline));
     }
 
     [Theory]

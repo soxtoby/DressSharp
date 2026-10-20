@@ -317,23 +317,23 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
     static async Task WriteConfiguration(HttpListenerResponse response, InteractiveEditorConfigData data) =>
         await WriteJson(
-        response,
-        200,
-        new
-            {
-                targetPath = data.TargetPath,
-                interactiveRoot = data.InteractiveRoot,
-                revision = data.Revision,
-                preferences = data.Preferences.Select(preference => new
-                    {
-                        key = preference.RuleKey.ToName(),
-                        local = Assignment(preference.Local),
-                        inherited = Assignment(preference.Inherited),
-                        inheritedSourcePath = preference.InheritedSourcePath,
-                        effectiveValue = preference.EffectiveValue,
-                        effectiveSourcePath = preference.EffectiveSourcePath,
-                    })
-            });
+            response,
+            200,
+            new
+                {
+                    targetPath = data.TargetPath,
+                    interactiveRoot = data.InteractiveRoot,
+                    revision = data.Revision,
+                    preferences = data.Preferences.Select(preference => new
+                        {
+                            key = preference.RuleKey.ToName(),
+                            local = Assignment(preference.Local),
+                            inherited = Assignment(preference.Inherited),
+                            inheritedSourcePath = preference.InheritedSourcePath,
+                            effectiveValue = preference.EffectiveValue,
+                            effectiveSourcePath = preference.EffectiveSourcePath,
+                        })
+                });
 
     static object Assignment(PreferenceAssignment assignment) => new
         {

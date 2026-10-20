@@ -1151,24 +1151,94 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         var structural = StructuralBase(occurrenceIndex);
         _plannedBases[occurrenceIndex] = structural;
         var placed = PlacingOccurrence(occurrenceIndex);
+        var line = ContinuationLineBase(occurrenceIndex, structural);
         if (placed < 0)
         {
             // Sharing a line with the construct that holds it would give a parenthesized group the
             // same column as that construct's own continuations, so the group opens a level of its
-            // own. A break already gave it a line of its own, and then it needs no help.
-            return _plannedBases[occurrenceIndex] = structural
-                + string.Concat(Enumerable.Repeat(
-                    _emitterPlan.IndentUnit,
-                    EnclosingParentheses(_occurrences[occurrenceIndex].Node)));
+            // own. A break already gave it a line of its own, and then it needs no help; nor does a
+            // group on a continuation line, which already stands clear of those continuations.
+            return _plannedBases[occurrenceIndex] = line
+                ?? structural
+                    + string.Concat(Enumerable.Repeat(
+                        _emitterPlan.IndentUnit,
+                        EnclosingParentheses(_occurrences[occurrenceIndex].Node)));
         }
 
         // The syntax already accounts for a break it declares, such as a brace that opens a block
         // or a setting that indents one; the plan only knows the breaks it decided itself.
         var placedIndent = Indent(placed, 1);
+        var deepest = line ?? structural;
         return _plannedBases[occurrenceIndex] =
-            VisualWidth(placedIndent, _settings.TabWidth) > VisualWidth(structural, _settings.TabWidth)
+            VisualWidth(placedIndent, _settings.TabWidth) > VisualWidth(deepest, _settings.TabWidth)
             ? placedIndent
-            : structural;
+            : deepest;
+    }
+
+    /// <summary>
+    /// Where a construct that opens partway along a line continuing its owner sits, or null when
+    /// that line is no deeper than the syntax already places the construct.
+    /// </summary>
+    /// <remarks>
+    /// The syntax says where a member or statement begins, and a line continuing it, such as
+    /// <c>new Action&lt;</c> after the <c>=</c> of a field, is written a level in from there, where
+    /// the emitter keeps it. A construct opening on that line indents its items from the line, or
+    /// they would land level with it. A line the syntax places deeper, such as the branch of a nested
+    /// conditional, keeps the answer the syntax gives, and a construct that opens a line of its own
+    /// is a continuation in its own right, whose operators or links the syntax already places.
+    /// </remarks>
+    string? ContinuationLineBase(int occurrenceIndex, string structural)
+    {
+        if (_emitterPlan.IndentBlockContents is null)
+            return null;
+        var firstToken = _occurrences[occurrenceIndex].FirstToken;
+        var first = PlannedLineStart(firstToken);
+        return first != firstToken
+            && PlannedIndentOfLine(first) is { } line
+            && VisualWidth(line, _settings.TabWidth) > VisualWidth(structural, _settings.TabWidth)
+                ? line
+                : null;
+    }
+
+    /// <summary>
+    /// The first token of the line that will hold <paramref name="index"/>, as this plan lays the file out.
+    /// </summary>
+    int PlannedLineStart(int index)
+    {
+        while (index > 0 && !PlannedBreakBefore(index))
+            index--;
+        return index;
+    }
+
+    bool PlannedBreakBefore(int index) =>
+        _plannedLineBreaks.TryGetValue(index, out var gap) ? gap.Contains('\n')
+            : _settledBoundaries.TryGetValue(index, out var breaks) ? breaks
+            : BreaksAt(index) || _stream.Pieces[index - 1].Token.Text.Contains('\n');
+
+    /// <summary>
+    /// The indentation the line opened by <paramref name="first"/> will be written with, or null when
+    /// nothing in this plan or the syntax places it.
+    /// </summary>
+    /// <remarks>
+    /// Content its owner lays out, such as an initializer member or a collection element, knows
+    /// where it is going, and the emitter writes it there whatever gap a list planned before it.
+    /// Any other line that a break this plan decided opens carries the indent of that break. The rest are
+    /// continuations the emitter keeps at the distance the source gave them from the member or
+    /// statement that owns them, rebased to where that owner is written.
+    /// </remarks>
+    string? PlannedIndentOfLine(int first)
+    {
+        if (PlannedLineIndent(first) is { } content)
+            return content;
+        if (_plannedLineBreaks.TryGetValue(first, out var gap) && gap.LastIndexOfAny(['\r', '\n']) is var lineStart and >= 0)
+        {
+            var end = ++lineStart;
+            while (end < gap.Length && gap[end] is ' ' or '\t')
+                end++;
+            return gap[lineStart..end];
+        }
+
+        return _indentation.ExistingContinuation(_stream.Pieces[first].Token);
     }
 
     /// <summary>

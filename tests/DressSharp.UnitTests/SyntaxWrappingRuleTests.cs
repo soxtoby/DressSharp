@@ -212,6 +212,50 @@ public class SyntaxWrappingRuleTests
         Format(result, preferences).ShouldBe(result);
     }
 
+    [Theory]
+    [InlineData(
+        "new Action<DeliveryScheduleNightlyShipments, DeliveryScheduleWeekendShipments, DeliveryScheduleStandardShipments, DeliveryScheduleSignedOvernightShipments>",
+        """
+        class C
+        {
+            private static readonly MethodInfo Method =
+                new Action<
+                    DeliveryScheduleNightlyShipments,
+                    DeliveryScheduleWeekendShipments,
+                    DeliveryScheduleStandardShipments,
+                    DeliveryScheduleSignedOvernightShipments>(Handle);
+        }
+        """)]
+    [InlineData(
+        "new Action(DeliveryScheduleNightlyShipments, DeliveryScheduleWeekendShipments, DeliveryScheduleStandardShipments, DeliveryScheduleSignedOvernightShipments)",
+        """
+        class C
+        {
+            private static readonly MethodInfo Method =
+                new Action(
+                    DeliveryScheduleNightlyShipments,
+                    DeliveryScheduleWeekendShipments,
+                    DeliveryScheduleStandardShipments,
+                    DeliveryScheduleSignedOvernightShipments)(Handle);
+        }
+        """)]
+    public void A_list_opening_along_a_continuation_line_indents_its_items_from_that_line(string creation, string expected)
+    {
+        var source = $$"""
+            class C
+            {
+                private static readonly MethodInfo Method =
+                    {{creation}}(Handle);
+            }
+            """;
+        var preferences = PreferenceCatalog.Defaults.Select(item => (item.Key.ToName(), item.Default)).ToArray();
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
     [Fact]
     public void Format_wrapped_type_arguments_keep_a_line_comment_from_swallowing_the_closing_bracket()
     {

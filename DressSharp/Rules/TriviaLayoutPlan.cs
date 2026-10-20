@@ -31,8 +31,8 @@ sealed class TriviaLayoutPlan
         RuleCatalog catalog,
         FormattingConfiguration configuration) =>
         new(
-        BlankLineSettings.From(catalog.BlankLineRules, configuration),
-        CommentSettings.From(catalog.CommentRules, configuration));
+            BlankLineSettings.From(catalog.BlankLineRules, configuration),
+            CommentSettings.From(catalog.CommentRules, configuration));
 
     internal static TriviaLayoutPlan For(
         SyntaxNode root,

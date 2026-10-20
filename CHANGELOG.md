@@ -12,6 +12,7 @@
 - `dress_preserve_trivial_single_line_blocks` is no longer read. `dress_single_line_blocks = expand_unless_trivial`, which `init` adds, gives the same result.
 
 ### Fixed
+- A list that opens partway along a continuation line, such as `new Action(` on the line after the `=` of a field, indents its wrapped items one level in from that line instead of level with it.
 - A multi-line collection initializer of `{ key, value }` elements, such as a dictionary, puts one element per line like any other wrapped initializer, instead of leaving them all on one line.
 - With `dress_base_type_lists_layout = auto`, a base type list that fits on the line after a wrapped colon, such as `: IFoo, IBar`, stays on one line instead of taking a line per type, and one already broken after the colon no longer joins into a line over the limit.
 - Comments inside a wrapped object initializer or argument list keep their own lines and indent with the item that follows. They could be merged onto one line, pulled onto the item's line, or left one level out with `dress_comment_align = false`.

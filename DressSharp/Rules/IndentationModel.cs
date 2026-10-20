@@ -258,7 +258,7 @@ sealed class IndentationModel
 
     internal string Contents(SyntaxNode owner) =>
         Brace(owner) + Unit(_plan.IndentBlockContents == true
-        || owner is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax or AccessorListSyntax);
+            || owner is BaseTypeDeclarationSyntax or BaseNamespaceDeclarationSyntax or AccessorListSyntax);
 
     internal string SwitchLabel(SwitchSectionSyntax section) =>
         Brace(section.Parent!) + Unit(_plan.IndentSwitchLabels ?? _plan.IndentBlockContents ?? false);
