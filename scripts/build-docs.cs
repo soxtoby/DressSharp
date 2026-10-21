@@ -1,5 +1,5 @@
 #!/usr/bin/env dotnet
-#:package DotNetDo.Core@0.8.0
+#:package DotNetDo.Core@0.9.0
 #:project ../DressSharp/DressSharp.csproj
 #:include docs/ContentWriter.cs
 #:include docs/LineDiff.cs

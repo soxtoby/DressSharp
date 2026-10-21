@@ -1,5 +1,5 @@
 #!/usr/bin/env dotnet
-#:package DotNetDo.Core@0.8.0
+#:package DotNetDo.Core@0.9.0
 #:package Microsoft.CodeAnalysis.CSharp@5.9.0
 #:include corpus/CorpusManifest.cs
 #:include corpus/CorpusProject.cs
