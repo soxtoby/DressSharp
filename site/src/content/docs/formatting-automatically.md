@@ -16,7 +16,7 @@ A Git pre-commit hook can format the files you're committing. Save this as `.git
 dotnet dress format --staged
 ```
 
-`--staged` formats only the files staged for this commit, and stages the formatted result, so the commit goes in already tidy. If you've staged only part of a file, the whole file is formatted and staged.
+`--staged` formats the working copies of files staged for this commit. If formatting changes any files, it exits with code 1 to block the commit. Review and stage the changes you want, then retry the commit. DressSharp leaves the index untouched, including when you've staged only part of a file; it still formats the whole working copy.
 
 If you use a hook manager such as [Husky.Net](https://alirezanet.github.io/Husky.Net/) or [pre-commit](https://pre-commit.com/), give it the same command.
 

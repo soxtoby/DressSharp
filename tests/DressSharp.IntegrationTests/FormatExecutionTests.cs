@@ -36,8 +36,10 @@ public sealed class FormatExecutionTests : IDisposable
         ExactAssert.Bytes(original, persisted);
     }
 
-    [Fact]
-    public async Task Format_reports_changed_file_count_and_second_run_as_a_no_op()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Format_reports_changed_file_count_and_second_run_as_a_no_op(bool changedOnly)
     {
         const string source = """class C { void M(int a,int b) { } }""";
         const string expected = """
@@ -45,11 +47,12 @@ public sealed class FormatExecutionTests : IDisposable
 
             """;
         var path = Source(source);
+        var scope = changedOnly ? SelectionScope.Changed : SelectionScope.All;
 
-        var first = await Run(CommandKind.Format, path);
+        var first = await Run(CommandKind.Format, path, scope: scope);
         var formatted = await File.ReadAllTextAsync(path, Token);
         var timestamp = File.GetLastWriteTimeUtc(path);
-        var second = await Run(CommandKind.Format, path);
+        var second = await Run(CommandKind.Format, path, scope: scope);
 
         first.ExitCode.ShouldBe(0);
         second.ExitCode.ShouldBe(0);
@@ -276,8 +279,10 @@ public sealed class FormatExecutionTests : IDisposable
         ExactAssert.Text("Program.cs: skipped 1 malformed occurrence(s)." + Environment.NewLine, error);
     }
 
-    [Fact]
-    public async Task Staged_format_stages_the_rewrite()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Staged_format_requires_manual_staging_of_rewrites(bool hasUnstagedChanges)
     {
         Git("init", "--quiet");
         Git("config", "user.email", "test@example.com");
@@ -285,15 +290,43 @@ public sealed class FormatExecutionTests : IDisposable
         var path = Source("class C { void M(int a,int b) { } }\n");
         Git("add", "--", "Program.cs");
         Git("commit", "--quiet", "--message", "initial");
-        Source("class C { void M(int a,int b,int c) { } }\n");
+        const string staged = "class C { void M(int a,int b,int c) { } }\n";
+        Source(staged);
         Git("add", "--", "Program.cs");
+        if (hasUnstagedChanges)
+            Source("class C { void M(int a,int b,int c,int d) { } }\n");
 
-        var (exitCode, _, error) = await Run(CommandKind.Format, path, scope: SelectionScope.Staged);
+        var result = await Run(CommandKind.Format, path, scope: SelectionScope.Staged);
 
-        exitCode.ShouldBe(0);
-        ExactAssert.Text(string.Empty, error);
-        Git("diff", "--quiet", "--", "Program.cs");
-        Git("show", ":Program.cs").ShouldBe("class C { void M(int a, int b, int c) { } }\n");
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("Review and stage");
+        Git("show", ":Program.cs").ShouldBe(staged);
+        var expected = hasUnstagedChanges
+            ? "class C { void M(int a, int b, int c, int d) { } }\n"
+            : "class C { void M(int a, int b, int c) { } }\n";
+        (await File.ReadAllTextAsync(path, Token)).ShouldBe(expected);
+
+        Git("add", "--", "Program.cs");
+        var second = await Run(CommandKind.Format, path, scope: SelectionScope.Staged);
+
+        second.ExitCode.ShouldBe(0);
+        ExactAssert.Text(string.Empty, second.Error);
+        Git("show", ":Program.cs").ShouldBe(expected);
+    }
+
+    [Fact]
+    public async Task Staged_format_with_no_selected_files_succeeds()
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var result = await new FormatExecutor(_directory, output, error).Run(
+            new(CommandKind.Format, [], false, null, SelectionScope.Staged),
+            [],
+            Token);
+
+        result.ShouldBe(0);
+        ExactAssert.Text(string.Empty, error.ToString());
     }
 
     string Git(params string[] arguments)

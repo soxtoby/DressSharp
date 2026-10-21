@@ -27,9 +27,6 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         var prepared = await FormatFiles(selected, preparation, timing, cancellationToken);
         var failed = await ReportAndPersist(request, selected, preparation.Contexts, prepared, timing, cancellationToken);
 
-        if (!failed && request is { Kind: CommandKind.Format, Scope: SelectionScope.Staged })
-            await StageRewrites(selected, prepared, cancellationToken);
-
         timing.Wall = Stopwatch.GetElapsedTime(commandStart);
         await BenchmarkDiagnostics.WriteAsync(timing, cancellationToken);
         if (!failed)
@@ -43,17 +40,6 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         return ExitCode(request, prepared, failed);
     }
 
-    // A staged selection is a pre-commit hook's. Staging the rewrite keeps the hook to one
-    // command; a file with both staged and unstaged hunks is staged whole, as it was formatted.
-    ValueTask StageRewrites(IReadOnlyList<SelectedFile> selected, IReadOnlyList<PreparedFile?> prepared, CancellationToken cancellationToken)
-    {
-        var rewritten = selected
-            .Where((file, index) => prepared[index]?.Changed == true)
-            .Select(file => file.FullPath)
-            .ToArray();
-        return new GitFileDiscovery().StageAsync(_invocationDirectory, rewritten, cancellationToken);
-    }
-
     async ValueTask ReportFormatSummary(CommandRequest request, int formatted, int selected, TimeSpan elapsed)
     {
         if (request.Kind != CommandKind.Format)
@@ -62,6 +48,8 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         var files = selected == 1 ? "file" : "files";
         var summary = FormattableString.Invariant($"Formatted {formatted} of {selected} {files} in {elapsed.TotalSeconds:F2} s.");
         await _output.WriteLineAsync(summary);
+        if (request.Scope == SelectionScope.Staged && formatted > 0)
+            await _error.WriteLineAsync("Review and stage the formatting changes, then retry the commit.");
     }
 
     async ValueTask<RunPreparation> PrepareRun(
@@ -253,7 +241,8 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
     {
         if (failed)
             return 2;
-        return request.Kind == CommandKind.Check && prepared.Any(result => result?.Changed == true) ? 1 : 0;
+        return (request.Kind == CommandKind.Check || request.Scope == SelectionScope.Staged)
+            && prepared.Any(result => result?.Changed == true) ? 1 : 0;
     }
 
     sealed record RunPreparation(

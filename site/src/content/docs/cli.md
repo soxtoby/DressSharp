@@ -20,7 +20,7 @@ description: Every dotnet dress command and option, which files it selects, and 
 | Option | Effect |
 | --- | --- |
 | `--include <pattern>` | Selects files matching a glob relative to the current directory, such as `src/**/*.cs` or a single file name. Repeat to add more. Quote the pattern so your shell doesn't expand it. |
-| `--staged` | Selects only files whose staged content differs from `HEAD`. `format` also stages what it rewrites. |
+| `--staged` | Selects only files whose staged content differs from `HEAD`. `format` leaves rewrites unstaged and exits with code 1 if any files change. |
 | `--changed` | Selects only files that differ from `HEAD`, plus untracked files. |
 | `--verbose` | Lists each changed file, and says so when nothing was selected. |
 | `--configuration <name>` | The MSBuild configuration used to read your projects. Defaults to `Debug`. |
@@ -48,6 +48,6 @@ DressSharp reads each file's project to learn its C# language version and prepro
 
 | Code | Meaning |
 | ---: | --- |
-| 0 | Success. For `check`, no files need formatting. |
-| 1 | `check` found files that need formatting. |
+| 0 | Success. For `check` and `format --staged`, no files need formatting. |
+| 1 | `check` found files that need formatting, or `format --staged` rewrote files. Review and stage the rewrites before retrying the commit. |
 | 2 | Something went wrong: an invalid option, an invalid EditorConfig value, or a file that couldn't be read or written. |

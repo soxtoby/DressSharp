@@ -10,6 +10,7 @@
 - `dress_type_arguments_layout = always_single | auto | always_multi` wraps a generic type's argument list, one argument per line with the closing `>` kept on the last argument. `auto` wraps a list that passes `max_line_length`, and keeps the first argument on the opening line when the text before `<` is no wider than the continuation indent, since breaking there would gain no room. `init` adds it at `auto`.
 
 ### Changed
+- `format --staged` leaves formatting changes unstaged and exits with code 1 to block a pre-commit hook. Review and stage the changes before retrying the commit.
 - `dotnet dress init` no longer writes `csharp_new_line_before_open_brace` or `csharp_preserve_single_line_blocks`, so Visual Studio and Rider stop acting on DressSharp's brace and single-line block settings. Both keys still work where set, but only where no `dress_` rule decided. `init` adds the new rules at their defaults, which match the old defaults, so remove the two standard keys once it has run.
 - `dress_preserve_trivial_single_line_blocks` is no longer read. `dress_single_line_blocks = expand_unless_trivial`, which `init` adds, gives the same result.
 
