@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.5.0
+
 ### Added
 - `dress_declaration_open_brace_position`, `dress_statement_open_brace_position`, and `dress_lambda_open_brace_position` place opening braces by what owns them, `same_line` or `next_line`, in place of the category list of `csharp_new_line_before_open_brace`. They also place the braces of block namespaces and `switch` statements, which the standard key never covered.
 - `dress_single_line_blocks = preserve | expand | expand_unless_trivial` says what happens to a block written on one line, in place of `csharp_preserve_single_line_blocks` and `dress_preserve_trivial_single_line_blocks` together.
