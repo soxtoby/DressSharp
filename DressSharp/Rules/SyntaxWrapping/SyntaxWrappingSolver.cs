@@ -929,13 +929,31 @@ sealed class SyntaxWrappingSolver : IWrappedItems
         // fails to fit and wrap it again on the next run.
         if (occurrence is { Node: InitializerExpressionSyntax or BaseListSyntax, FirstToken: > 0 })
         {
-            var previous = occurrence.FirstToken - 1;
-            return VisualStartColumn(previous)
-                + VisualWidth(_stream.Pieces[previous].Token.Text, _settings.TabWidth)
-                + 1;
+            // The gap before an element belongs to the list holding it, which decided before the
+            // element whether that gap breaks; the element starts where that decision put it.
+            if (SyntaxWrappingDiscovery.IsElement(occurrence.Node))
+            {
+                if (!_settledBoundaries.TryGetValue(occurrence.FirstToken, out var opensLine))
+                    return VisualStartColumn(occurrence.FirstToken);
+                if (!opensLine)
+                    return JoinedStartColumn(occurrence.FirstToken);
+                return PlannedIndentOfLine(occurrence.FirstToken) is { } indent
+                    ? VisualWidth(indent, _settings.TabWidth)
+                    : VisualStartColumn(occurrence.FirstToken);
+            }
+
+            return JoinedStartColumn(occurrence.FirstToken);
         }
 
         return VisualStartColumn(occurrence.FirstToken);
+    }
+
+    int JoinedStartColumn(int firstToken)
+    {
+        var previous = firstToken - 1;
+        return VisualStartColumn(previous)
+            + VisualWidth(_stream.Pieces[previous].Token.Text, _settings.TabWidth)
+            + 1;
     }
 
     int VisualStartColumn(int firstToken)

@@ -119,7 +119,8 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
-    [InlineData(
+    [
+        InlineData(
         "Map",
         """
         class C
@@ -129,8 +130,10 @@ public class SyntaxWrappingRuleTests
                 ThirdTypeArgumentWithAVeryLongNameIndeed,
                 FourthTypeArgumentWithAVeryLongNameIndeed> Held;
         }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "Maps",
         """
         class C
@@ -141,7 +144,8 @@ public class SyntaxWrappingRuleTests
                 ThirdTypeArgumentWithAVeryLongNameIndeed,
                 FourthTypeArgumentWithAVeryLongNameIndeed> Held;
         }
-        """)]
+        """)
+    ]
     public void Auto_holds_the_first_type_argument_when_the_text_before_the_bracket_ends_by_the_continuation_column(string typeName, string expected)
     {
         var source = $$"""
@@ -213,7 +217,8 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
-    [InlineData(
+    [
+        InlineData(
         "new Action<DeliveryScheduleNightlyShipments, DeliveryScheduleWeekendShipments, DeliveryScheduleStandardShipments, DeliveryScheduleSignedOvernightShipments>",
         """
         class C
@@ -225,8 +230,10 @@ public class SyntaxWrappingRuleTests
                     DeliveryScheduleStandardShipments,
                     DeliveryScheduleSignedOvernightShipments>(Handle);
         }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "new Action(DeliveryScheduleNightlyShipments, DeliveryScheduleWeekendShipments, DeliveryScheduleStandardShipments, DeliveryScheduleSignedOvernightShipments)",
         """
         class C
@@ -238,7 +245,8 @@ public class SyntaxWrappingRuleTests
                     DeliveryScheduleStandardShipments,
                     DeliveryScheduleSignedOvernightShipments)(Handle);
         }
-        """)]
+        """)
+    ]
     public void A_list_opening_along_a_continuation_line_indents_its_items_from_that_line(string creation, string expected)
     {
         var source = $$"""
@@ -439,7 +447,9 @@ public class SyntaxWrappingRuleTests
     [InlineData("\r\n", "dress_arguments_layout", "M(alpha, beta,\n    gamma);", "M(\n    alpha,\n    beta,\n    gamma);")]
     [InlineData("\n", "dress_arguments_layout", "new C(alpha, beta,\n    gamma);", "new C(\n    alpha,\n    beta,\n    gamma);")]
     [InlineData("\n", "dress_parameters_layout", "void M(int alpha, int beta,\n    int gamma) {}", "void M(\n    int alpha,\n    int beta,\n    int gamma) {}")]
-    [InlineData("\r\n", "dress_parameters_layout", "void M(int alpha, int beta,\n    int gamma) {}", "void M(\n    int alpha,\n    int beta,\n    int gamma) {}")]
+    [
+        InlineData("\r\n", "dress_parameters_layout", "void M(int alpha, int beta,\n    int gamma) {}", "void M(\n    int alpha,\n    int beta,\n    int gamma) {}")
+    ]
     public void Auto_puts_each_item_of_a_multiline_list_on_its_own_line(string lineEnding, string key, string source, string expected)
     {
         var preferences = new[] { (key, "auto"), ("max_line_length", "500") };
@@ -528,7 +538,8 @@ public class SyntaxWrappingRuleTests
         Format(result, preferences).ShouldBe(result);
     }
 
-    [InlineData(
+    [
+        InlineData(
         "dress_arguments_layout",
         "class C { void M() { N(alpha, beta); } void N(int a, int b) {} int alpha; int beta; }",
         "class C { void M() { N(alpha, beta); } void N(int a, int b) {} int alpha; int beta; }",
@@ -537,8 +548,10 @@ public class SyntaxWrappingRuleTests
             alpha,
             beta
         ); } void N(int a, int b) {} int alpha; int beta; }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_parameters_layout",
         "class C { void M(int alpha, string beta) {} }",
         "class C { void M(int alpha, string beta) {} }",
@@ -547,8 +560,10 @@ public class SyntaxWrappingRuleTests
             int alpha,
             string beta
         ) {} }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_collection_expressions_layout",
         "class C { int[] M() => [alpha, beta]; int alpha; int beta; }",
         "class C { int[] M() => [alpha, beta]; int alpha; int beta; }",
@@ -557,8 +572,10 @@ public class SyntaxWrappingRuleTests
             alpha,
             beta
         ]; int alpha; int beta; }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_base_type_lists_layout",
         "class C : Alpha, IBeta {} class Alpha {} interface IBeta {}",
         "class C : Alpha, IBeta {} class Alpha {} interface IBeta {}",
@@ -566,8 +583,10 @@ public class SyntaxWrappingRuleTests
         class C
             : Alpha,
             IBeta {} class Alpha {} interface IBeta {}
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_constraint_clauses_layout",
         "class C<T, U> where T : class where U : struct {}",
         "class C<T, U> where T : class where U : struct {}",
@@ -575,8 +594,10 @@ public class SyntaxWrappingRuleTests
         class C<T, U>
             where T : class
             where U : struct {}
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_member_access_chains_layout",
         """class C { string M() => value.Trim().ToString(); string value = ""; }""",
         """class C { string M() => value.Trim().ToString(); string value = ""; }""",
@@ -584,16 +605,20 @@ public class SyntaxWrappingRuleTests
         class C { string M() => value
             .Trim()
             .ToString(); string value = ""; }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_binary_expressions_layout",
         "class C { bool M() => alpha && beta; bool alpha; bool beta; }",
         "class C { bool M() => alpha && beta; bool alpha; bool beta; }",
         """
         class C { bool M() => alpha
             && beta; bool alpha; bool beta; }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_conditional_expressions_layout",
         "class C { int M() => condition ? alpha : beta; bool condition; int alpha; int beta; }",
         "class C { int M() => condition ? alpha : beta; bool condition; int alpha; int beta; }",
@@ -601,8 +626,10 @@ public class SyntaxWrappingRuleTests
         class C { int M() => condition
             ? alpha
             : beta; bool condition; int alpha; int beta; }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_query_clauses_layout",
         "class C { object M(int[] xs) => from x in xs where x > 0 select x; }",
         "class C { object M(int[] xs) => from x in xs where x > 0 select x; }",
@@ -610,16 +637,20 @@ public class SyntaxWrappingRuleTests
         class C { object M(int[] xs) => from x in xs
             where x > 0
             select x; }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_attributes_layout",
         "[A, B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}",
         "[A, B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}",
         """
         [A,
             B] class C {} class AAttribute : System.Attribute {} class BAttribute : System.Attribute {}
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "dress_type_arguments_layout",
         "class C { System.Collections.Generic.Dictionary<string, int> Values { get; set; } }",
         "class C { System.Collections.Generic.Dictionary<string, int> Values { get; set; } }",
@@ -627,7 +658,8 @@ public class SyntaxWrappingRuleTests
         class C { System.Collections.Generic.Dictionary<
             string,
             int> Values { get; set; } }
-        """)]
+        """)
+    ]
     [Theory]
     public void Each_syntax_shape_supports_all_layout_modes_and_is_idempotent(
         string key,
@@ -998,7 +1030,8 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
-    [InlineData("dress_arguments_layout",
+    [
+        InlineData("dress_arguments_layout",
         "class C { object M() => Outer(Inner(firstArgument, secondArgument), thirdArgument); }",
         """
         class C { object M() => Outer(
@@ -1008,8 +1041,10 @@ public class SyntaxWrappingRuleTests
             ),
             thirdArgument
         ); }
-        """)]
-    [InlineData("dress_collection_expressions_layout",
+        """)
+    ]
+    [
+        InlineData("dress_collection_expressions_layout",
         "class C { object[] M() => [N(firstArgument, secondArgument), thirdArgument]; }",
         """
         class C { object[] M() => [
@@ -1019,8 +1054,10 @@ public class SyntaxWrappingRuleTests
             ),
             thirdArgument
         ]; }
-        """)]
-    [InlineData("dress_member_access_chains_layout",
+        """)
+    ]
+    [
+        InlineData("dress_member_access_chains_layout",
         "class C { object M() => N(firstArgument, secondArgument).First.Second; }",
         """
         class C { object M() => N(
@@ -1029,8 +1066,10 @@ public class SyntaxWrappingRuleTests
         )
             .First
             .Second; }
-        """)]
-    [InlineData("dress_binary_expressions_layout",
+        """)
+    ]
+    [
+        InlineData("dress_binary_expressions_layout",
         "class C { int M() => N(firstArgument, secondArgument) + thirdArgument; }",
         """
         class C { int M() => N(
@@ -1038,8 +1077,10 @@ public class SyntaxWrappingRuleTests
             secondArgument
         )
             + thirdArgument; }
-        """)]
-    [InlineData("dress_conditional_expressions_layout",
+        """)
+    ]
+    [
+        InlineData("dress_conditional_expressions_layout",
         "class C { int M() => N(firstArgument, secondArgument) ? firstArgument : secondArgument; }",
         """
         class C { int M() => N(
@@ -1048,8 +1089,10 @@ public class SyntaxWrappingRuleTests
         )
                 ? firstArgument
                 : secondArgument; }
-        """)]
-    [InlineData("dress_query_clauses_layout",
+        """)
+    ]
+    [
+        InlineData("dress_query_clauses_layout",
         "class C { object M(int[] xs) => from x in xs where N(firstArgument, secondArgument) select x; }",
         """
         class C { object M(int[] xs) => from x in xs
@@ -1058,7 +1101,8 @@ public class SyntaxWrappingRuleTests
                 secondArgument
             )
             select x; }
-        """)]
+        """)
+    ]
     public void Outer_auto_layout_kinds_keep_stable_source_anchors_after_inner_rewrite(
         string outerKey,
         string source,
@@ -1893,21 +1937,25 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
-    [InlineData(
+    [
+        InlineData(
         "class C { string M(string value) => value?.Trim(); }",
         "class C { string M(string value) => value?.Trim(); }",
         """
         class C { string M(string value) => value
             ?.Trim(); }
-        """)]
-    [InlineData(
+        """)
+    ]
+    [
+        InlineData(
         "class C { string M(string value) => value?.Trim().ToString(); }",
         "class C { string M(string value) => value?.Trim().ToString(); }",
         """
         class C { string M(string value) => value
             ?.Trim()
             .ToString(); }
-        """)]
+        """)
+    ]
     public void Conditional_access_chains_support_all_modes_without_splitting_question_dot(
         string source,
         string expectedSingle,
@@ -1984,7 +2032,8 @@ public class SyntaxWrappingRuleTests
     }
 
     [Theory]
-    [InlineData("indented",
+    [
+        InlineData("indented",
         """
         class C
         {
@@ -1996,8 +2045,10 @@ public class SyntaxWrappingRuleTests
             int X;
             int Y;
         }
-        """)]
-    [InlineData("not_indented",
+        """)
+    ]
+    [
+        InlineData("not_indented",
         """
         class C
         {
@@ -2009,7 +2060,8 @@ public class SyntaxWrappingRuleTests
             int X;
             int Y;
         }
-        """)]
+        """)
+    ]
     public void Earlier_initializer_indentation_sets_the_base_used_by_syntax_wrapping(
         string indentation,
         string expected)
@@ -2302,6 +2354,113 @@ public class SyntaxWrappingRuleTests
             }
             """;
         (string Key, string Value)[] preferences = [("dress_base_type_lists_layout", "auto"), ("max_line_length", "160")];
+
+        Format(source, preferences).ShouldBe(expected);
+        Format(expected, preferences).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("compact")]
+    [InlineData("expanded")]
+    public void Collection_initializer_layout_spaces_the_braces_of_its_elements(string mode)
+    {
+        const string source = """
+            class C
+            {
+                readonly Dictionary<string, Func<ITest>> _tests = new Dictionary<string, Func<ITest>>
+                    {
+                        {"Counting", () => new CountingTest()},
+                        {"Sorting", () => new SortingTest()}
+                    };
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                readonly Dictionary<string, Func<ITest>> _tests = new Dictionary<string, Func<ITest>>
+                    {
+                        { "Counting", () => new CountingTest() },
+                        { "Sorting", () => new SortingTest() }
+                    };
+            }
+            """;
+        (string Key, string Value)[] preferences =
+            [
+                ("dress_collection_initializer_layout", mode),
+                ("dress_collection_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "160")
+            ];
+
+        Format(source, preferences).ShouldBe(expected);
+        Format(expected, preferences).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Compact_collection_initializer_joins_its_elements_with_the_list()
+    {
+        const string source = """
+            class C
+            {
+                readonly Dictionary<string, int> _values = new Dictionary<string, int>
+                    {
+                        {"one", 1},
+                        {"two", 2}
+                    };
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                readonly Dictionary<string, int> _values = new Dictionary<string, int> { { "one", 1 }, { "two", 2 } };
+            }
+            """;
+        (string Key, string Value)[] preferences =
+            [
+                ("dress_collection_initializer_layout", "compact"),
+                ("dress_collection_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "160")
+            ];
+
+        Format(source, preferences).ShouldBe(expected);
+        Format(expected, preferences).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Auto_collection_initializer_wraps_an_element_that_passes_the_limit_from_its_own_line()
+    {
+        const string source = """
+            class C
+            {
+                readonly Dictionary<string, Func<ITest>> _tests = new Dictionary<string, Func<ITest>>
+                    {
+                        {"Counting", () => new CountingTestWithAVeryLongNameIndeed()},
+                        {"Sorting", () => new SortingTest()}
+                    };
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                readonly Dictionary<string, Func<ITest>> _tests = new Dictionary<string, Func<ITest>>
+                    {
+                        {
+                            "Counting",
+                            () => new CountingTestWithAVeryLongNameIndeed()
+                        },
+                        { "Sorting", () => new SortingTest() }
+                    };
+            }
+            """;
+        (string Key, string Value)[] preferences =
+            [
+                ("dress_collection_initializer_layout", "auto"),
+                ("dress_collection_initializer_indentation", "indented"),
+                ("csharp_indent_block_contents", "true"),
+                ("max_line_length", "64")
+            ];
 
         Format(source, preferences).ShouldBe(expected);
         Format(expected, preferences).ShouldBe(expected);

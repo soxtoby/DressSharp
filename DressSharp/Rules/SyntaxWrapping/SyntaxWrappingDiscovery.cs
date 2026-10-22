@@ -84,8 +84,7 @@ sealed class SyntaxWrappingDiscovery
                 }
                 else if (token.Parent is InitializerExpressionSyntax initializer
                     && token == initializer.OpenBraceToken
-                    && InitializerIndentationRule.KindOf(initializer) is { } initializerKind
-                    && SyntaxWrappingRule.KindFor(initializerKind) is { } wrappingKind
+                    && WrappingKindOf(initializer) is { } wrappingKind
                     && Enabled(wrappingKind) is not null)
                 {
                     AddOccurrence(initializer, wrappingKind);
@@ -281,6 +280,11 @@ sealed class SyntaxWrappingDiscovery
         if (Enabled(kind) is not { } setting || Unsafe(node))
             return;
 
+        // An expanded list puts each element on a line of its own; the element itself keeps the
+        // lines it has, as auto with no limit does, rather than taking a line per key and value.
+        if (IsElement(node) && setting.Mode == SyntaxWrappingSettings.WrappingMode.Multi)
+            setting = setting with { Mode = SyntaxWrappingSettings.WrappingMode.Auto };
+
         var start = _boundaries.Count;
         var firstToken = _stream.IndexOf(node.GetFirstToken(), _currentSegmentIndex);
         var lastToken = _stream.IndexOf(OccurrenceLastToken(node), _currentSegmentIndex);
@@ -303,7 +307,9 @@ sealed class SyntaxWrappingDiscovery
                 Delimited(list.Arguments, list.GreaterThanToken, keepCloseAttached: true);
                 break;
             case InitializerExpressionSyntax initializer:
-                AddBoundary(initializer.OpenBraceToken, GapStyle.InitializerOpen);
+                // The gap before an element's brace is an item gap of the list holding it.
+                if (!IsElement(initializer))
+                    AddBoundary(initializer.OpenBraceToken, GapStyle.InitializerOpen);
                 Delimited(initializer.Expressions, initializer.CloseBraceToken, spacesInside: true);
                 break;
             case AnonymousObjectCreationExpressionSyntax anonymous:
@@ -624,6 +630,25 @@ sealed class SyntaxWrappingDiscovery
     }
 
     SyntaxWrappingSettings.Setting? Enabled(SyntaxWrappingKind kind) => _byKind[(int)kind];
+
+    /// <summary>
+    /// The preference that lays out an initializer, or null when none does.
+    /// </summary>
+    /// <remarks>
+    /// A <c>{ key, value }</c> element of a collection initializer is a list in its own right, with
+    /// braces spaced like the list that holds it and items that wrap where that list's would, so
+    /// the collection initializer preference lays it out too.
+    /// </remarks>
+    static SyntaxWrappingKind? WrappingKindOf(InitializerExpressionSyntax initializer) =>
+        IsElement(initializer)
+            ? initializer.Expressions.Count > 0
+                ? SyntaxWrappingKind.CollectionInitializers
+                : null
+            : InitializerIndentationRule.KindOf(initializer) is { } kind
+                ? SyntaxWrappingRule.KindFor(kind)
+                : null;
+
+    internal static bool IsElement(SyntaxNode node) => node.IsKind(SyntaxKind.ComplexElementInitializerExpression);
 
     bool Unsafe(SyntaxNode node) => node.ContainsDirectives
         || ReferenceEquals(node.SyntaxTree, _root.SyntaxTree)

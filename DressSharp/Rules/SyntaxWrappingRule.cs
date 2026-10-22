@@ -21,6 +21,7 @@ sealed class SyntaxWrappingRule(
                     : kind == SyntaxWrappingKind.ConditionalExpressions ? " Wrapped branches indent one level beyond the deepest formatted line of a multiline condition."
                     : kind == SyntaxWrappingKind.MemberAccessChains ? " A wrapped chain keeps its first call with a receiver no wider than the continuation indent, since breaking there would gain no room."
                     : kind == SyntaxWrappingKind.Attributes ? " Square brackets stay attached to the first and last attributes when the list wraps."
+                    : kind == SyntaxWrappingKind.CollectionInitializers ? " The { key, value } elements of the initializer are laid out the same way, with their braces spaced like its own."
                     : kind == SyntaxWrappingKind.TypeArguments ? " The closing bracket stays attached to the last type argument when the list wraps. Auto keeps the first argument on the opening line when the text before the bracket is no wider than the continuation indent, since breaking there would gain no room."
                     : ""),
             Values = RuleValues.From(InitializerKindFor(kind) is not null
