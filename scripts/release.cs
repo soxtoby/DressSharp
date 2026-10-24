@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using DotNetDo;
 using static DotNetDo.Tools;
 
-[assembly: TaskDescription("Publish the packed NuGet packages and Rider plugin in one GitHub release.")]
+[assembly: TaskDescription("Publish the packed NuGet packages, Rider plugin, and VS Code extension in one GitHub release.")]
 
 var tag = Do.GitHubActions?.Workflow.ReferenceName is { } defaultTag
     ? Do.Param("tag", defaultTag, "Release tag.").Value
@@ -42,6 +42,10 @@ var riderPackage = Do.RootDirectory / $"extensions/DressSharpRider/build/distrib
 if (!File.Exists(riderPackage.ToString()))
     throw new InvalidOperationException($"Expected Rider plugin package '{riderPackage}'. Build the plugin before publishing the release.");
 
+var vscodePackage = Do.RootDirectory / $"dist/DressSharpVSCode-{version}.vsix";
+if (!File.Exists(vscodePackage.ToString()))
+    throw new InvalidOperationException($"Expected VS Code extension package '{vscodePackage}'. Run 'build-vscode' before publishing the release.");
+
 // Push the tool package last, so it never resolves to a runtime package that isn't there yet.
 foreach (var name in expected)
 {
@@ -58,5 +62,6 @@ var notesFile = Do.CreateTempFile("dresssharp-release-notes-", ".md");
 notesFile.WriteText(notesMatch.Groups["notes"].Value.Trim() + Environment.NewLine);
 var assets = expected.Select(name => (packages / name).QuotedArgument())
     .Append(riderPackage.QuotedArgument())
+    .Append(vscodePackage.QuotedArgument())
     .JoinWith(" ");
 await Do.Exec($"gh release create {tag.QuotedArgument()} {assets} --title {tag.QuotedArgument()} --notes-file {notesFile.QuotedArgument()}");

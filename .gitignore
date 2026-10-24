@@ -17,3 +17,5 @@ extensions/**/.kotlin/
 extensions/**/build/
 extensions/**/*.iml
 extensions/**/local.properties
+# VS Code extension bundle; the VSIX goes to dist/.
+extensions/DressSharpVSCode/out/

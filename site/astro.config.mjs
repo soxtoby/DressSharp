@@ -21,7 +21,7 @@ export default defineConfig({
       favicon: "/favicon.svg",
       social: repository ? [{ icon: "github", label: "GitHub", href: `https://github.com/${repository}` }] : [],
       sidebar: [
-        { label: "Guides", items: ["getting-started", "choosing-rules", "formatting-automatically", "rider"] },
+        { label: "Guides", items: ["getting-started", "choosing-rules", "formatting-automatically", "rider", "vscode"] },
         { label: "Rules", items: [{ autogenerate: { directory: "rules" } }] },
         {
           label: "Reference",

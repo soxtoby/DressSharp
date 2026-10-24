@@ -1,0 +1,84 @@
+{
+  "name": "dresssharp",
+  "displayName": "DressSharp",
+  "description": "Format C# with the DressSharp rules in your repository's EditorConfig.",
+  "publisher": "soxtoby",
+  "version": "0.0.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/soxtoby/DressSharp"
+  },
+  "homepage": "https://soxtoby.github.io/DressSharp/vscode/",
+  "categories": ["Formatters"],
+  "keywords": ["C#", "csharp", "formatter", "EditorConfig", "dotnet"],
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "main": "./out/extension.js",
+  "files": ["out/extension.js"],
+  "activationEvents": ["onLanguage:csharp"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "DressSharp runs the .NET tool the repository installs and reads its MSBuild projects."
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "dresssharp.formatDocument",
+        "title": "Format document with DressSharp"
+      },
+      {
+        "command": "dresssharp.useAsDefaultFormatter",
+        "title": "Use DressSharp as the default C# formatter"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "dresssharp.formatDocument",
+          "when": "editorLangId == csharp"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "dresssharp.formatDocument",
+          "when": "editorLangId == csharp && resourceScheme == file",
+          "group": "1_modification"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "DressSharp",
+      "properties": {
+        "dresssharp.backgroundProcess": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "markdownDescription": "Keep a DressSharp process running for each repository, so formatting doesn't wait for one to start. Turn off to start a fresh process for each format and use less memory."
+        },
+        "dresssharp.dotnetPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "The `dotnet` executable that runs the repository's DressSharp tool. Leave empty to find it on the `PATH` or in a standard installation folder."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "bun run typecheck && bun run build.ts",
+    "package": "bun run typecheck && bun run build.ts --package",
+    "check": "bun run typecheck && bun test",
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "@types/vscode": "1.95.0",
+    "@vscode/vsce": "4.0.0",
+    "typescript": "7.0.2"
+  }
+}

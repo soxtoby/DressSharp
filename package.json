@@ -1,13 +1,15 @@
 {
   "name": "dresssharp",
   "private": true,
-  "workspaces": ["DressSharp.Interactive", "site"],
+  "workspaces": ["DressSharp.Interactive", "site", "extensions/DressSharpVSCode"],
   "scripts": {
     "interactive:build": "bun run --cwd DressSharp.Interactive build",
     "interactive:build:production": "bun run --cwd DressSharp.Interactive build:production",
     "interactive:check": "bun run --cwd DressSharp.Interactive check",
     "site:dev": "bun run --cwd site dev",
-    "site:build": "bun run --cwd site build"
+    "site:build": "bun run --cwd site build",
+    "vscode:check": "bun run --cwd extensions/DressSharpVSCode check",
+    "vscode:package": "bun run --cwd extensions/DressSharpVSCode package"
   },
   "engines": {
     "bun": "1.4.0"

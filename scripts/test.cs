@@ -7,6 +7,7 @@ using static DotNetDo.Tools;
 
 await (Bun.Install with { FrozenLockfile = true });
 await (Bun.Run with { Target = "interactive:check" });
+await (Bun.Run with { Target = "vscode:check" });
 // The interactive server tests serve the embedded assets, so a clean checkout needs them built.
 await (Bun.Run with { Target = "interactive:build" });
 // The test projects reference Microsoft.Testing.Extensions.GitHubActionsReport, which annotates failures

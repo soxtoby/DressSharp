@@ -50,6 +50,8 @@ dotnet dress
 
 The [Rider plugin](https://soxtoby.github.io/DressSharp/rider/) formats C# on save, as you type, or with **Code | Format with DressSharp**. See the guide for installation, repository setup, and settings.
 
+The [VS Code extension](https://soxtoby.github.io/DressSharp/vscode/) formats C# from the command palette, and can be VS Code's default C# formatter for **Format Document** and format on save.
+
 ## Learn more
 
 - [Getting started](https://soxtoby.github.io/DressSharp/getting-started/): install, choose your rules, and format for the first time.
