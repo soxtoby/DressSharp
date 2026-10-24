@@ -104,7 +104,7 @@ export class Preview {
 
     static async create(onSelectionRules: (keys: Set<string> | null, label: string) => void) {
         if (!DiffsContainerLoaded) throw new Error("The preview editor could not load.");
-        await preloadHighlighter({themes: ["github-light"], langs: ["csharp"], preferredHighlighter: "shiki-js"});
+        await preloadHighlighter({themes: ["github-light"], langs: ["csharp"], preferredHighlighter: "highlights"});
         return new Preview(onSelectionRules);
     }
 
@@ -204,7 +204,7 @@ export class Preview {
 
     private options(): FileDiffOptions<undefined, undefined> {
         return {diffStyle: "split", expandUnchanged: true, disableFileHeader: true, theme: "github-light", themeType: "light",
-            preferredHighlighter: "shiki-js", overflow: "scroll", unsafeCSS: editorCss,
+            preferredHighlighter: "highlights", overflow: "scroll", unsafeCSS: editorCss,
             disableBackground: this.stale, diffIndicators: "none", lineDiffType: this.stale ? "none" : "char",
             onPostRender: () => this.queueMarkers()};
     }

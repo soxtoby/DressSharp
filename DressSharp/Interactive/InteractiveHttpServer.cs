@@ -317,23 +317,23 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
     static async Task WriteConfiguration(HttpListenerResponse response, InteractiveEditorConfigData data) =>
         await WriteJson(
-            response,
-            200,
-            new
-                {
-                    targetPath = data.TargetPath,
-                    interactiveRoot = data.InteractiveRoot,
-                    revision = data.Revision,
-                    preferences = data.Preferences.Select(preference => new
-                        {
-                            key = preference.RuleKey.ToName(),
-                            local = Assignment(preference.Local),
-                            inherited = Assignment(preference.Inherited),
-                            inheritedSourcePath = preference.InheritedSourcePath,
-                            effectiveValue = preference.EffectiveValue,
-                            effectiveSourcePath = preference.EffectiveSourcePath,
-                        })
-                });
+        response,
+        200,
+        new
+            {
+                targetPath = data.TargetPath,
+                interactiveRoot = data.InteractiveRoot,
+                revision = data.Revision,
+                preferences = data.Preferences.Select(preference => new
+                    {
+                        key = preference.RuleKey.ToName(),
+                        local = Assignment(preference.Local),
+                        inherited = Assignment(preference.Inherited),
+                        inheritedSourcePath = preference.InheritedSourcePath,
+                        effectiveValue = preference.EffectiveValue,
+                        effectiveSourcePath = preference.EffectiveSourcePath,
+                    })
+            });
 
     static object Assignment(PreferenceAssignment assignment) => new
         {
@@ -358,8 +358,8 @@ sealed class InteractiveHttpServer : IInteractiveServer
 
     static void AddSecurityHeaders(HttpListenerResponse response)
     {
-        // Pierre generates shadow-DOM styles; Shiki colors tokens with style attributes.
-        response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
+        // Pierre generates shadow-DOM styles and colors tokens with style attributes. Its highlighter is WebAssembly.
+        response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
         response.Headers["X-Content-Type-Options"] = "nosniff";
         response.Headers["Referrer-Policy"] = "no-referrer";
         response.Headers["Cache-Control"] = "no-store";

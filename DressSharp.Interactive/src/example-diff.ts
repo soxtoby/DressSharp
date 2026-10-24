@@ -26,7 +26,7 @@ export class ExampleDiff extends FileDiff {
 
     constructor() {
         super({diffStyle: "split", expandUnchanged: true, disableFileHeader: true,
-            theme: "github-light", themeType: "light", preferredHighlighter: "shiki-js",
+            theme: "github-light", themeType: "light", preferredHighlighter: "highlights",
             overflow: "scroll", lineDiffType: "char", diffIndicators: "none", unsafeCSS: styles,
             onPostRender: () => this.decorate()});
     }

@@ -1,7 +1,7 @@
 # Pierre fragment offsets
 
 `@pierre/diffs@1.6.1.patch` keeps each rendered fragment's actual line column in
-`data-char`. Intra-line highlighting can split one Shiki token into several spans;
+`data-char`. Intra-line highlighting can split one syntax token into several spans;
 copying the original token's column onto every fragment makes native selections
 resolve to earlier characters. This patches the main-thread `renderTokenLines` used
 by our offline preview; the preview does not use Pierre workers.
