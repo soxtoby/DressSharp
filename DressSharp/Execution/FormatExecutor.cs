@@ -40,6 +40,48 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         return ExitCode(request, prepared, failed);
     }
 
+    /// <summary>
+    /// Formats <paramref name="input"/> as though it were the file at <paramref name="path"/>, which
+    /// decides its EditorConfig preferences and parse context, and writes the result to
+    /// <paramref name="output"/>. The file itself is never read or written, so an editor can format
+    /// what it holds before saving.
+    /// </summary>
+    /// <returns>0 when the formatted text was written, including text the file's projects left as it
+    /// was; 2 when it could not be formatted.</returns>
+    internal async Task<int> RunStandardInput(
+        string path,
+        string? buildConfiguration,
+        bool verbose,
+        TextReader input,
+        TextWriter output,
+        CancellationToken cancellationToken = default)
+    {
+        var timing = new BenchmarkTiming();
+        var commandStart = Stopwatch.GetTimestamp();
+        var request = new CommandRequest(CommandKind.Format, [], verbose, buildConfiguration);
+        var fullPath = Path.GetFullPath(path, _invocationDirectory);
+        var file = new SelectedFile(fullPath, Path.GetRelativePath(_invocationDirectory, fullPath).Replace('\\', '/'));
+        var text = await input.ReadToEndAsync(cancellationToken);
+
+        var preparation = await PrepareRun(request, [file], timing, cancellationToken);
+        var context = preparation.Contexts[fullPath];
+        var prepared = context.CanFormat
+            ? await FormatDocument(SourceDocument.FromText(fullPath, text), context, preparation.Formatters[0], timing, cancellationToken)
+            : null;
+        var outcome = await ReportFile(request, file, context, prepared);
+
+        timing.Wall = Stopwatch.GetElapsedTime(commandStart);
+        await BenchmarkDiagnostics.WriteAsync(timing, cancellationToken);
+        if (outcome != FileOutcome.Failed)
+        {
+            // A file whose projects disagree, or whose project could not be read, is left as it was.
+            var formatted = prepared is { Failure: null } ? SourceDocument.Decode(prepared.Content, prepared.Encoding) : text;
+            await output.WriteAsync(formatted.AsMemory(), cancellationToken);
+            await output.FlushAsync(cancellationToken);
+        }
+        return outcome == FileOutcome.Failed ? 2 : 0;
+    }
+
     async ValueTask ReportFormatSummary(CommandRequest request, int formatted, int selected, TimeSpan elapsed)
     {
         if (request.Kind != CommandKind.Format)
@@ -140,6 +182,23 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
             var readStart = Stopwatch.GetTimestamp();
             var document = await SourceDocument.ReadAsync(file.FullPath, cancellationToken);
             timing.AddRead(Stopwatch.GetElapsedTime(readStart));
+            return await FormatDocument(document, context, formatter, timing, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new(exception);
+        }
+    }
+
+    static async ValueTask<PreparedFile> FormatDocument(
+        SourceDocument document,
+        ParseContextResolution context,
+        DocumentFormatter formatter,
+        BenchmarkTiming timing,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
             var formatted = await formatter.Format(document, context.Contexts, cancellationToken);
             return new(document, formatted);
         }
@@ -183,6 +242,24 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         BenchmarkTiming timing,
         CancellationToken cancellationToken)
     {
+        var outcome = await ReportFile(request, file, context, prepared);
+        if (outcome == FileOutcome.Changed && (request.Kind == CommandKind.Check || request.Verbose))
+            await _output.WriteLineAsync(file.DisplayPath);
+        return outcome switch
+            {
+                FileOutcome.Failed => false,
+                FileOutcome.Changed when request.Kind == CommandKind.Format => await Persist(file, prepared!, timing, cancellationToken),
+                _ => true
+            };
+    }
+
+    /// <summary>Writes a file's diagnostics to the error stream and says what became of it.</summary>
+    async ValueTask<FileOutcome> ReportFile(
+        CommandRequest request,
+        SelectedFile file,
+        ParseContextResolution context,
+        PreparedFile? prepared)
+    {
         foreach (var diagnostic in context.Diagnostics)
         {
             if (request.Verbose || !context.CanFormat)
@@ -190,31 +267,23 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         }
 
         if (!context.CanFormat)
-            return context.Skipped;
+            return context.Skipped ? FileOutcome.Skipped : FileOutcome.Failed;
 
         var result = prepared!;
         if (result.Failure is not null)
         {
             await _error.WriteLineAsync($"{file.DisplayPath}: {result.Failure.Message}");
-            return false;
+            return FileOutcome.Failed;
         }
         if (result.ContextsDisagree)
         {
             await _error.WriteLineAsync($"warning: {file.DisplayPath}: the projects that compile it disagree about its layout, so it is left as it is.");
-            return true;
+            return FileOutcome.Skipped;
         }
 
         if (request.Verbose && result.SkippedOccurrences > 0)
             await _error.WriteLineAsync($"{file.DisplayPath}: skipped {result.SkippedOccurrences} malformed occurrence(s).");
-        if (!result.Changed)
-            return true;
-
-        if (request.Kind == CommandKind.Check || request.Verbose)
-            await _output.WriteLineAsync(file.DisplayPath);
-        if (request.Kind == CommandKind.Check)
-            return true;
-
-        return await Persist(file, result, timing, cancellationToken);
+        return result.Changed ? FileOutcome.Changed : FileOutcome.Unchanged;
     }
 
     async ValueTask<bool> Persist(
@@ -249,12 +318,22 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
         IReadOnlyDictionary<string, ParseContextResolution> Contexts,
         DocumentFormatter[] Formatters);
 
+    enum FileOutcome
+    {
+        Failed,
+        /// <summary>Left as it was, with the reason reported as a warning.</summary>
+        Skipped,
+        Unchanged,
+        Changed,
+    }
+
     sealed class PreparedFile
     {
         internal PreparedFile(SourceDocument document, FormattedDocument formatted)
         {
             Document = document;
             Content = formatted.Content;
+            Encoding = formatted.Encoding;
             SkippedOccurrences = formatted.SkippedOccurrences;
             ContextsDisagree = formatted.ContextsDisagree;
         }
@@ -263,6 +342,7 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
 
         internal SourceDocument? Document { get; }
         internal ReadOnlyMemory<byte> Content { get; }
+        internal SourceEncoding Encoding { get; }
         internal Exception? Failure { get; }
         internal int SkippedOccurrences { get; }
         internal bool ContextsDisagree { get; }

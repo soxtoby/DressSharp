@@ -88,6 +88,44 @@ public sealed class CommandTests
     }
 
     [Fact]
+    public void Format_stdin_names_the_file_the_input_stands_in_for()
+    {
+        var sut = Program.CreateCommand();
+
+        var result = sut.Parse(["format", "--stdin", "src/Program.cs"]);
+        result.Errors.ShouldBeEmpty();
+        result.GetValue<string?>("--stdin").ShouldBe("src/Program.cs");
+    }
+
+    [Theory]
+    [InlineData("format --stdin a.cs --include b.cs")]
+    [InlineData("format --stdin a.cs --staged")]
+    [InlineData("format --stdin a.cs --changed")]
+    [InlineData("format --stdin")]
+    [InlineData("check --stdin a.cs")]
+    [InlineData("--stdin a.cs")]
+    public void Stdin_is_rejected_where_it_has_no_file_to_stand_in_for(string commandLine)
+    {
+        Program.CreateCommand().Parse(commandLine).Errors.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public void Format_server_accepts_a_stream_of_editor_requests()
+    {
+        Program.CreateCommand().Parse("format --server").Errors.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("format --server --stdin a.cs")]
+    [InlineData("format --server --include a.cs")]
+    [InlineData("format --server --changed")]
+    [InlineData("check --server")]
+    public void Server_rejects_conflicting_input_modes(string commandLine)
+    {
+        Program.CreateCommand().Parse(commandLine).Errors.ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public void Init_target_is_an_option()
     {
         var sut = Program.CreateCommand();

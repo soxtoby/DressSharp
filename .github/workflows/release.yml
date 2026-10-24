@@ -9,18 +9,29 @@ permissions:
   id-token: write
 
 jobs:
+  rider:
+    uses: ./.github/workflows/rider.yml
+
   release:
+    needs: rider
     runs-on: ubuntu-24.04
     environment: release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.302
+          global-json-file: global.json
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
+      - run: ./do test
       - run: ./do pack
+      - name: Download Rider plugin
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.rider.outputs.artifact-id }}
+          path: extensions/DressSharpRider/build/distributions
+          skip-decompress: true
       - name: NuGet login
         id: nuget
         uses: NuGet/login@v1

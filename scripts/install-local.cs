@@ -5,7 +5,8 @@ using static DotNetDo.Tools;
 
 [assembly: TaskDescription("Pack DressSharp and install it from the local package as a repository tool.")]
 
-var packages = (Do.RootDirectory / "dist/packages").EnsureDirectoryExists();
+// Older versions would make selecting the wrapper package ambiguous.
+var packages = (Do.RootDirectory / "dist/packages").RecreateDirectory();
 var manifest = Do.RootDirectory / ".config/dotnet-tools.json";
 
 await (Bun.Install with { FrozenLockfile = true });
@@ -30,10 +31,23 @@ var globalPackages = Environment.GetEnvironmentVariable("NUGET_PACKAGES") is { L
     ? AbsolutePath.Parse(configured)
     : AbsolutePath.Parse(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)) / ".nuget" / "packages";
 foreach (var cached in globalPackages.GlobDirectories("dresssharp*/" + version.ToLowerInvariant()))
-    cached.Delete();
-var resolverCache = AbsolutePath.Parse(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)) / ".dotnet" / "toolResolverCache";
-foreach (var entry in resolverCache.GlobFiles("*/dresssharp"))
-    entry.Delete();
-
+    await DeleteCachedPackage(cached);
 await Do.Exec(
     $"dotnet tool install DressSharp --version {version.QuotedArgument()} --add-source {packages.QuotedArgument()} --ignore-failed-sources --no-cache");
+
+static async Task DeleteCachedPackage(AbsolutePath path)
+{
+    // An editor worker stops when the uninstall changes its manifest; allow it to release mapped files.
+    var attempts = 0;
+    while (path.IsExistingDirectory)
+    {
+        try
+        {
+            path.Delete();
+        }
+        catch (Exception exception) when ((exception is IOException or UnauthorizedAccessException) && attempts++ < 12)
+        {
+            await Task.Delay(250);
+        }
+    }
+}

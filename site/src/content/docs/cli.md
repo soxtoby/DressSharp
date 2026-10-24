@@ -27,6 +27,8 @@ description: Every dotnet dress command and option, which files it selects, and 
 
 `--staged` and `--changed` can't be combined, and both need a Git repository. In a repository with no commits yet, they select every file.
 
+`dotnet dress format --stdin <path>` reads C# from standard input, uses the named file's EditorConfig and project, and writes formatted text to standard output without changing the file. It is available only with `format` and cannot be combined with `--include`, `--staged`, or `--changed`.
+
 `init` takes `--target <path>`, the EditorConfig file to write. It defaults to `.editorconfig` in the current directory, and is created if missing. A setting already present in any section is left unchanged. New settings go into the last `[*.cs]` section, or a new one at the end of the file.
 
 `interactive` takes `--config <path>`, an EditorConfig file or the directory holding one. Without it, DressSharp uses the nearest `.editorconfig` in the current directory or above.

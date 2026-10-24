@@ -5,6 +5,7 @@ using Kind = DressSharp.Parsing.MSBuildEvaluationKind;
 
 namespace DressSharp.UnitTests;
 
+[Collection("Process-wide MSBuild")]
 public sealed class InProcessMSBuildEvaluatorTests : IDisposable
 {
     readonly string _root = Path.Combine(Path.GetTempPath(), $"DressSharp-{Guid.NewGuid():N}");
@@ -151,3 +152,7 @@ public sealed class InProcessMSBuildEvaluatorTests : IDisposable
         }
     }
 }
+
+// MSBuild changes the current directory; separate evaluator instances must not overlap in this process.
+[CollectionDefinition("Process-wide MSBuild", DisableParallelization = true)]
+public sealed class MSBuildProcessCollection;

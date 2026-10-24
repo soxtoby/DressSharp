@@ -10,6 +10,7 @@
     <File Path="scripts/benchmark.cs" />
     <File Path="scripts/build-docs.cs" />
     <File Path="scripts/build-interactive.cs" />
+    <File Path="scripts/build-rider.cs" />
     <File Path="scripts/build.cs" />
     <File Path="scripts/install-local.cs" />
     <File Path="scripts/materialize-corpus.cs" />

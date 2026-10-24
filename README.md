@@ -9,11 +9,10 @@ DressSharp is an unopinionated C# formatter. It formats your code to the rules y
 DressSharp is a .NET tool and needs the .NET 10 SDK. Install it into your repository so everyone on the team, and your CI, runs the same version:
 
 ```sh
-dotnet new tool-manifest
 dotnet tool install DressSharp
 ```
 
-Skip the first command if your repository already has a `.config/dotnet-tools.json`. Commit that file. Anyone who clones the repository then runs `dotnet tool restore` once to get the tool.
+This creates `.config/dotnet-tools.json` if needed. Commit that file. Anyone who clones the repository then runs `dotnet tool restore` once to get the tool.
 
 To use DressSharp everywhere on your machine instead, install it globally:
 
@@ -46,6 +45,10 @@ Then format every C# file in the current directory and below:
 ```sh
 dotnet dress
 ```
+
+## Editor extensions
+
+The [Rider plugin](https://soxtoby.github.io/DressSharp/rider/) formats C# on save, as you type, or with **Code | Format with DressSharp**. See the guide for installation, repository setup, and settings.
 
 ## Learn more
 
