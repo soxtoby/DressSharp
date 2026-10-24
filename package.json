@@ -15,6 +15,6 @@
     "bun": "1.4.0"
   },
   "patchedDependencies": {
-    "@pierre/diffs@1.4.1": "DressSharp.Interactive/patches/@pierre%2Fdiffs@1.4.1.patch"
+    "@pierre/diffs@1.6.1": "DressSharp.Interactive/patches/@pierre%2Fdiffs@1.6.1.patch"
   }
 }

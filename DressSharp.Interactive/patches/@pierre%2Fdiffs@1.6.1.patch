@@ -1,0 +1,13 @@
+diff --git a/dist/utils/renderTokenLines.js b/dist/utils/renderTokenLines.js
+index c97c3bd848a715f930ef001261fb2e70f29dee7b..9658e156fa289385616151cb0ebb32f97dec8c68 100644
+--- a/dist/utils/renderTokenLines.js
++++ b/dist/utils/renderTokenLines.js
+@@ -209,7 +209,7 @@ function appendDecoratedTokens(line, tokens, spans, lineIndex, useTokenTransform
+ 		while (column < end) {
+ 			if (boundaries[boundaryIndex]?.position === column) advanceBoundary(column);
+ 			const to = Math.min(end, boundaries[boundaryIndex]?.position ?? end);
+-			parent.children.push(createTokenSpan(token, style, column === start && to === end ? token.content : token.content.slice(column - start, to - start), start, useTokenTransformer));
++			parent.children.push(createTokenSpan(token, style, column === start && to === end ? token.content : token.content.slice(column - start, to - start), column, useTokenTransformer));
+ 			column = to;
+ 		}
+ 	}
