@@ -36,10 +36,10 @@ The extension runs only in trusted workspaces, since it runs the repository's Dr
 ## Format your code
 
 - **From the command palette:** run **Format document with DressSharp**, or choose it from the editor's context menu. It formats the current file whichever formatter is VS Code's default.
-- **With Format Document:** run **Use DressSharp as the default C# formatter** from the command palette and choose this workspace or all workspaces. **Format Document** then uses DressSharp for C# files.
-- **On save:** after making DressSharp the default formatter, accept its offer to turn on format on save, or turn on `editor.formatOnSave` yourself.
+- **With Format Document:** run **Format Document With...** from the command palette or the editor's context menu, choose **Configure Default Formatter...**, then choose DressSharp. VS Code saves the choice in your user settings, and **Format Document** then uses DressSharp for C# files. If DressSharp is your only C# formatter, VS Code uses it without asking.
+- **On save:** once DressSharp is the default formatter, turn on `editor.formatOnSave`.
 
-The default formatter command writes these settings, which you can also add to your `settings.json` yourself:
+To set both for one repository, so they apply to everyone who opens it, add these to its `.vscode/settings.json`:
 
 ```json
 "[csharp]": {

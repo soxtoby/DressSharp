@@ -5,7 +5,7 @@
 ### Added
 - [Rider plugin](https://soxtoby.github.io/DressSharp/rider/) with format on save, format as you type, and a **Code | Format with DressSharp** action for repositories using DressSharp as a local .NET tool. Installable ZIPs accompany each release.
 - Optional background formatter in Rider, enabled by default, keeps a process ready for save, typing, and manual formatting.
-- [VS Code extension](https://soxtoby.github.io/DressSharp/vscode/) with a **Format document with DressSharp** command, and a command that makes DressSharp VS Code's default C# formatter for **Format Document** and format on save. Installable VSIX files accompany each release.
+- [VS Code extension](https://soxtoby.github.io/DressSharp/vscode/) that formats C# with a **Format document with DressSharp** command, or as VS Code's default C# formatter for **Format Document** and format on save. Installable VSIX files accompany each release.
 - `dotnet dress format --stdin <path>` formats unsaved text using the named file's EditorConfig and project, writing the result to standard output without changing the file.
 
 ### Changed

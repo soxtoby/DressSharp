@@ -13,7 +13,7 @@ The [Rider plugin](../rider/) formats C# on save, as you type, or with **Code | 
 
 ## In VS Code
 
-The [VS Code extension](../vscode/) formats C# with **Format document with DressSharp**, or as VS Code's default C# formatter for **Format Document** and format on save. Install its VSIX from a GitHub release, then run **Use DressSharp as the default C# formatter**.
+The [VS Code extension](../vscode/) formats C# with **Format document with DressSharp**, or as VS Code's default C# formatter for **Format Document** and format on save. Install its VSIX from a GitHub release, then choose DressSharp with **Format Document With...** and **Configure Default Formatter...**.
 
 ## Before each commit
 
