@@ -1,8 +1,5 @@
 package com.soxtoby.dresssharp.rider
 
-import com.intellij.execution.ExecutionException
-import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessOutput
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.EDT
@@ -14,7 +11,6 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.openapi.progress.coroutineToIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.toNioPathOrNull
@@ -22,7 +18,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -31,7 +26,7 @@ import java.nio.file.Path
 
 /**
  * Formats the statement or block the user has just finished typing. The unsaved document goes through
- * `dotnet dress format --stdin`, and of the changes DressSharp would make to the file, only those on
+ * DressSharp, and of the changes it would make to the file, only those on
  * the lines the typed `;` or `}` settled are applied, so the rest of the file stays as the user left it.
  *
  * Nothing is read until a moment after the keystroke, so that Rider's own typing assists, such as
@@ -78,7 +73,7 @@ class DressSharpTypingFormatter(private val project: Project, private val scope:
         val region = TriggerRegion.of(snapshot.text, snapshot.caretOffset, typed)
         LOG.debug { "DressSharp formatting lines ${region.first + 1}-${region.last + 1} of ${path.fileName} after '$typed'" }
 
-        val output = run(DressSharpInvocation.standardInput(manifest.root, path, dotnet), snapshot.text) ?: return
+        val output = run(manifest, path, dotnet, snapshot.text) ?: return
         if (output.exitCode != 0) {
             reportFailure(output)
             return
@@ -95,23 +90,13 @@ class DressSharpTypingFormatter(private val project: Project, private val scope:
         }
     }
 
-    /** Runs DressSharp with [input] on its standard input. Returns null when it couldn't start, or the request was superseded. */
-    private suspend fun run(commandLine: GeneralCommandLine, input: String): ProcessOutput? {
-        val handler = try {
-            CapturingProcessHandler(commandLine)
-        } catch (e: ExecutionException) {
-            reportFailure("DressSharp couldn't start <code>${commandLine.exePath.escaped()}</code>: ${e.message.orEmpty().escaped()}")
-            return null
-        }
-        return try {
-            coroutineScope {
-                launch(Dispatchers.IO) { handler.processInput.use { it.write(input.toByteArray(Charsets.UTF_8)) } }
-                coroutineToIndicator { indicator -> handler.runProcessWithProgressIndicator(indicator) }
-            }
-        } catch (e: CancellationException) {
-            handler.destroyProcess()
-            throw e
-        }
+    private suspend fun run(manifest: ToolManifest, path: Path, dotnet: Path, input: String): ProcessOutput? = try {
+        DressSharpWorkers.getInstance(project).format(manifest, path, dotnet, input)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        reportFailure("DressSharp formatting failed: ${e.message.orEmpty().escaped()}")
+        null
     }
 
     private fun reportFailure(output: ProcessOutput) {

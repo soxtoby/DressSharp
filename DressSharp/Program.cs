@@ -172,16 +172,21 @@ static class Program
                 Description = "Format standard input as the file at this path, writing the result to standard output and leaving the file alone.",
                 HelpName = "path",
             };
+        var server = new Option<bool>("--server") { Hidden = true };
         format.Add(stdin);
+        format.Add(server);
         format.Validators.Add(result =>
             {
-                if (result.GetResult(stdin) is null)
+                if (result.GetResult(stdin) is null && result.GetResult(server) is null)
                     return;
+                var inputOption = result.GetResult(server) is not null ? "--server" : "--stdin";
                 foreach (var option in new Option[] { includes, scope.Staged, scope.Changed })
                 {
                     if (result.GetResult(option) is not null)
-                        result.AddError($"Option '--stdin' cannot be combined with '{option.Name}'.");
+                        result.AddError($"Option '{inputOption}' cannot be combined with '{option.Name}'.");
                 }
+                if (result.GetResult(stdin) is not null && result.GetResult(server) is not null)
+                    result.AddError("Options '--stdin' and '--server' cannot be combined.");
             });
         format.SetAction((parseResult, cancellationToken) =>
             {
@@ -191,8 +196,8 @@ static class Program
                     parseResult.GetValue(verbose),
                     parseResult.GetValue(configuration),
                     scope.Read(parseResult));
-                return parseResult.GetValue(stdin) is { } path
-                    ? RunStandardInputAsync(path, request, Environment.CurrentDirectory, cancellationToken)
+                return parseResult.GetValue(server) ? RunFormattingServerAsync(request, cancellationToken)
+                    : parseResult.GetValue(stdin) is { } path ? RunStandardInputAsync(path, request, Environment.CurrentDirectory, cancellationToken)
                     : RunSelectionAsync(request, Environment.CurrentDirectory);
             });
         return format;
@@ -245,6 +250,14 @@ static class Program
             await Console.Error.WriteLineAsync(exception.Message);
             return 2;
         }
+    }
+
+    static async Task<int> RunFormattingServerAsync(CommandRequest request, CancellationToken cancellationToken)
+    {
+        using var input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false, true));
+        await using var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false));
+        await FormattingServer.Run(Environment.CurrentDirectory, input, output, request.BuildConfiguration, request.Verbose, cancellationToken);
+        return 0;
     }
 
     static async Task<int> RunSelectionAsync(CommandRequest request, string invocationDirectory)

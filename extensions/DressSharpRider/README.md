@@ -13,21 +13,25 @@ Any other file is left alone, so the plugin is safe to leave enabled across ever
 
 - **Format on save.** Switched on by default, and controlled from Settings | Tools | Actions on Save, or Settings | Tools | DressSharp. The setting is stored with the solution.
 - **Code | Format with DressSharp.** Formats the current file, or the C# files selected in the Solution Explorer. When a file isn't set up for DressSharp, this tells you why.
-- **Format as you type**, experimental and off by default. Typing `;` or `}` in an eligible file formats the statement or block just finished. See [below](#format-as-you-type).
+- **Format as you type.** Off by default. Typing `;` or `}` in an eligible file formats the statement or block just finished. See [below](#format-as-you-type).
 
-Each run invokes `dotnet dress format --verbose --include <file>` from the manifest's directory, with one process per manifest and the files from a save batched together. When DressSharp rewrites a file, the editor reloads it from disk. Errors from DressSharp or dotnet are shown as notifications. When the tool is in the manifest but hasn't been restored on this machine, the notification offers to run `dotnet tool restore`.
+By default, save, typing, and manual formatting share one background formatter per repository. It starts on demand from the tool manifest's directory and stays alive until the Rider project closes. Each request reads the current preferences and project context. Tool manifest, formatter, or SDK configuration changes stop the process; the next request starts it again. The first request can take longer while the runtime starts and the project is evaluated.
 
-Since DressSharp formats files on disk rather than through standard input, the plugin saves a file before formatting it. If you type into a file between saving it and DressSharp finishing, Rider shows its usual file-changed-on-disk prompt.
+Turn off **Keep a formatter process running in the background** in Settings | Tools | DressSharp to start a fresh process for each run instead. Applying this setting lets current requests finish, then stops any background formatters. The setting is stored with the solution. Background formatting requires a formatter build with this support; for a development build, run `./do install-local`, then install the plugin ZIP built by `./do build-rider`.
+
+Save and manual formatting batch files from the same repository and format them on disk, preserving DressSharp's file selection and encoding preferences. With the background process disabled, each batch invokes `dotnet dress format --verbose --include <file>`. When DressSharp rewrites a file, the editor reloads it from disk. Errors from DressSharp or dotnet are shown as notifications. When the tool is in the manifest but hasn't been restored on this machine, the notification offers to run `dotnet tool restore`.
+
+The plugin saves a file before save or manual formatting. If you type into a file between saving it and DressSharp finishing, Rider shows its usual file-changed-on-disk prompt.
 
 ## Format as you type
 
-Switched on from Settings | Tools | DressSharp, and stored with the solution. When you type `;` or `}` in an eligible C# file, the plugin waits a moment for Rider's own typing assists to finish, then pipes the unsaved document through `dotnet dress format --stdin <file>`, which formats it as the file at that path without reading or writing the file on disk. Of the changes DressSharp would make to the whole file, only those on the lines of the statement or block just finished are applied: after `;`, back to the previous `;`, `{`, or `}`; after `}`, back to its matching `{`. Those boundaries are found by looking at the characters rather than the syntax, so braces in strings or comments can widen or narrow the range. The rest of the file is left as you had it, so a file that has never been formatted doesn't jump when you type.
+Switched on from Settings | Tools | DressSharp, and stored with the solution. When you type `;` or `}` in an eligible C# file, the plugin waits a moment for Rider's own typing assists to finish, then sends the unsaved document to DressSharp without reading or writing the file on disk. It uses the shared background process when enabled, or `dotnet dress format --stdin <file>` in a fresh process when disabled. Of the changes DressSharp would make to the whole file, only those on the lines of the statement or block just finished are applied: after `;`, back to the previous `;`, `{`, or `}`; after `}`, back to its matching `{`. Those boundaries are found by looking at the characters rather than the syntax, so braces in strings or comments can widen or narrow the range. The rest of the file is left as you had it, so a file that has never been formatted doesn't jump when you type.
 
 The result is applied only when the document hasn't changed since it was sent. Typing another `;` or `}` before DressSharp answers starts over with the newer text.
 
-Each keystroke costs a `dotnet dress` process. With a warm MSBuild cache that takes around a quarter of a second on a fast machine; the first run after a project change takes longer while the project is evaluated. Errors are shown once per distinct message rather than on every keystroke.
+Typing requires a formatter build with standard-input support. Errors are shown once per distinct message rather than on every keystroke.
 
-This is a prototype of how such a feature should behave. What it doesn't yet do: it hasn't been verified against every way Rider sends C# keystrokes to its backend, so if typing `;` never formats anything, check `idea.log` with debug logging enabled for `com.soxtoby.dresssharp.rider.DressSharpTypingFormatter`; it reformats whole lines, so a statement that shares a line with another is formatted with it; and it waits for a process per keystroke rather than keeping DressSharp running.
+Formatting applies to whole lines, so a statement that shares a line with another is formatted with it. If typing `;` never formats anything, check `idea.log` with debug logging enabled for `com.soxtoby.dresssharp.rider.DressSharpTypingFormatter`.
 
 ## Settings
 
@@ -35,6 +39,7 @@ Settings | Tools | DressSharp has:
 
 - **Format C# files with DressSharp on save**, per solution.
 - **Format the statement or block just finished when you type `;` or `}`**, per solution and off by default.
+- **Keep a formatter process running in the background**, per solution and on by default. Applies to save, typing, and manual formatting.
 - **dotnet executable**, per machine. Leave empty to use the `dotnet` on the PATH, falling back to `DOTNET_ROOT` and the usual SDK install locations.
 
 ## Install

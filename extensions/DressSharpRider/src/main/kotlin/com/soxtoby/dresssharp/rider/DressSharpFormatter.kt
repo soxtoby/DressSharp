@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.nio.file.Path
 
 enum class FormatTrigger {
@@ -40,7 +41,7 @@ enum class FormatTrigger {
 }
 
 /**
- * Runs DressSharp over files as a local tool, one process per tool manifest. Requests that arrive
+ * Runs DressSharp over files as a local tool. Requests that arrive
  * while a run is in progress, or within a moment of each other, are formatted together in the next run.
  */
 @Service(Service.Level.PROJECT)
@@ -122,7 +123,16 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
     private suspend fun execute(batch: Batch) {
         val dotnet = locateDotnet() ?: return
         val invocation = DressSharpInvocation(batch.manifest.root, batch.files.keys)
-        val output = runProcess(invocation.commandLine(dotnet), "Formatting with DressSharp") ?: return
+        val output = runProcess(invocation.commandLine(dotnet), "Formatting with DressSharp") {
+            try {
+                DressSharpWorkers.getInstance(project).formatFiles(batch.manifest, invocation, dotnet)
+            } catch (e: IOException) {
+                ProcessOutput().apply {
+                    exitCode = 2
+                    appendStderr(e.message.orEmpty())
+                }
+            }
+        } ?: return
         val result = DressSharpOutput.parse(output.stdout, invocation.includes)
 
         if (output.exitCode != 0) {
@@ -138,10 +148,14 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
     }
 
     /** Runs a command under a cancellable background progress. Returns null when the user cancelled it. */
-    private suspend fun runProcess(commandLine: GeneralCommandLine, title: String): ProcessOutput? {
+    private suspend fun runProcess(
+        commandLine: GeneralCommandLine,
+        title: String,
+        execute: suspend () -> ProcessOutput = { coroutineToIndicator { indicator -> CapturingProcessHandler(commandLine).runProcessWithProgressIndicator(indicator) } },
+    ): ProcessOutput? {
         try {
             return withBackgroundProgress(project, title, cancellable = true) {
-                coroutineToIndicator { indicator -> CapturingProcessHandler(commandLine).runProcessWithProgressIndicator(indicator) }
+                execute()
             }
         } catch (e: ExecutionException) {
             notify(
@@ -200,7 +214,7 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
 
     /** Warnings such as an EditorConfig with no DressSharp rules. Each new set is shown once per session, or every time the user asks. */
     internal fun reportWarnings(stderr: String, manual: Boolean) {
-        val warnings = stderr.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        val warnings = DressSharpOutput.parseWarnings(stderr)
         if (warnings.isEmpty()) return
         val isNew = synchronized(lock) {
             val changed = warnings != reportedWarnings

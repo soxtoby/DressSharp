@@ -114,6 +114,22 @@ public sealed class CommandTests
     }
 
     [Fact]
+    public void Format_server_accepts_a_stream_of_editor_requests()
+    {
+        Program.CreateCommand().Parse("format --server").Errors.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("format --server --stdin a.cs")]
+    [InlineData("format --server --include a.cs")]
+    [InlineData("format --server --changed")]
+    [InlineData("check --server")]
+    public void Server_rejects_conflicting_input_modes(string commandLine)
+    {
+        Program.CreateCommand().Parse(commandLine).Errors.ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public void Init_target_is_an_option()
     {
         var sut = Program.CreateCommand();

@@ -33,8 +33,17 @@ class DressSharpConfigurable(private val project: Project) : BoundSearchableConf
                 checkBox("Format the statement or block just finished when you type ; or }")
                     .bindSelected(projectState::formatOnType)
                     .comment(
-                        "Experimental. Runs <code>dotnet dress format --stdin</code> on the unsaved file after each <code>;</code> " +
-                            "or <code>}</code>, and applies only the changes to the lines just completed.",
+                        "Formats the unsaved file after each <code>;</code> or <code>}</code>, " +
+                            "and applies only the changes to the lines just completed.",
+                    )
+            }
+            row {
+                checkBox("Keep a formatter process running in the background")
+                    .bindSelected(projectState::useBackgroundProcess)
+                    .comment(
+                        "Reuses one process per repository for save, typing, and manual formatting until this Rider project closes. " +
+                            "Uses more idle memory and requires a formatter with background process support. " +
+                            "When disabled, each formatting run starts a new process.",
                     )
             }
             row("dotnet executable:") {
@@ -44,6 +53,11 @@ class DressSharpConfigurable(private val project: Project) : BoundSearchableConf
                     .align(AlignX.FILL)
             }
         }
+    }
+
+    override fun apply() {
+        super.apply()
+        if (!DressSharpProjectSettings.getInstance(project).state.useBackgroundProcess) DressSharpWorkers.getInstance(project).stop()
     }
 
     companion object {

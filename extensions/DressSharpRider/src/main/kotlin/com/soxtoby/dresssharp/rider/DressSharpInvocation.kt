@@ -18,14 +18,11 @@ class DressSharpInvocation(val root: Path, files: Collection<Path>) {
     }
 
     companion object {
-        /**
-         * A `dotnet dress format --stdin` run that formats what it is given on standard input as [file],
-         * writing the result to standard output and leaving the file on disk alone.
-         */
-        fun standardInput(root: Path, file: Path, dotnet: Path): GeneralCommandLine {
-            val relative = root.relativize(file.toAbsolutePath().normalize()).toString().replace('\\', '/')
-            return GeneralCommandLine(dotnet.toString(), "dress", "format", "--stdin", relative).fromRoot(root)
-        }
+        fun standardInput(root: Path, file: Path, dotnet: Path): GeneralCommandLine =
+            GeneralCommandLine(dotnet.toString(), "dress", "format", "--stdin", root.relativize(file).toString().replace('\\', '/')).fromRoot(root)
+
+        fun server(root: Path, dotnet: Path): GeneralCommandLine =
+            GeneralCommandLine(dotnet.toString(), "dress", "format", "--server").fromRoot(root)
     }
 }
 
@@ -35,7 +32,7 @@ private fun GeneralCommandLine.fromRoot(root: Path): GeneralCommandLine = this
     .withCharset(Charsets.UTF_8)
     .withEnvironment("DOTNET_NOLOGO", "1")
 
-/** What a `dotnet dress format --verbose` run reported on standard output. */
+/** What a `dotnet dress format` run reported. */
 data class DressSharpOutput(
     /** The includes DressSharp rewrote. */
     val changed: List<String>,
@@ -61,5 +58,11 @@ data class DressSharpOutput(
             }
             return DressSharpOutput(changed, formatted, selected)
         }
+
+        /** Verbose notes also use stderr; only labeled warnings should produce notifications. */
+        fun parseWarnings(stderr: String): Set<String> = stderr.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("warning: ") }
+            .toSet()
     }
 }

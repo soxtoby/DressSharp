@@ -25,8 +25,17 @@ class DressSharpInvocationTest {
     }
 
     @Test
-    fun `a standard input run names the file it stands in for relative to the manifest root`() {
-        val command = DressSharpInvocation.standardInput(root, root.resolve("src/../src/A.cs"), Path.of("dotnet"))
+    fun `a worker runs the repository local tool from the manifest root`() {
+        val command = DressSharpInvocation.server(root, Path.of("dotnet"))
+
+        assertEquals(listOf("dotnet", "dress", "format", "--server"), command.getCommandLineList(null))
+        assertEquals(root, command.workingDirectory)
+        assertEquals("1", command.environment["DOTNET_NOLOGO"])
+    }
+
+    @Test
+    fun `a fresh typing process formats standard input as the repository file`() {
+        val command = DressSharpInvocation.standardInput(root, root.resolve("src/A.cs"), Path.of("dotnet"))
 
         assertEquals(listOf("dotnet", "dress", "format", "--stdin", "src/A.cs"), command.getCommandLineList(null))
         assertEquals(root, command.workingDirectory)
@@ -49,6 +58,25 @@ class DressSharpInvocationTest {
         val output = DressSharpOutput.parse(stdout, listOf("src/A.cs"))
 
         assertEquals(DressSharpOutput(emptyList(), formatted = 0, selected = 0), output)
+    }
+
+    @Test
+    fun `verbose parse context notes do not become warning notifications`() {
+        val stderr = "src/Shared.cs: parsed 2 ways by the projects that compile it.\n"
+
+        val result = DressSharpOutput.parseWarnings(stderr)
+
+        assertEquals(emptySet<String>(), result)
+    }
+
+    @Test
+    fun `actionable warnings remain when verbose notes accompany them`() {
+        val warning = "warning: src/Shared.cs: the projects that compile it disagree about its layout, so it is left as it is."
+        val stderr = "src/Shared.cs: parsed 2 ways by the projects that compile it.\r\n$warning\r\n"
+
+        val result = DressSharpOutput.parseWarnings(stderr)
+
+        assertEquals(setOf(warning), result)
     }
 
     @Test

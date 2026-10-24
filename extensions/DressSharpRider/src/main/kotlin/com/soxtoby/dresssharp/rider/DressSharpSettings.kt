@@ -15,8 +15,10 @@ class DressSharpProjectSettings : SimplePersistentStateComponent<DressSharpProje
     class State : BaseState() {
         var formatOnSave by property(true)
 
-        /** Experimental: format the statement or block just finished when `;` or `}` is typed. */
+        /** Format the statement or block just finished when `;` or `}` is typed. */
         var formatOnType by property(false)
+
+        var useBackgroundProcess by property(true)
     }
 
     companion object {
