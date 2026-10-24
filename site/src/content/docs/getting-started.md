@@ -10,11 +10,10 @@ DressSharp only changes what your EditorConfig asks it to. With no preferences s
 DressSharp is a .NET tool and needs the .NET 10 SDK. Install it into your repository so everyone on the team, and your CI, runs the same version:
 
 ```sh
-dotnet new tool-manifest
 dotnet tool install DressSharp
 ```
 
-Skip the first command if your repository already has a `.config/dotnet-tools.json`. Commit that file. Anyone who clones the repository then runs `dotnet tool restore` once to get the tool.
+This creates `.config/dotnet-tools.json` if needed. Commit that file. Anyone who clones the repository then runs `dotnet tool restore` once to get the tool.
 
 To use DressSharp everywhere on your machine instead, install it globally:
 

@@ -1,11 +1,15 @@
 ---
 title: Formatting automatically
-description: Format on every commit, after every coding agent edit, and check formatting in CI.
+description: Format in Rider, on every commit, after every coding agent edit, and check formatting in CI.
 ---
 
 Once your rules are settled, you shouldn't have to think about formatting again. DressSharp can format just the files you've changed, so it's quick enough to run on every commit or after every edit.
 
 Each of these setups runs the version of DressSharp in your repository's tool manifest (see [Install](../getting-started/#install)). Run `dotnet tool restore` once after cloning.
+
+## In Rider
+
+The [Rider plugin](../rider/) formats C# on save, as you type, or with **Code | Format with DressSharp**. Install its ZIP from a GitHub release, then choose when it formats from Rider's settings.
 
 ## Before each commit
 

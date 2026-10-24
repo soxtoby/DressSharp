@@ -70,7 +70,7 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
                     }
                     Eligibility.NoToolManifest ->
                         skipped += "<b>${file.name.escaped()}</b>: no <code>.config/dotnet-tools.json</code> above it installs DressSharp. " +
-                            "Run <code>dotnet new tool-manifest</code> and <code>dotnet tool install DressSharp</code> in the repository."
+                            "Run <code>dotnet tool install DressSharp</code> in the repository."
                     Eligibility.NoEditorConfig ->
                         skipped += "<b>${file.name.escaped()}</b>: no <code>.editorconfig</code> applies to it. Run <code>dotnet dress init</code> to create one."
                 }
