@@ -53,7 +53,7 @@ sealed class NamespaceStyleRule : ISyntaxFormattingRule
             declaration.Usings,
             declaration.Members)
             .WithLeadingTrivia(declaration.GetLeadingTrivia())
-            .WithTrailingTrivia(declaration.CloseBraceToken.TrailingTrivia.AddRange(declaration.GetTrailingTrivia()));
+            .WithTrailingTrivia(declaration.CloseBraceToken.TrailingTrivia.AddRange(declaration.SemicolonToken.TrailingTrivia));
         return unit.WithMembers(SyntaxFactory.SingletonList<MemberDeclarationSyntax>(converted));
     }
 

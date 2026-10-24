@@ -11,6 +11,9 @@
 ### Changed
 - `dress_collection_initializer_layout` lays out the `{ key, value }` elements of a collection initializer as well as the initializer itself, so their braces get the same inner spaces and an element over `max_line_length` wraps one item per line. `expanded` still puts one element per line without expanding the elements.
 
+### Fixed
+- Converting a block-scoped namespace to file-scoped no longer leaves an extra blank line at the end of the file.
+
 ## v0.5.0
 
 ### Added

@@ -26,7 +26,9 @@ public class SyntaxConversionRuleTests
     [Theory]
     [InlineData("dress_method_body", "class C { int M() { return 1; } }", "class C { int M() => 1; }")]
     [InlineData("dress_constructor_body", "class C { C() { Start(); } void Start() {} }", "class C { C() => Start(); void Start() {} }")]
-    [InlineData("dress_operator_body", "class C { public static C operator +(C x, C y) { return x; } }", "class C { public static C operator +(C x, C y) => x; }")]
+    [
+        InlineData("dress_operator_body", "class C { public static C operator +(C x, C y) { return x; } }", "class C { public static C operator +(C x, C y) => x; }")
+    ]
     [InlineData("dress_property_body", "class C { int P { get { return 1; } } }", "class C { int P => 1; }")]
     [InlineData("dress_indexer_body", "class C { int this[int i] { get { return i; } } }", "class C { int this[int i] => i; }")]
     [InlineData("dress_accessor_body", "class C { int P { get { return 1; } } }", "class C { int P { get => 1; } }")]
@@ -37,7 +39,9 @@ public class SyntaxConversionRuleTests
     [Theory]
     [InlineData("dress_method_body", "class C { int M() => 1; }", "class C { int M() {\nreturn 1;\n} }")]
     [InlineData("dress_constructor_body", "class C { C() => Start(); void Start() {} }", "class C { C() {\nStart();\n} void Start() {} }")]
-    [InlineData("dress_operator_body", "class C { public static C operator +(C x, C y) => x; }", "class C { public static C operator +(C x, C y) {\nreturn x;\n} }")]
+    [
+        InlineData("dress_operator_body", "class C { public static C operator +(C x, C y) => x; }", "class C { public static C operator +(C x, C y) {\nreturn x;\n} }")
+    ]
     [InlineData("dress_property_body", "class C { int P => 1; }", "class C { int P {get{\nreturn 1;\n}} }")]
     [InlineData("dress_indexer_body", "class C { int this[int i] => i; }", "class C { int this[int i] {get{\nreturn i;\n}} }")]
     [InlineData("dress_accessor_body", "class C { int P { get => 1; } }", "class C { int P { get {\nreturn 1;\n} } }")]
@@ -89,6 +93,17 @@ public class SyntaxConversionRuleTests
         var source = $"namespace Foo.Bar  {newline}  {{{newline}    using X;{newline}    class C {{ }}{newline}}}";
         var result = Transform(source, ("dress_namespace_style", "file_scoped"));
         result.ShouldBe($"namespace Foo.Bar;{newline}    using X;{newline}    class C {{ }}");
+        Transform(result, ("dress_namespace_style", "file_scoped")).ShouldBe(result);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void File_scoped_namespace_keeps_one_final_newline(string newline)
+    {
+        var source = $"namespace Foo{newline}{{{newline}    class C {{ }}{newline}}}{newline}";
+        var result = Transform(source, ("dress_namespace_style", "file_scoped"));
+        result.ShouldBe($"namespace Foo;{newline}    class C {{ }}{newline}");
         Transform(result, ("dress_namespace_style", "file_scoped")).ShouldBe(result);
     }
 
