@@ -1,8 +1,6 @@
 package com.soxtoby.dresssharp.rider
 
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class LineEditsTest {
@@ -47,17 +45,46 @@ class LineEditsTest {
     }
 
     @Test
-    fun `an edit touches the lines it replaces and an insertion touches the lines around it`() {
-        val replacement = LineEdit(startLine = 2, endLine = 4, start = 0, end = 0, replacement = "")
-        assertTrue(replacement.touches(3..3))
-        assertTrue(replacement.touches(0..2))
-        assertFalse(replacement.touches(4..6))
-        assertFalse(replacement.touches(0..1))
+    fun `typing applies a complete transformation within the finished lines`() {
+        val before = "class C\n{\nint M() { return 1; }\n}\n"
+        val after = "class C\n{\nint M() => 1;\n}\n"
 
-        val insertion = LineEdit(startLine = 5, endLine = 5, start = 0, end = 0, replacement = "\n")
-        assertTrue(insertion.touches(5..7), "inserted before the first line")
-        assertTrue(insertion.touches(2..4), "inserted after the last line")
-        assertFalse(insertion.touches(6..8))
-        assertFalse(insertion.touches(1..3))
+        val result = apply(before, LineEdits.forTyping(before, after, 2..2))
+
+        assertEquals(after, result)
     }
+
+    @Test
+    fun `typing preserves both imports when sorting crosses the finished line`() {
+        val before = "using Acme;\nusing System;\n"
+        val after = "using System;\nusing Acme;\n"
+
+        val result = apply(before, LineEdits.forTyping(before, after, 1..1))
+
+        assertEquals(before, result)
+    }
+
+    @Test
+    fun `typing does not apply a hunk extending into a neighboring statement`() {
+        val before = "int x=1;\nint y=2;\n"
+        val after = "int x = 1;\nint y = 2;\n"
+
+        val result = apply(before, LineEdits.forTyping(before, after, 1..1))
+
+        assertEquals(before, result)
+    }
+
+    @Test
+    fun `typing applies insertions and deletions together when the region contains both imports`() {
+        val before = "using Acme;\nusing System;\n"
+        val after = "using System;\nusing Acme;\n"
+
+        val result = apply(before, LineEdits.forTyping(before, after, 0..1))
+
+        assertEquals(after, result)
+    }
+
+    private fun apply(text: String, edits: List<LineEdit>): String = StringBuilder(text).apply {
+        edits.asReversed().forEach { replace(it.start, it.end, it.replacement) }
+    }.toString()
 }

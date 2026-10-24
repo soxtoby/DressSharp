@@ -16,9 +16,6 @@ class TriggerRegionTest {
         }
     """.trimIndent()
 
-    /** The offset just after the first occurrence of [marker]. */
-    private fun after(marker: String): Int = text.indexOf(marker).also { check(it >= 0) } + marker.length
-
     @Test
     fun `a semicolon settles the statement back to the previous boundary`() {
         assertEquals(4..5, TriggerRegion.of(text, after("1;"), ';'))
@@ -46,4 +43,7 @@ class TriggerRegionTest {
     fun `the first statement of a file starts at its first character`() {
         assertEquals(0..1, TriggerRegion.of("using\n  System;", 15, ';'))
     }
+
+    /** The offset just after the first occurrence of [marker]. */
+    private fun after(marker: String): Int = text.indexOf(marker).also { check(it >= 0) } + marker.length
 }

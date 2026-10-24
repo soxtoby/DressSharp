@@ -16,10 +16,10 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.toNioPathOrNull
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
@@ -35,8 +35,6 @@ import java.nio.file.Path
  */
 @Service(Service.Level.PROJECT)
 class DressSharpTypingFormatter(private val project: Project, private val scope: CoroutineScope) {
-    private class Snapshot(val text: String, val stamp: Long, val caretOffset: Int)
-
     private val lock = Any()
     private val pending = HashMap<Document, Job>()
     private var reportedFailure: String? = null
@@ -46,46 +44,53 @@ class DressSharpTypingFormatter(private val project: Project, private val scope:
         val file = FileDocumentManager.getInstance().getFile(document) ?: return
         if (!file.isCSharpSourceFile || !document.isWritable) return
         val path = file.toNioPathOrNull()?.toAbsolutePath()?.normalize() ?: return
+        val trigger = TypingTrigger(document, editor.selectionModel.selectionStart, typed, allowOvertype = !editor.selectionModel.hasSelection())
         synchronized(lock) {
             pending.remove(document)?.cancel()
-            pending[document] = scope.launch {
+            val job = scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
                 try {
-                    format(editor, document, path, typed)
+                    format(document, path, trigger)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    LOG.warn("DressSharp formatting after typing failed", e)
-                } finally {
-                    synchronized(lock) { if (pending[document] === coroutineContext.job) pending.remove(document) }
+                    log.warn("DressSharp formatting after typing failed", e)
                 }
             }
+            pending[document] = job
+            job.invokeOnCompletion {
+                trigger.close()
+                synchronized(lock) { if (pending[document] === job) pending.remove(document) }
+            }
+            job.start()
         }
     }
 
-    private suspend fun format(editor: Editor, document: Document, path: Path, typed: Char) {
-        delay(SETTLE_DELAY_MS)
+    private suspend fun format(document: Document, path: Path, trigger: TypingTrigger) {
+        delay(settleDelayMs)
         val manifest = (Eligibility.of(path) as? Eligibility.Eligible)?.manifest ?: return
         val formatter = DressSharpFormatter.getInstance(project)
         val dotnet = formatter.locateDotnet() ?: return
         val snapshot = withContext(Dispatchers.EDT) {
-            Snapshot(document.immutableCharSequence.toString(), document.modificationStamp, editor.caretModel.offset)
-        }
-        val region = TriggerRegion.of(snapshot.text, snapshot.caretOffset, typed)
-        LOG.debug { "DressSharp formatting lines ${region.first + 1}-${region.last + 1} of ${path.fileName} after '$typed'" }
+            val text = document.immutableCharSequence.toString()
+            trigger.region(text)?.let { TypingSnapshot(text, document.modificationStamp, it) }
+        } ?: return
+        log.debug { "DressSharp formatting lines ${snapshot.region.first + 1}-${snapshot.region.last + 1} of ${path.fileName}" }
 
         val output = run(manifest, path, dotnet, snapshot.text) ?: return
-        if (output.exitCode != 0) {
+        if (output.exitCode == 0) {
+            formatter.reportWarnings(output.stderr, manual = false)
+            apply(document, snapshot, output.stdout)
+        } else {
             reportFailure(output)
-            return
         }
-        formatter.reportWarnings(output.stderr, manual = false)
+    }
 
-        val edits = LineEdits.between(snapshot.text, StringUtil.convertLineSeparators(output.stdout)).filter { it.touches(region) }
+    private suspend fun apply(document: Document, snapshot: TypingSnapshot, formatted: String) {
+        val edits = LineEdits.forTyping(snapshot.text, StringUtil.convertLineSeparators(formatted), snapshot.region)
         if (edits.isEmpty()) return
         withContext(Dispatchers.EDT) {
-            if (document.modificationStamp != snapshot.stamp || !document.isWritable) return@withContext
             WriteCommandAction.runWriteCommandAction(project, "Format with DressSharp", null, {
-                for (edit in edits.asReversed()) document.replaceString(edit.start, edit.end, edit.replacement)
+                snapshot.applyTo(document, edits)
             })
         }
     }
@@ -100,7 +105,7 @@ class DressSharpTypingFormatter(private val project: Project, private val scope:
     }
 
     private fun reportFailure(output: ProcessOutput) {
-        val details = output.stderr.ifBlank { output.stdout }.trim().lines().take(MAX_REPORTED_LINES).joinToString("<br>") { it.escaped() }
+        val details = output.stderr.ifBlank { output.stdout }.trim().lines().take(maxReportedLines).joinToString("<br>") { it.escaped() }
         reportFailure("DressSharp failed with exit code ${output.exitCode}.<br>$details")
     }
 
@@ -118,10 +123,18 @@ class DressSharpTypingFormatter(private val project: Project, private val scope:
 
     companion object {
         /** Long enough for Rider's typing assists to apply, short enough to read as part of the keystroke. */
-        private const val SETTLE_DELAY_MS = 150L
-        private const val MAX_REPORTED_LINES = 12
-        private val LOG = logger<DressSharpTypingFormatter>()
+        private const val settleDelayMs = 150L
+        private const val maxReportedLines = 12
+        private val log = logger<DressSharpTypingFormatter>()
 
         fun getInstance(project: Project): DressSharpTypingFormatter = project.service()
+    }
+}
+
+internal class TypingSnapshot(val text: String, private val stamp: Long, val region: IntRange) {
+    fun applyTo(document: Document, edits: List<LineEdit>) {
+        if (document.modificationStamp == stamp && document.isWritable) {
+            edits.asReversed().forEach { document.replaceString(it.start, it.end, it.replacement) }
+        }
     }
 }

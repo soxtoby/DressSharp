@@ -7,14 +7,13 @@ import com.intellij.util.diff.Diff
  * until [end] of that text, become [replacement]. An insertion has no lines of its own, so its start and
  * end are the same line and offset.
  */
-data class LineEdit(val startLine: Int, val endLine: Int, val start: Int, val end: Int, val replacement: String) {
-    /** Whether the edit changes one of [lines], or inserts beside one of them. */
-    fun touches(lines: IntRange): Boolean =
-        if (startLine == endLine) startLine in lines.first..lines.last + 1
-        else startLine <= lines.last && endLine > lines.first
-}
+data class LineEdit(val startLine: Int, val endLine: Int, val start: Int, val end: Int, val replacement: String)
 
 object LineEdits {
+    /** Keep transformations atomic: a reorder can span separate insertion and deletion hunks. */
+    fun forTyping(before: String, after: String, lines: IntRange): List<LineEdit> =
+        between(before, after).takeIf { edits -> edits.all { it.startLine >= lines.first && it.endLine <= lines.last + 1 } }.orEmpty()
+
     /** The line edits that turn [before] into [after]. Both are expected to end lines with `\n`, as editor documents do. */
     fun between(before: String, after: String): List<LineEdit> {
         val oldLines = lines(before)

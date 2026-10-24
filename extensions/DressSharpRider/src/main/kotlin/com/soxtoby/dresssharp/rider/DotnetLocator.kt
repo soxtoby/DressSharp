@@ -22,16 +22,16 @@ object DotnetLocator {
 
     fun locate(configuredPath: String?): Result {
         val configured = configuredPath?.trim().orEmpty()
-        if (configured.isNotEmpty()) {
-            val path = try {
-                Path.of(configured)
-            } catch (e: InvalidPathException) {
-                return Result.ConfiguredPathMissing(configured)
-            }
-            return if (Files.isRegularFile(path)) Result.Found(path) else Result.ConfiguredPathMissing(configured)
-        }
-        PathEnvironmentVariableUtil.findInPath(executableName)?.let { return Result.Found(it.toPath()) }
-        return wellKnownLocations().firstOrNull { Files.isRegularFile(it) }?.let { Result.Found(it) } ?: Result.NotFound
+        return if (configured.isNotEmpty()) locateConfigured(configured)
+        else PathEnvironmentVariableUtil.findInPath(executableName)?.let { Result.Found(it.toPath()) }
+            ?: wellKnownLocations().firstOrNull { Files.isRegularFile(it) }?.let { Result.Found(it) } ?: Result.NotFound
+    }
+
+    private fun locateConfigured(configured: String): Result = try {
+        val path = Path.of(configured).toAbsolutePath().normalize()
+        if (Files.isRegularFile(path)) Result.Found(path) else Result.ConfiguredPathMissing(configured)
+    } catch (e: InvalidPathException) {
+        Result.ConfiguredPathMissing(configured)
     }
 
     /** Where SDK installers put dotnet when it isn't on the PATH the IDE was started with. */

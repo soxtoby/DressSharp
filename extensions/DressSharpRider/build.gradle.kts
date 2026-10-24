@@ -1,4 +1,7 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.xml.sax.InputSource
 import java.io.StringReader
 import javax.xml.parsers.DocumentBuilderFactory
@@ -7,6 +10,18 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.4.21"
     id("org.jetbrains.intellij.platform") version "2.19.0"
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions.jvmTarget = JvmTarget.JVM_21
+    // Coroutine metadata must be readable by Rider 2025.2's bundled Kotlin runtime.
+    compilerOptions.languageVersion = KotlinVersion.KOTLIN_2_1
+    compilerOptions.apiVersion = KotlinVersion.KOTLIN_2_1
 }
 
 group = providers.gradleProperty("pluginGroup").get()
@@ -22,6 +37,7 @@ repositories {
     mavenCentral()
     intellijPlatform {
         defaultRepositories()
+        jetbrainsRuntime()
     }
 }
 
@@ -32,7 +48,8 @@ dependencies {
         if (riderPath.isPresent) {
             local(riderPath)
         } else {
-            rider(providers.gradleProperty("platformVersion"))
+            rider(providers.gradleProperty("platformVersion")) { useInstaller = false }
+            jetbrainsRuntime()
         }
         testFramework(TestFrameworkType.JUnit5)
     }

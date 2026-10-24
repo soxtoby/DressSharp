@@ -42,6 +42,7 @@ static class FormattingServer
             int exitCode;
             if (request is { Includes.Length: > 0, Path: null, Text: null } && request.Includes.All(include => !string.IsNullOrWhiteSpace(include)))
             {
+                // File batches report changed paths for the editor to reload.
                 var command = new CommandRequest(CommandKind.Format, request.Includes, true, configuration);
                 var selected = await new FileSelector(invocationDirectory).Select(command.Includes, command.Scope, cancellationToken);
                 exitCode = await new FormatExecutor(invocationDirectory, output, error).Run(command, selected, cancellationToken);
@@ -59,7 +60,8 @@ static class FormattingServer
             }
             else
             {
-                return new(2, "", "A formatting request must contain either a path and text, or nonempty includes.");
+                exitCode = 2;
+                await error.WriteAsync("A formatting request must contain either a path and text, or nonempty includes.");
             }
 
             return new(exitCode, output.ToString(), error.ToString());

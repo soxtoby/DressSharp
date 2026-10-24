@@ -3,6 +3,7 @@ package com.soxtoby.dresssharp.rider
 import com.google.gson.JsonParser
 import com.intellij.execution.configurations.GeneralCommandLine
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -33,12 +34,6 @@ class FormattingWorkerTest {
 
     @AfterEach
     fun cleanup() { scope.cancel() }
-
-    private fun command(): GeneralCommandLine = GeneralCommandLine(
-        java.toString(), helper.toString(), directory.resolve("binary").toString(), directory.resolve("received").toString(), directory.resolve("release").toString(),
-    )
-
-    private fun inputs(): WorkerInputs = WorkerInputs.capture(ToolManifest(directory.resolve("dotnet-tools.json"), directory), directory.resolve("dotnet"))
 
     @Test
     fun `requests reuse the process and preserve escaped document text`() = runBlocking {
@@ -78,7 +73,7 @@ class FormattingWorkerTest {
             withTimeout(15_000) { while (!Files.exists(directory.resolve("received"))) delay(10) }
             val process = ProcessHandle.of(Files.readString(directory.resolve("received")).toLong()).orElseThrow()
 
-            val stopped = async { sut.stop() }
+            val stopped = async(start = CoroutineStart.UNDISPATCHED) { sut.stop() }
             assertTrue(process.isAlive)
             Files.writeString(directory.resolve("release"), "go")
             val result = pending.await()
@@ -209,4 +204,25 @@ class FormattingWorkerTest {
         assertFalse(process.isAlive)
         assertTrue(failure is IOException)
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["text", "empty", "protocol"])
+    fun `an older formatter explains how to restore supported formatting`(greeting: String) = runBlocking {
+        Files.writeString(directory.resolve("binary"), "first")
+        FormattingWorker(scope).use { sut ->
+            val result = runCatching { sut.format(command().withEnvironment("DRESSSHARP_TEST_GREETING", greeting), ::inputs, "File.cs", "text") }
+
+            assertTrue(result.exceptionOrNull() is IOException)
+            val message = result.exceptionOrNull()?.message.orEmpty()
+            assertTrue(message.contains("Update the repository's local tool"), message)
+            assertTrue(message.contains("disable the background process"), message)
+            if (greeting == "empty") assertTrue(message.contains("Unrecognized option '--server'"), message)
+        }
+    }
+
+    private fun command(): GeneralCommandLine = GeneralCommandLine(
+        java.toString(), helper.toString(), directory.resolve("binary").toString(), directory.resolve("received").toString(), directory.resolve("release").toString(),
+    )
+
+    private fun inputs(): WorkerInputs = WorkerInputs.capture(ToolManifest(directory.resolve("dotnet-tools.json"), directory), directory.resolve("dotnet"))
 }

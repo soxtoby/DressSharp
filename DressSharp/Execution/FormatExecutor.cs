@@ -75,15 +75,14 @@ sealed class FormatExecutor(string invocationDirectory, TextWriter? output = nul
 
         timing.Wall = Stopwatch.GetElapsedTime(commandStart);
         await BenchmarkDiagnostics.WriteAsync(timing, cancellationToken);
-        if (outcome == FileOutcome.Failed)
-            return 2;
-
-        // A file its projects disagree about, or could not be read for, is left as it was, which an
-        // editor applies as no change.
-        var formatted = prepared is { Failure: null } ? SourceDocument.Decode(prepared.Content, prepared.Encoding) : text;
-        await output.WriteAsync(formatted.AsMemory(), cancellationToken);
-        await output.FlushAsync(cancellationToken);
-        return 0;
+        if (outcome != FileOutcome.Failed)
+        {
+            // A file whose projects disagree, or whose project could not be read, is left as it was.
+            var formatted = prepared is { Failure: null } ? SourceDocument.Decode(prepared.Content, prepared.Encoding) : text;
+            await output.WriteAsync(formatted.AsMemory(), cancellationToken);
+            await output.FlushAsync(cancellationToken);
+        }
+        return outcome == FileOutcome.Failed ? 2 : 0;
     }
 
     // A staged selection is a pre-commit hook's. Staging the rewrite keeps the hook to one

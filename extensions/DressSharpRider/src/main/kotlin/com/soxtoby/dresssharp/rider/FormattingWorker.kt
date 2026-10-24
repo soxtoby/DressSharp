@@ -85,6 +85,7 @@ internal class FormattingWorker(private val scope: CoroutineScope) : AutoCloseab
     }
 
     private class Connection(val process: Process, val inputs: WorkerInputs, private val scope: CoroutineScope) : AutoCloseable {
+        private val diagnostics = StringBuilder()
         private val responses = Channel<String>(1)
         private val writer = process.outputStream.bufferedWriter(Charsets.UTF_8)
         @Volatile private var assembly: FileStamp? = null
@@ -93,7 +94,6 @@ internal class FormattingWorker(private val scope: CoroutineScope) : AutoCloseab
         private var watcher: Job? = null
 
         init {
-            val diagnostics = StringBuilder()
             val errors = scope.launch(Dispatchers.IO) {
                 try {
                     process.errorStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
@@ -124,7 +124,8 @@ internal class FormattingWorker(private val scope: CoroutineScope) : AutoCloseab
                 try {
                     while (isActive && reusable(inputs.refresh())) delay(250)
                 } finally {
-                    close()
+                    // Natural exit is reported after the readers drain stderr.
+                    if (!isActive || process.toHandle().isAlive) close()
                 }
             }
         }
@@ -133,12 +134,8 @@ internal class FormattingWorker(private val scope: CoroutineScope) : AutoCloseab
             !stopped.get() && process.toHandle().isAlive && inputs == current && assembly?.let { it == FileStamp.capture(it.path) } != false
 
         suspend fun format(request: JsonObject): ProcessOutput {
-            if (!ready) {
-                val greeting = JsonParser.parseString(responses.receive()).asJsonObject
-                if (greeting.get("protocol")?.asInt != 2) throw IOException("The installed DressSharp does not support formatting protocol 2. Update the repository's local tool or disable the background process in Settings | Tools | DressSharp.")
-                assembly = FileStamp.capture(Path.of(greeting.get("assemblyPath").asString))
-                ready = true
-            }
+            if (!ready) initialize()
+            // A separate writer lets the deadline terminate a process whose stdin stopped draining.
             scope.async(Dispatchers.IO) {
                 writer.write(request.toString())
                 writer.newLine()
@@ -149,6 +146,27 @@ internal class FormattingWorker(private val scope: CoroutineScope) : AutoCloseab
                 exitCode = response.get("exitCode").asInt
                 appendStdout(response.get("stdout").asString)
                 appendStderr(response.get("stderr").asString)
+            }
+        }
+
+        private suspend fun initialize() {
+            try {
+                val greeting = JsonParser.parseString(responses.receive()).asJsonObject
+                if (greeting.get("protocol")?.asInt != 2) throw IOException("Unsupported formatter version.")
+                assembly = FileStamp.capture(Path.of(greeting.get("assemblyPath").asString))
+                ready = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val message = e.message.orEmpty()
+                val errors = synchronized(diagnostics) { diagnostics.toString().trim() }
+                val details = listOf(message, errors.takeUnless { message.contains(it) }.orEmpty())
+                    .filter { it.isNotBlank() }.joinToString("\n")
+                throw IOException(
+                    "The installed DressSharp does not support background formatting. Update the repository's local tool " +
+                        "or disable the background process in Settings | Tools | DressSharp.\n$details",
+                    e,
+                )
             }
         }
 

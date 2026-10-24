@@ -12,7 +12,7 @@ object TriggerRegion {
         val caret = caretOffset.coerceIn(0, text.length)
         val caretLine = lineOf(text, caret)
         val start = when (typed) {
-            '}' -> openingBrace(text, caret) ?: return caretLine..caretLine
+            '}' -> openingBrace(text, caret) ?: caret
             else -> statementStart(text, caret)
         }
         return lineOf(text, start)..caretLine
@@ -24,13 +24,16 @@ object TriggerRegion {
         while (close >= 0 && text[close] != '}' && text[close] != '\n') close--
         if (close < 0 || text[close] != '}') return null
         var depth = 0
-        for (index in close downTo 0) {
+        var index = close
+        var opening: Int? = null
+        while (index >= 0 && opening == null) {
             when (text[index]) {
                 '}' -> depth++
-                '{' -> if (--depth == 0) return index
+                '{' -> if (--depth == 0) opening = index
             }
+            index--
         }
-        return null
+        return opening
     }
 
     /** The first non-blank character after the previous statement or block boundary before [caret]. */

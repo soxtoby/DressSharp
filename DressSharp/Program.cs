@@ -143,16 +143,20 @@ static class Program
         command.TreatUnmatchedTokensAsErrors = true;
         command.Validators.Add(scope.Validate);
         if (kind == CommandKind.Format)
-            return AddStandardInput(command, includes, scope, verbose, configuration);
-
-        command.SetAction(parseResult => RunSelectionAsync(
-            new CommandRequest(
-                kind,
-                parseResult.GetValue(includes) ?? [],
-                parseResult.GetValue(verbose),
-                parseResult.GetValue(configuration),
-                scope.Read(parseResult)),
-            Environment.CurrentDirectory));
+        {
+            AddStandardInput(command, includes, scope, verbose, configuration);
+        }
+        else
+        {
+            command.SetAction(parseResult => RunSelectionAsync(
+                new CommandRequest(
+                    kind,
+                    parseResult.GetValue(includes) ?? [],
+                    parseResult.GetValue(verbose),
+                    parseResult.GetValue(configuration),
+                    scope.Read(parseResult)),
+                Environment.CurrentDirectory));
+        }
         return command;
     }
 

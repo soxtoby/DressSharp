@@ -17,26 +17,24 @@ data class ToolManifest(val file: Path, val root: Path)
  * then `dotnet-tools.json`, and a manifest marked `isRoot` ends the search.
  */
 object DressSharpToolManifest {
-    private const val PACKAGE_ID = "dresssharp"
-    private const val COMMAND = "dotnet-dress"
+    private const val packageId = "dresssharp"
+    private const val command = "dotnet-dress"
     private val manifestNames = listOf(Path.of(".config", "dotnet-tools.json"), Path.of("dotnet-tools.json"))
 
     fun find(file: Path): ToolManifest? {
-        var directory: Path? = file.toAbsolutePath().normalize().parent
-        while (directory != null) {
-            for (name in manifestNames) {
-                val candidate = directory.resolve(name)
-                if (!Files.isRegularFile(candidate)) continue
-                val manifest = read(candidate) ?: continue
-                if (manifest.installsDressSharp) return ToolManifest(candidate, directory)
-                if (manifest.isRoot) return null
-            }
-            directory = directory.parent
-        }
-        return null
+        val located = generateSequence(file.toAbsolutePath().normalize().parent) { it.parent }
+            .flatMap(::candidates)
+            .firstOrNull { it.manifest.installsDressSharp || it.manifest.isRoot }
+        return located?.takeIf { it.manifest.installsDressSharp }?.let { ToolManifest(it.file, it.root) }
     }
 
     private class Manifest(val isRoot: Boolean, val installsDressSharp: Boolean)
+    private data class LocatedManifest(val file: Path, val root: Path, val manifest: Manifest)
+
+    private fun candidates(directory: Path): Sequence<LocatedManifest> = manifestNames.asSequence().mapNotNull { name ->
+        val candidate = directory.resolve(name)
+        if (Files.isRegularFile(candidate)) read(candidate)?.let { LocatedManifest(candidate, directory, it) } else null
+    }
 
     /** Reads a manifest, or returns null when it is not one dotnet itself would accept. */
     private fun read(file: Path): Manifest? = try {
@@ -45,7 +43,7 @@ object DressSharpToolManifest {
         Manifest(
             isRoot = json.get("isRoot")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: false,
             installsDressSharp = tools.entrySet().any { (id, tool) ->
-                id.equals(PACKAGE_ID, ignoreCase = true) || tool.commands().any { it.equals(COMMAND, ignoreCase = true) }
+                id.equals(packageId, ignoreCase = true) || tool.commands().any { it.equals(command, ignoreCase = true) }
             },
         )
     } catch (e: IOException) {

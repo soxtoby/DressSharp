@@ -13,13 +13,22 @@ class FormatterWorker {
         var pid = Long.toString(ProcessHandle.current().pid());
         var text = Pattern.compile("\"text\"\\s*:\\s*(\"(?:\\\\.|[^\"\\\\])*\")");
         var output = new java.io.PrintWriter(System.out, true, java.nio.charset.StandardCharsets.UTF_8);
-        output.println("{\"protocol\":2,\"assemblyPath\":" + quote(args[0]) + "}");
+        var greeting = System.getenv("DRESSSHARP_TEST_GREETING");
+        if ("text".equals(greeting) || "empty".equals(greeting)) {
+            System.err.println("Unrecognized option '--server'.");
+            if ("text".equals(greeting)) output.println("DressSharp command line help");
+            return;
+        }
+        var protocol = "protocol".equals(greeting) ? 1 : 2;
+        output.println("{\"protocol\":" + protocol + ",\"assemblyPath\":" + quote(args[0]) + "}");
         var input = new java.io.BufferedReader(new java.io.InputStreamReader(System.in, java.nio.charset.StandardCharsets.UTF_8));
         String line;
         while ((line = input.readLine()) != null) {
             var match = text.matcher(line);
             var payload = match.find() ? match.group(1) : quote(line);
-            Files.writeString(Path.of(args[1]), pid);
+            var marker = Path.of(args[1]);
+            var temporary = Files.writeString(marker.resolveSibling(marker.getFileName() + ".tmp"), pid);
+            Files.move(temporary, marker, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             if (payload.contains("slow")) {
                 while (!Files.exists(Path.of(args[2]))) Thread.sleep(5);
             }

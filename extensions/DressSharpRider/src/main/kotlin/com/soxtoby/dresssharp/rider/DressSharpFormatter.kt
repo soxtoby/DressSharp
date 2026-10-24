@@ -55,14 +55,14 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
     private val pending = HashMap<Path, Batch>()
     private val running = HashSet<Path>()
     private var reportedWarnings = emptySet<String>()
+    private var reportedDotnetFailure: String? = null
 
     /** Formats the files DressSharp is set up for: those with a local tool manifest and an `.editorconfig` in scope. */
     fun format(files: Collection<VirtualFile>, trigger: FormatTrigger) {
         scope.launch(Dispatchers.IO) {
             val skipped = ArrayList<String>()
             val roots = LinkedHashSet<Path>()
-            for (file in files) {
-                val path = file.toNioPathOrNull()?.toAbsolutePath()?.normalize() ?: continue
+            files.mapNotNull { file -> file.toNioPathOrNull()?.toAbsolutePath()?.normalize()?.let { file to it } }.forEach { (file, path) ->
                 when (val eligibility = Eligibility.of(path)) {
                     is Eligibility.Eligible -> {
                         enqueue(path, file, eligibility.manifest, trigger)
@@ -87,29 +87,28 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
     }
 
     private fun scheduleRun(root: Path) {
-        synchronized(lock) { if (!running.add(root)) return }
-        scope.launch {
-            try {
-                while (true) {
-                    delay(COALESCE_DELAY_MS)
-                    val batch = takePending(root) ?: break
-                    try {
-                        execute(batch)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        LOG.warn("DressSharp run failed", e)
-                        notify(NotificationType.ERROR, "DressSharp failed: ${e.message.orEmpty().escaped()}")
+        if (synchronized(lock) { running.add(root) }) {
+            scope.launch {
+                try {
+                    var batch = takeAfterDelay(root)
+                    while (batch != null) {
+                        executeSafely(batch)
+                        batch = takeAfterDelay(root)
                     }
+                } catch (e: CancellationException) {
+                    synchronized(lock) {
+                        running.remove(root)
+                        pending.remove(root)
+                    }
+                    throw e
                 }
-            } catch (e: CancellationException) {
-                synchronized(lock) {
-                    running.remove(root)
-                    pending.remove(root)
-                }
-                throw e
             }
         }
+    }
+
+    private suspend fun takeAfterDelay(root: Path): Batch? {
+        delay(coalesceDelayMs)
+        return takePending(root)
     }
 
     /** Takes the next batch for [root], or hands the root back when nothing is waiting. */
@@ -120,8 +119,19 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
         }
     }
 
+    private suspend fun executeSafely(batch: Batch) {
+        try {
+            execute(batch)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("DressSharp run failed", e)
+            notify(NotificationType.ERROR, "DressSharp failed: ${e.message.orEmpty().escaped()}")
+        }
+    }
+
     private suspend fun execute(batch: Batch) {
-        val dotnet = locateDotnet() ?: return
+        val dotnet = locateDotnet(manual = batch.manual) ?: return
         val invocation = DressSharpInvocation(batch.manifest.root, batch.files.keys)
         val output = runProcess(invocation.commandLine(dotnet), "Formatting with DressSharp") {
             try {
@@ -134,60 +144,66 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
             }
         } ?: return
         val result = DressSharpOutput.parse(output.stdout, invocation.includes)
+        val changed = result.changed.mapNotNull { batch.files[batch.manifest.root.resolve(it).normalize()] }
+        if (changed.isNotEmpty()) VfsUtil.markDirtyAndRefresh(true, false, false, *changed.toTypedArray())
 
         if (output.exitCode != 0) {
             reportFailure(batch, dotnet, output)
-            return
+        } else {
+            reportWarnings(output.stderr, batch.manual)
+            if (batch.manual) reportOutcome(batch, result)
         }
-        if (result.formatted != 0) {
-            // DressSharp rewrote the files on disk; once the VFS sees that, the editors reload them.
-            VfsUtil.markDirtyAndRefresh(true, false, false, *batch.files.values.toTypedArray())
-        }
-        reportWarnings(output.stderr, batch.manual)
-        if (batch.manual) reportOutcome(batch, result)
     }
 
-    /** Runs a command under a cancellable background progress. Returns null when the user cancelled it. */
+    /** Runs a command under a cancellable background progress. Returns null when the user canceled it. */
     private suspend fun runProcess(
         commandLine: GeneralCommandLine,
         title: String,
         execute: suspend () -> ProcessOutput = { coroutineToIndicator { indicator -> CapturingProcessHandler(commandLine).runProcessWithProgressIndicator(indicator) } },
-    ): ProcessOutput? {
-        try {
-            return withBackgroundProgress(project, title, cancellable = true) {
-                execute()
-            }
-        } catch (e: ExecutionException) {
-            notify(
-                NotificationType.ERROR,
-                "DressSharp couldn't start <code>${commandLine.exePath.escaped()}</code>: ${e.message.orEmpty().escaped()}",
-                listOf(openSettingsAction()),
-            )
-            return null
-        } catch (e: CancellationException) {
-            currentCoroutineContext().ensureActive()
-            return null
+    ): ProcessOutput? = try {
+        withBackgroundProgress(project, title, cancellable = true) {
+            execute()
         }
+    } catch (e: ExecutionException) {
+        notify(
+            NotificationType.ERROR,
+            "DressSharp couldn't start <code>${commandLine.exePath.escaped()}</code>: ${e.message.orEmpty().escaped()}",
+            listOf(openSettingsAction()),
+        )
+        null
+    } catch (e: CancellationException) {
+        currentCoroutineContext().ensureActive()
+        null
     }
 
-    internal fun locateDotnet(): Path? = when (val located = DotnetLocator.locate(DressSharpApplicationSettings.getInstance().state.dotnetPath)) {
-        is DotnetLocator.Result.Found -> located.path
+    internal fun locateDotnet(manual: Boolean = false): Path? = when (val located = DotnetLocator.locate(DressSharpApplicationSettings.getInstance().state.dotnetPath)) {
+        is DotnetLocator.Result.Found -> {
+            synchronized(lock) { reportedDotnetFailure = null }
+            located.path
+        }
         is DotnetLocator.Result.ConfiguredPathMissing -> {
-            notify(
-                NotificationType.ERROR,
+            reportDotnetFailure(
                 "The dotnet executable set in the DressSharp settings doesn't exist: <code>${located.path.escaped()}</code>",
-                listOf(openSettingsAction()),
+                manual,
             )
             null
         }
         DotnetLocator.Result.NotFound -> {
-            notify(
-                NotificationType.ERROR,
+            reportDotnetFailure(
                 "dotnet wasn't found on the PATH. Set its location in Settings | Tools | DressSharp.",
-                listOf(openSettingsAction()),
+                manual,
             )
             null
         }
+    }
+
+    private fun reportDotnetFailure(message: String, manual: Boolean) {
+        val isNew = synchronized(lock) {
+            val changed = message != reportedDotnetFailure
+            reportedDotnetFailure = message
+            changed
+        }
+        if (manual || isNew) notify(NotificationType.ERROR, message, listOf(openSettingsAction()))
     }
 
     private fun reportFailure(batch: Batch, dotnet: Path, output: ProcessOutput) {
@@ -245,22 +261,22 @@ class DressSharpFormatter(private val project: Project, private val scope: Corou
     }
 
     internal fun notify(type: NotificationType, content: String, actions: List<AnAction> = emptyList()) {
-        val notification = NotificationGroupManager.getInstance().getNotificationGroup(NOTIFICATION_GROUP).createNotification("DressSharp", content, type)
+        val notification = NotificationGroupManager.getInstance().getNotificationGroup(notificationGroup).createNotification("DressSharp", content, type)
         actions.forEach(notification::addAction)
         notification.notify(project)
     }
 
     /** The first lines a process wrote about what went wrong, ready for a notification. */
     private fun ProcessOutput.details(): String =
-        stderr.ifBlank { stdout }.trim().lines().take(MAX_REPORTED_LINES).joinToString("<br>") { it.escaped() }
+        stderr.ifBlank { stdout }.trim().lines().take(maxReportedLines).joinToString("<br>") { it.escaped() }
 
     private fun String.escaped(): String = StringUtil.escapeXmlEntities(this)
 
     companion object {
-        const val NOTIFICATION_GROUP = "DressSharp"
-        private const val COALESCE_DELAY_MS = 200L
-        private const val MAX_REPORTED_LINES = 12
-        private val LOG = logger<DressSharpFormatter>()
+        const val notificationGroup = "DressSharp"
+        private const val coalesceDelayMs = 200L
+        private const val maxReportedLines = 12
+        private val log = logger<DressSharpFormatter>()
 
         fun getInstance(project: Project): DressSharpFormatter = project.service()
     }

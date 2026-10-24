@@ -94,11 +94,7 @@ public sealed class CommandTests
 
         var result = sut.Parse(["format", "--stdin", "src/Program.cs"]);
         result.Errors.ShouldBeEmpty();
-        sut.Subcommands.Where(command => command.Name == "format")
-            .ShouldBeASingular<Command>()
-            .And.Options.OfType<Option<string?>>()
-            .Where(option => option.Name == "--stdin").ShouldBeASingular<Option<string?>>()
-            .And(o => result.GetValue(o).ShouldBe("src/Program.cs"));
+        result.GetValue<string?>("--stdin").ShouldBe("src/Program.cs");
     }
 
     [Theory]

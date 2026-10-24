@@ -11,7 +11,7 @@ import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
 
 /** Settings | Tools | DressSharp. */
-class DressSharpConfigurable(private val project: Project) : BoundSearchableConfigurable("DressSharp", ID, ID) {
+class DressSharpConfigurable(private val project: Project) : BoundSearchableConfigurable("DressSharp", id, id) {
     /** Exposed so the Actions on Save page can mirror the checkbox while this page is open. */
     var formatOnSaveCheckBox: JBCheckBox? = null
         private set
@@ -47,7 +47,7 @@ class DressSharpConfigurable(private val project: Project) : BoundSearchableConf
                     )
             }
             row("dotnet executable:") {
-                textFieldWithBrowseButton(FileChooserDescriptorFactory.singleFile().withTitle("Select dotnet Executable"), project)
+                textFieldWithBrowseButton(FileChooserDescriptorFactory.singleFile().withTitle("Select dotnet executable"), project)
                     .bindText({ applicationState.dotnetPath.orEmpty() }, { applicationState.dotnetPath = it.trim().ifEmpty { null } })
                     .comment("Leave empty to use the dotnet found on the PATH.")
                     .align(AlignX.FILL)
@@ -61,6 +61,6 @@ class DressSharpConfigurable(private val project: Project) : BoundSearchableConf
     }
 
     companion object {
-        const val ID = "dresssharp.settings"
+        const val id = "dresssharp.settings"
     }
 }

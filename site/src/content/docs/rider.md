@@ -42,6 +42,8 @@ DressSharp only changes what your EditorConfig asks it to. Preferences that are 
 
 Save and manual formatting skip generated files and files Git ignores. If a file isn't being formatted, the manual action tells you why.
 
+Typing leaves a change alone if it would also alter lines outside the statement or block you just finished. Use **Code | Format with DressSharp** to bring an existing file into line with your rules first.
+
 ## Settings
 
 Open **Settings | Tools | DressSharp**.
@@ -54,3 +56,5 @@ Open **Settings | Tools | DressSharp**.
 | **dotnet executable** | Automatic | Leave empty for Rider to find `dotnet`, or select the executable if your .NET installation isn't found. |
 
 The three formatting options are stored with the solution. The `dotnet` executable setting applies to this machine.
+
+If the repository's DressSharp version doesn't support background formatting, update it with `dotnet tool update DressSharp` or turn off the background option. Save and manual formatting still work with older tool versions.

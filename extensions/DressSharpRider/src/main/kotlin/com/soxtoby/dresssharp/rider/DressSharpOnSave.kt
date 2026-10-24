@@ -30,7 +30,7 @@ class DressSharpOnSaveInfoProvider : ActionOnSaveInfoProvider() {
 }
 
 private class DressSharpOnSaveInfo(context: ActionOnSaveContext) :
-    ActionOnSaveBackedByOwnConfigurable<DressSharpConfigurable>(context, DressSharpConfigurable.ID, DressSharpConfigurable::class.java) {
+    ActionOnSaveBackedByOwnConfigurable<DressSharpConfigurable>(context, DressSharpConfigurable.id, DressSharpConfigurable::class.java) {
 
     override fun getActionOnSaveName(): String = "Format with DressSharp"
 
@@ -46,5 +46,5 @@ private class DressSharpOnSaveInfo(context: ActionOnSaveContext) :
     override fun getCommentAccordingToStoredState(): ActionOnSaveComment =
         ActionOnSaveComment.info("C# files with DressSharp in a local tool manifest and an .editorconfig in scope")
 
-    override fun getActionLinks(): List<ActionLink> = listOf(createGoToPageInSettingsLink(DressSharpConfigurable.ID))
+    override fun getActionLinks(): List<ActionLink> = listOf(createGoToPageInSettingsLink(DressSharpConfigurable.id))
 }
