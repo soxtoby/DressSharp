@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.6.0
+
 ### Added
 - [Rider plugin](https://soxtoby.github.io/DressSharp/rider/) with format on save, format as you type, and a **Code | Format with DressSharp** action for repositories using DressSharp as a local .NET tool. Installable ZIPs accompany each release.
 - Optional background formatter in Rider, enabled by default, keeps a process ready for save, typing, and manual formatting.
