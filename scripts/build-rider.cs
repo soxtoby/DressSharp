@@ -1,5 +1,5 @@
 #!/usr/bin/env dotnet
-#:package DotNetDo.Core@0.8.0
+#:package DotNetDo.Core@0.11.0
 using DotNetDo;
 
 [assembly: TaskDescription("Build and test the Rider plugin, and copy its ZIP into dist.")]
