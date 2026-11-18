@@ -9,7 +9,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>dotnet-dress</ToolCommandName>
     <PackageId>DressSharp</PackageId>
-    <Version>0.6.0</Version>
+    <Version>0.7.0</Version>
     <Authors>Simon Oxtoby</Authors>
     <Description>A syntax-only, explicitly configured C# formatter.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
