@@ -7,7 +7,7 @@ The DressSharp extension formats C# in VS Code using your repository's EditorCon
 
 ## Install the extension
 
-You need VS Code 1.95 or later and the .NET 10 SDK or later.
+You need VS Code 1.95 or later and the .NET 10 or .NET 11 SDK.
 
 1. Open the [DressSharp releases on GitHub](https://github.com/soxtoby/DressSharp/releases).
 2. Download `DressSharpVSCode-<version>.vsix` from the release's **Assets**.

@@ -7,7 +7,7 @@ The DressSharp plugin formats C# in Rider using your repository's EditorConfig r
 
 ## Install the plugin
 
-You need Rider 2025.2 or later and the .NET 10 SDK or later.
+You need Rider 2025.2 or later and the .NET 10 or .NET 11 SDK.
 
 1. Open the [DressSharp releases on GitHub](https://github.com/soxtoby/DressSharp/releases).
 2. Download `DressSharpRider-<version>.zip` from the release's **Assets**. Leave the ZIP intact.

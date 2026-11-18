@@ -55,6 +55,23 @@ public sealed class ParseContextResolverTests : IDisposable
     }
 
     [Fact]
+    public async Task Net11_project_parses_with_the_language_version_its_SDK_assigns()
+    {
+        var file = File("Program.cs");
+        var project = File("App.csproj");
+        var evaluator = new FakeEvaluator
+            {
+                [project, null, Kind.Declaration] = Success(file, ("TargetFramework", "net11.0")),
+                [project, "net11.0", Kind.Compilation] = Success(file, ("TargetFramework", "net11.0"), ("LangVersion", "15.0")),
+            };
+
+        var result = await Resolve(evaluator, file);
+
+        result.CanFormat.ShouldBe(true);
+        result.Options!.LanguageVersion.ShouldBe(LanguageVersion.CSharp15);
+    }
+
+    [Fact]
     public async Task Project_without_a_framework_compiles_with_what_it_declares()
     {
         var file = File("Program.cs");

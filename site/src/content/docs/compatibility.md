@@ -5,7 +5,7 @@ description: Supported platforms and C# versions, and how to keep formatting sta
 
 ## Platforms
 
-DressSharp needs the .NET 10 SDK or later. It's precompiled for each of these platforms so that it starts faster:
+DressSharp needs the .NET 10 or .NET 11 SDK. It's precompiled for each of these platforms so that it starts faster:
 
 - Windows x64
 - Linux x64

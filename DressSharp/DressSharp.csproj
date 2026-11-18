@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!-- Overrides single framework in Directory.Build.props -->
+    <TargetFramework />
+    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
     <AssemblyName>DressSharp</AssemblyName>
     <RootNamespace>DressSharp</RootNamespace>
     <PackAsTool>true</PackAsTool>
@@ -30,6 +33,10 @@
          three quarters of the wall time and half the CPU time, for a package twice the size. -->
     <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <PublishReadyToRun>true</PublishReadyToRun>
+    <!-- The top-level package keeps its tool settings, which name the platform packages, at the one
+         path tools/any/any/DotnetToolSettings.xml. Each framework's build adds an identical copy
+         there, and pack keeps the first and warns that it dropped the second. -->
+    <NoWarn>$(NoWarn);NU5118</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="editorconfig" />

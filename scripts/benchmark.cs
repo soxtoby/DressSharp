@@ -47,6 +47,8 @@ var publish = await Start(
         Do.RootDirectory / "DressSharp/DressSharp.csproj",
         "--configuration",
         "Release",
+        "--framework",
+        "net11.0",
         "--runtime",
         RuntimeInformation.RuntimeIdentifier,
         "--self-contained",

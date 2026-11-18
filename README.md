@@ -6,7 +6,7 @@ DressSharp is an unopinionated C# formatter. It formats your code to the rules y
 
 ## Install
 
-DressSharp is a .NET tool and needs the .NET 10 SDK. Install it into your repository so everyone on the team, and your CI, runs the same version:
+DressSharp is a .NET tool and needs the .NET 10 or .NET 11 SDK. Install it into your repository so everyone on the team, and your CI, runs the same version:
 
 ```sh
 dotnet tool install DressSharp

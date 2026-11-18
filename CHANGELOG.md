@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- DressSharp supports the .NET 11 SDK and C# 15, including `union` declarations, `closed` classes, collection expression arguments, extension indexers, and labeled `break` and `continue`. It also runs where .NET 11 is the only .NET installed.
+
 ## v0.6.0
 
 ### Added

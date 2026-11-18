@@ -118,6 +118,61 @@ public class SyntaxWrappingRuleTests
         Format(result, preferences).ShouldBe(result);
     }
 
+    [Fact]
+    public void Format_long_collection_expression_arguments_wrap_like_an_invocation_element()
+    {
+        const string source = """
+            class C
+            {
+                void M(int count)
+                {
+                    HashSet<int> values = [with(capacity: count, comparer: StringComparer.Ordinal), first, ..rest];
+                }
+            }
+            """;
+        const string expected = """
+            class C
+            {
+                void M(int count)
+                {
+                    HashSet<int> values = [
+                            with(
+                                capacity: count,
+                                comparer: StringComparer.Ordinal),
+                            first,
+                            .. rest
+                        ];
+                }
+            }
+            """;
+        var preferences = DefaultsWith(("max_line_length", "60"));
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    [Fact]
+    public void Format_long_union_case_list_takes_a_line_per_case_type()
+    {
+        const string source = "union Pet(Cat, Dog, Hamster, Rabbit, GuineaPig, Ferret);";
+        const string expected = "union Pet(\n    Cat,\n    Dog,\n    Hamster,\n    Rabbit,\n    GuineaPig,\n    Ferret\n);";
+        var preferences = DefaultsWith(("max_line_length", "40"));
+
+        var result = Format(source, preferences);
+
+        result.ShouldBe(expected);
+        Format(result, preferences).ShouldBe(result);
+    }
+
+    static (string Key, string Value)[] DefaultsWith(params (string Key, string Value)[] overrides) =>
+        PreferenceCatalog.Defaults
+            .Select(item => (Key: item.Key.ToName(), Value: item.Default))
+            .Where(item => overrides.All(@override => @override.Key != item.Key))
+            .Concat(overrides)
+            .ToArray();
+
     [Theory]
     [
         InlineData(

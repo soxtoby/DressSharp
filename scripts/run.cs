@@ -11,4 +11,4 @@ await (Bun.Install with { FrozenLockfile = true });
 await (Bun.Run with { Target = "interactive:build" });
 
 var arguments = Do.TrailingArguments.Select(argument => argument.QuotedArgument()).JoinWith(" ");
-await Do.Exec($"dotnet run --project {project.Path.QuotedArgument()} -- {arguments}");
+await Do.Exec($"dotnet run --project {project.Path.QuotedArgument()} --framework net11.0 -- {arguments}");
