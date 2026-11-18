@@ -1,8 +1,8 @@
 name: Docs
 
+# Deployed by release.yml so the site documents the published version, not master.
 on:
-  push:
-    branches: [master]
+  workflow_call:
   workflow_dispatch:
 
 permissions:
